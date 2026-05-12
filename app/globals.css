@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #0a0f1c;
+  --font-inter: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 50% 18%, rgba(0, 212, 255, 0.1), transparent 28%),
+              linear-gradient(180deg, #05070c 0%, #0a0f1c 48%, #070a10 100%);
+}
+
+button, input {
+  font: inherit;
+}
+
+/* ====================== SCROLL FIXES ====================== */
+.app-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(142, 150, 167, 0.4) transparent;
+  -webkit-overflow-scrolling: touch;   /* Important for trackpad momentum */
+  scroll-behavior: smooth;
+}
+
+.app-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-scroll::-webkit-scrollbar-thumb {
+  background: rgba(142, 150, 167, 0.35);
+  border-radius: 9999px;
+}
+
+.app-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(142, 150, 167, 0.6);
+}
+
+/* No scrollbar for horizontal skill cards */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Extra utilities */
+.glassy {
+  background: linear-gradient(180deg, rgba(22, 27, 43, 0.9), rgba(13, 17, 29, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.touch-pan-y {
+  touch-action: pan-y;
+}

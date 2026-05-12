@@ -1,0 +1,81 @@
+"use client";
+
+import { Atom, LayoutDashboard, FileText, PieChart, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import type { NavKey } from "@/lib/types";
+
+const navItems = [
+  { key: "research" as NavKey, label: "Research", icon: Atom },
+  { key: "dashboard" as NavKey, label: "Dashboard", icon: LayoutDashboard },
+  { key: "headlines" as NavKey, label: "Headlines", icon: FileText },
+  { key: "portfolio" as NavKey, label: "Portfolio", icon: PieChart },
+];
+
+type SidebarDrawerProps = {
+  active: NavKey;
+  onNavigate: (key: NavKey) => void;
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDrawerProps) {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50 bg-black/70 md:bg-black/60"
+          />
+
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed left-0 top-0 z-50 h-full w-72 bg-[#0A0F1C] border-r border-white/10 shadow-2xl md:w-80"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-5">
+              <div className="flex items-center gap-2">
+                <div className="text-xl">B ▲ REBONE</div>
+              </div>
+              <button onClick={onClose} className="text-white/60 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+
+            <nav className="p-3 pt-6">
+              {navItems.map(({ key, label, icon: Icon }) => {
+                const isActive = active === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      onNavigate(key);
+                      onClose();
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3.5 rounded-2xl px-5 py-4 text-left text-[15px] font-medium transition-all mb-1",
+                      isActive 
+                        ? "bg-white/10 text-white" 
+                        : "text-white/70 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <Icon size={22} strokeWidth={2.1} />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
