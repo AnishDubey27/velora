@@ -8,6 +8,7 @@ import type { Skill } from "@/lib/types";
 type ResearchScreenProps = {
   skills: Skill[];
   onOpenSkills: () => void;
+  onStartChat: (prompt: string) => void;
 };
 
 const iconMap: any = {
@@ -17,7 +18,7 @@ const iconMap: any = {
   news: Sparkles,
 };
 
-export function ResearchScreen({ skills, onOpenSkills }: ResearchScreenProps) {
+export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchScreenProps) {
   const popular = skills.filter((skill) => skill.popular).slice(0, 3);
   const shouldCenterPopular = popular.length <= 3;
 
@@ -79,7 +80,7 @@ export function ResearchScreen({ skills, onOpenSkills }: ResearchScreenProps) {
             return (
               <motion.button
                 key={skill.id}
-                onClick={onOpenSkills}
+                onClick={() => onStartChat(skill.description)}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.08 }}
@@ -107,21 +108,27 @@ export function ResearchScreen({ skills, onOpenSkills }: ResearchScreenProps) {
         className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-md md:max-w-lg"
       >
         <div className="rounded-2xl border border-[#00D4FF]/30 bg-[#0A0F1C]/95 p-4 shadow-2xl shadow-black/80 backdrop-blur-2xl">
-          <div className="flex items-center gap-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = (e.currentTarget.elements.namedItem("query") as HTMLInputElement).value;
+              if (input.trim()) onStartChat(input);
+            }}
+            className="flex items-center gap-3"
+          >
             <input
+              name="query"
               type="text"
-              readOnly
               placeholder="Ask me anything..."
-              onClick={onOpenSkills}
               className="flex-1 bg-transparent text-[16px] text-white/70 placeholder:text-white/40 focus:outline-none"
             />
             <button
-              onClick={onOpenSkills}
+              type="submit"
               className="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20 transition"
             >
               <ArrowUp size={18} className="text-white" />
             </button>
-          </div>
+          </form>
 
           <button
             onClick={onOpenSkills}

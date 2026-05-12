@@ -8,6 +8,7 @@ import { HeadlinesScreen } from "@/components/screens/headlines-screen";
 import { PortfolioScreen } from "@/components/screens/portfolio-screen";
 import { ResearchScreen } from "@/components/screens/research-screen";
 import { SkillLibraryScreen } from "@/components/screens/skill-library-screen";
+import { ChatScreen } from "@/components/screens/chat-screen";
 import type { NavKey, Skill } from "@/lib/types";
 
 const screenVariants = {
@@ -19,6 +20,7 @@ const screenVariants = {
 export default function Home() {
   const [active, setActive] = useState<NavKey>("research");
   const [skillLibraryOpen, setSkillLibraryOpen] = useState(false);
+  const [chatPrompt, setChatPrompt] = useState<string>("");
   const [skills, setSkills] = useState<Skill[]>([]);
 
   useEffect(() => {
@@ -57,11 +59,25 @@ export default function Home() {
         return <HeadlinesScreen />;
       case "portfolio":
         return <PortfolioScreen />;
+      case "chat":
+        return (
+          <ChatScreen 
+            initialPrompt={chatPrompt} 
+            onBack={() => {
+              setActive("research");
+              setChatPrompt("");
+            }} 
+          />
+        );
       default:
         return (
           <ResearchScreen
             skills={skills}
             onOpenSkills={() => setSkillLibraryOpen(true)}
+            onStartChat={(prompt) => {
+              setChatPrompt(prompt);
+              setActive("chat");
+            }}
           />
         );
     }
@@ -72,6 +88,10 @@ export default function Home() {
       active={active} 
       onNavigate={setActive}
       onDashboard={() => setActive("dashboard")}
+      onStartChat={(prompt) => {
+        setChatPrompt(prompt);
+        setActive("chat");
+      }}
     >
       <AnimatePresence mode="wait">
         <motion.main

@@ -4,12 +4,14 @@ import { ReactNode, useState } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { TopBar } from "@/components/top-bar";
 import { SidebarDrawer } from "@/components/sidebar-drawer";
+import { GlobalSearchModal } from "@/components/global-search";
 import type { NavKey } from "@/lib/types";
 
 type AppShellProps = {
   active: NavKey;
   onNavigate: (key: NavKey) => void;
   onDashboard: () => void;
+  onStartChat?: (prompt: string) => void;
   children: ReactNode;
 };
 
@@ -17,9 +19,11 @@ export function AppShell({
   active, 
   onNavigate, 
   onDashboard, 
+  onStartChat,
   children 
 }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div className="h-dvh overflow-hidden bg-[#05070C] text-vel-text">
@@ -31,6 +35,7 @@ export function AppShell({
           <TopBar 
             onDashboard={onDashboard} 
             onMenuClick={() => setDrawerOpen(true)} 
+            onSearchClick={() => setSearchOpen(true)}
           />
 
           {/* Main scrollable area - this is the critical part */}
@@ -50,6 +55,17 @@ export function AppShell({
           onNavigate={onNavigate}
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+        />
+
+        <GlobalSearchModal
+          isOpen={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelect={(symbol) => {
+            setSearchOpen(false);
+            if (onStartChat) {
+              onStartChat(`Give me an analysis on ${symbol}`);
+            }
+          }}
         />
       </section>
     </div>

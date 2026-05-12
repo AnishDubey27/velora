@@ -1,4 +1,4 @@
-export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard";
+export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat";
 
 export type Skill = {
   id: string;
