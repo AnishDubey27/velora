@@ -88,7 +88,7 @@ export function SkillLibraryScreen({ skills, onClose }: SkillLibraryScreenProps)
             className={cn(
               "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] transition",
               tab === item
-                ? "bg-bone-teal/20 text-white shadow-glow"
+                ? "bg-vel-teal/20 text-white shadow-glow"
                 : "bg-white/[0.045] text-white/70"
             )}
           >

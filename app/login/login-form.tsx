@@ -56,10 +56,10 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-bone-bg px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-vel-bg px-4">
       <div className="w-full max-w-sm rounded-3xl glassy p-8 shadow-card">
         <h1 className="mb-6 text-3xl font-semibold tracking-tighter text-white">
-          Initialize<span className="text-bone-teal">.</span>
+          Initialize<span className="text-vel-teal">.</span>
         </h1>
 
         <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
@@ -71,7 +71,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-bone-teal focus:outline-none"
+            className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-vel-teal focus:outline-none"
           />
           <input
             name="password"
@@ -81,7 +81,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-bone-teal focus:outline-none"
+            className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-vel-teal focus:outline-none"
           />
 
           {message && <p className="mt-2 text-sm text-red-400">{message}</p>}
@@ -91,7 +91,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
               type="button"
               onClick={handleSignIn}
               disabled={pending !== null}
-              className="flex-1 rounded-xl bg-bone-teal py-3 text-sm font-semibold text-bone-bg transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="flex-1 rounded-xl bg-vel-teal py-3 text-sm font-semibold text-vel-bg transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending === "signin" ? "Signing In..." : "Sign In"}
             </button>

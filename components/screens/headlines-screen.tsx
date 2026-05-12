@@ -46,7 +46,7 @@ export function HeadlinesScreen() {
             className={cn(
               "whitespace-nowrap rounded-2xl px-6 py-2.5 text-sm font-semibold transition",
               activeTab === tab
-                ? "bg-bone-teal/20 text-white"
+                ? "bg-vel-teal/20 text-white"
                 : "bg-white/5 text-white/70 hover:bg-white/10"
             )}
           >
@@ -171,7 +171,7 @@ export function HeadlinesScreen() {
                     }}
                     className={cn(
                       "flex w-full items-center justify-between rounded-2xl px-5 py-4 text-left",
-                      filter === f ? "bg-bone-teal/20" : "bg-white/5 hover:bg-white/10"
+                      filter === f ? "bg-vel-teal/20" : "bg-white/5 hover:bg-white/10"
                     )}
                   >
                     <div>
@@ -182,7 +182,7 @@ export function HeadlinesScreen() {
                         {f === "Critical" && "Systemic or geopolitical impact"}
                       </p>
                     </div>
-                    {filter === f && <span className="text-bone-teal">✓</span>}
+                    {filter === f && <span className="text-vel-teal">✓</span>}
                   </button>
                 ))}
               </div>

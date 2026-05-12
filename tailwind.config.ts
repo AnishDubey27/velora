@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bone: {
+        vel: {
           bg: "#0A0F1C",
           panel: "#101524",
           panel2: "#151A2B",

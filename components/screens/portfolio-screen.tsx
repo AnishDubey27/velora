@@ -306,10 +306,10 @@ export function PortfolioScreen() {
   if (!user) {
     return (
       <section className="flex min-h-[calc(100dvh-164px)] flex-col items-center justify-center p-6 text-center">
-        <Bot size={48} className="mb-4 text-bone-teal/50" />
+        <Bot size={48} className="mb-4 text-vel-teal/50" />
         <h2 className="mb-2 text-xl font-semibold text-white">Encrypted Vault</h2>
         <p className="mb-6 text-sm text-white/60">Initialize your session to track live holdings and AI metrics.</p>
-        <button onClick={() => router.push('/login')} className="flex items-center gap-2 rounded-full bg-bone-teal px-6 py-2.5 text-sm font-semibold text-bone-bg transition-opacity hover:opacity-90">
+        <button onClick={() => router.push('/login')} className="flex items-center gap-2 rounded-full bg-vel-teal px-6 py-2.5 text-sm font-semibold text-vel-bg transition-opacity hover:opacity-90">
           <LogIn size={16} /> Authenticate
         </button>
       </section>
@@ -328,7 +328,7 @@ export function PortfolioScreen() {
             <p className={cn("text-sm", portfolioStats.dayChangePercent >= 0 ? "text-green-400" : "text-red-400")}>
               {portfolioStats.dayChangePercent >= 0 ? "+" : ""}{portfolioStats.dayChangePercent.toFixed(2)}% Today
             </p>
-            <p className={cn("text-sm", portfolioStats.allTimePercent >= 0 ? "text-bone-teal" : "text-red-400")}>
+            <p className={cn("text-sm", portfolioStats.allTimePercent >= 0 ? "text-vel-teal" : "text-red-400")}>
               {portfolioStats.allTimePercent >= 0 ? "+" : ""}{portfolioStats.allTimePercent.toFixed(2)}% All-Time
             </p>
           </div>
@@ -414,13 +414,13 @@ export function PortfolioScreen() {
                       <div className="relative w-24">
                         <input 
                           placeholder="TICKER" value={newSymbol} onChange={handleSymbolChange}
-                          className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-bone-teal uppercase"
+                          className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal uppercase"
                         />
                         <AnimatePresence>
                           {showDropdown && searchResults.length > 0 && (
                             <motion.ul 
                               initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
-                              className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-bone-panel2 border border-white/10 shadow-card overflow-hidden z-50"
+                              className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-vel-panel2 border border-white/10 shadow-card overflow-hidden z-50"
                             >
                               {searchResults.slice(0, 5).map(res => (
                                 <li 
@@ -437,13 +437,13 @@ export function PortfolioScreen() {
                       </div>
                       <input 
                         type="number" placeholder="Shares" value={newShares} onChange={(e) => setNewShares(e.target.value)}
-                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-bone-teal"
+                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
                       />
                       <input 
                         type="number" placeholder="Avg $" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
-                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-bone-teal"
+                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
                       />
-                      <button onClick={addHolding} className="ml-auto p-1.5 bg-bone-teal/20 text-bone-teal rounded-lg hover:bg-bone-teal/30 transition-colors">
+                      <button onClick={addHolding} className="ml-auto p-1.5 bg-vel-teal/20 text-vel-teal rounded-lg hover:bg-vel-teal/30 transition-colors">
                         <Plus size={18} />
                       </button>
                     </div>
@@ -457,18 +457,14 @@ export function PortfolioScreen() {
              <div className="glassy rounded-3xl p-5">
               <h2 className="text-xl font-semibold mb-6">Portfolio Pulse</h2>
               <div className="space-y-6">
-                {[
-                  { label: "Volatility", value: "53.04%", percent: 80 },
-                  { label: "Sharpe Ratio", value: "0.61", percent: 30 },
-                  { label: "Beta", value: "1.55", percent: 85 },
-                ].map((metric, i) => (
+                {pulseMetrics.rows.map((metric, i) => (
                   <div key={i}>
                     <div className="flex justify-between mb-1.5">
                       <p className="text-white/80">{metric.label}</p>
                       <p className="text-white">{metric.value}</p>
                     </div>
                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${metric.percent}%` }} transition={{ duration: 1, delay: 0.2 }} className="h-full bg-gradient-to-r from-bone-teal to-red-500" />
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${metric.percent}%` }} transition={{ duration: 1, delay: 0.2 }} className="h-full bg-gradient-to-r from-vel-teal to-red-500" />
                     </div>
                   </div>
                 ))}
@@ -481,7 +477,7 @@ export function PortfolioScreen() {
       {!isEditing && (
         <div className="mt-4 flex justify-center gap-2">
           {[0, 1].map((i) => (
-            <button key={i} onClick={() => setPage(i)} className={cn("h-1.5 rounded-full transition-all", page === i ? "w-8 bg-bone-teal" : "w-1.5 bg-white/30")} />
+            <button key={i} onClick={() => setPage(i)} className={cn("h-1.5 rounded-full transition-all", page === i ? "w-8 bg-vel-teal" : "w-1.5 bg-white/30")} />
           ))}
         </div>
       )}

@@ -43,7 +43,7 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDr
           >
             <div className="flex items-center justify-between border-b border-white/10 p-5">
               <div className="flex items-center gap-2">
-                <div className="text-xl">B ▲ REBONE</div>
+                <div className="text-xl font-bold tracking-[0.12em]">VELORA</div>
               </div>
               <button onClick={onClose} className="text-white/60 hover:text-white">
                 <X size={24} />

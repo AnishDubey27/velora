@@ -18,7 +18,7 @@ export function SectionTitle({
     <div className={cn("mb-2 flex items-center justify-between", className)}>
       <div>
         {eyebrow && (
-          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-bone-muted">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-vel-muted">
             {eyebrow}
           </p>
         )}

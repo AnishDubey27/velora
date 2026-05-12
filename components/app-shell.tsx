@@ -22,7 +22,7 @@ export function AppShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#05070C] text-bone-text">
+    <div className="h-dvh overflow-hidden bg-[#05070C] text-vel-text">
       <section className="relative mx-auto h-dvh w-full max-w-[1480px] overflow-hidden bg-[#070A11] md:rounded-3xl md:border md:border-white/10 md:shadow-2xl">
         
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.09),transparent_40%),linear-gradient(180deg,rgba(7,10,17,0.3),#070A11_75%)]" />

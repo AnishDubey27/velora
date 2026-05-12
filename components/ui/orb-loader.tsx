@@ -6,7 +6,7 @@ export function OrbLoader({ compact = false }: { compact?: boolean }) {
   return (
     <div className="relative grid place-items-center">
       <motion.div
-        className="absolute rounded-full bg-bone-teal/20 blur-2xl"
+        className="absolute rounded-full bg-vel-teal/20 blur-2xl"
         animate={{
           width: compact ? [90, 118, 90] : [148, 190, 148],
           height: compact ? [90, 118, 90] : [148, 190, 148],
