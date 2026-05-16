@@ -110,7 +110,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                       type="password"
                       placeholder="Password"
                       autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                      required={mode !== "forgot"}
+                      required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full rounded-xl border border-white/10 bg-black/40 pl-11 pr-4 py-3.5 text-white placeholder:text-vel-faint focus:border-vel-teal focus:ring-1 focus:ring-vel-teal focus:outline-none transition-all"

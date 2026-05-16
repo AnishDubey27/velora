@@ -40,14 +40,4 @@ pm2 delete velora 2>/dev/null || true
 PORT=3000 pm2 start npm --name "velora" -- start
 pm2 save
 
-echo "Setting up iptables to forward port 80 to 3000..."
-sudo iptables -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3000 2>/dev/null || sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3000
-sudo iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
-sudo iptables -C INPUT -p tcp --dport 3000 -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 1 -p tcp --dport 3000 -j ACCEPT
-
-# Save iptables rules on Ubuntu (Oracle usually uses netfilter-persistent)
-if command -v netfilter-persistent &> /dev/null; then
-    sudo netfilter-persistent save
-fi
-
 echo "Deployment finished!"
