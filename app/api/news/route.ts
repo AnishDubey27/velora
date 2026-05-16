@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 const MARKETAUX_KEY = process.env.MARKETAUX_API_KEY;
+const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
+const BRAVE_KEY = process.env.BRAVE_SEARCH_API_KEY;
 
 function isProbablyEnglish(text: string) {
   if (!text) return true;
@@ -17,6 +19,9 @@ function isProbablyEnglish(text: string) {
 }
 
 function formatTime(publishedAt: unknown) {
+  if (typeof publishedAt === "number") {
+    publishedAt = new Date(publishedAt).toISOString();
+  }
   if (typeof publishedAt !== "string") return null;
   const date = new Date(publishedAt);
   if (Number.isNaN(date.getTime())) return null;
@@ -31,21 +36,99 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const country = searchParams.get("country") || "US";
 
-  let symbols = "NVDA,MSFT,AAPL,TSLA";
-  let topics = "";
-  let countries = "us";
-
-  if (country === "India") {
-    symbols = "RELIANCE.NS,HDFCBANK.NS,INFY,TCS";
-    topics = "india";
-    countries = "in";
-  } else if (country === "Crypto") {
-    symbols = "BTC,ETH,SOL";
-    topics = "crypto,bitcoin";
-    countries = "";
-  }
-
   try {
+    if (country === "Crypto") {
+      if (!FINNHUB_KEY) {
+        return NextResponse.json(
+          [{ title: "Finnhub API key not configured.", summary: "Set FINNHUB_API_KEY in .env.local." }],
+          { status: 500 }
+        );
+      }
+
+      const url = `https://finnhub.io/api/v1/news?category=crypto&token=${FINNHUB_KEY}`;
+      const res = await fetch(url, { cache: "no-store" });
+      const data = await res.json();
+
+      const articles = Array.isArray(data) ? data : [];
+
+      const englishOnly = articles.filter((item: any) => {
+        const text = [item?.headline, item?.summary].filter(Boolean).join(" ");
+        return isProbablyEnglish(text);
+      });
+
+      if (englishOnly.length > 0) {
+        const normalized = englishOnly
+          .filter((item: any) => !!item?.headline)
+          .map((item: any) => ({
+            title: item.headline,
+            summary: item.summary || "",
+            description: item.summary || "",
+            time: formatTime(item.datetime * 1000) || null,
+            url: item.url || null,
+            source: item.source || null,
+            domain: item.source || null,
+            symbol: item.related || null,
+            image_url: item.image || null,
+          }));
+        return NextResponse.json(normalized);
+      }
+
+      return NextResponse.json([
+        {
+          title: "No English articles available right now.",
+          summary: "Try again in a few minutes.",
+        },
+      ]);
+    }
+
+    // Prioritize Brave News Search for US and India to deliver 5+ articles
+    if (BRAVE_KEY) {
+      try {
+        const query = country === "India" ? "India stock market business news" : "US stock market business news";
+        const url = `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(query)}&count=10&freshness=pw`;
+        
+        const res = await fetch(url, {
+          headers: {
+            "X-Subscription-Token": BRAVE_KEY,
+            "Accept": "application/json",
+          },
+          cache: "no-store",
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          const results = Array.isArray(data?.results) ? data.results : [];
+          
+          if (results.length > 0) {
+            const normalized = results.map((item: any) => ({
+              title: item.title,
+              summary: item.description || "",
+              description: item.description || "",
+              time: formatTime(item.page_age) || item.age || null,
+              url: item.url || null,
+              source: item.profile?.name || null,
+              domain: item.profile?.name || null,
+              image_url: item.thumbnail?.src || null,
+            }));
+            return NextResponse.json(normalized);
+          }
+        }
+      } catch (braveErr) {
+        console.error("Brave News Search failed, falling back...", braveErr);
+      }
+    }
+
+    // Default to Marketaux for other categories
+    let symbols = "NVDA,MSFT,AAPL,TSLA";
+    let topics = "";
+    let countries = "us";
+
+    if (country === "India") {
+      symbols = "RELIANCE.NS,HDFCBANK.NS,INFY,TCS";
+      topics = "india";
+      countries = "in";
+    }
+
     if (!MARKETAUX_KEY) {
       return NextResponse.json(
         [{ title: "News API key not configured.", summary: "Set MARKETAUX_API_KEY in .env.local." }],

@@ -73,7 +73,7 @@ export function HeadlinesScreen() {
         ) : filteredNews.length === 0 ? (
           <div className="py-10 text-center text-white/50">No news found for this category</div>
         ) : (
-          filteredNews.slice(0, 10).map((item, index) => {
+          filteredNews.slice(0, 5).map((item, index) => {
             const href = item.url || item.link || item.source_url || null;
             const Card: any = href ? motion.a : motion.div;
 

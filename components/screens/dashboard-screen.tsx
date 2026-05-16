@@ -75,60 +75,7 @@ function titleCase(value: string) {
     .join(" ");
 }
 
-function deriveTrends(news: NewsItem[]) {
-  const stop = new Set([
-    "stock",
-    "stocks",
-    "market",
-    "markets",
-    "shares",
-    "company",
-    "companies",
-    "today",
-    "week",
-    "weekly",
-    "us",
-    "usa",
-    "u.s.",
-    "wall",
-    "street",
-    "amid",
-    "as",
-    "to",
-    "in",
-    "of",
-    "for",
-    "and",
-    "on",
-    "with",
-    "after",
-    "before",
-    "from",
-    "at",
-  ]);
 
-  const counts = new Map<string, number>();
-  for (const item of news) {
-    const raw = typeof item.keywords === "string" ? item.keywords : "";
-    for (const part of raw.split(",")) {
-      const normalized = part.trim().toLowerCase();
-      if (!normalized) continue;
-      if (normalized.length < 3) continue;
-      if (stop.has(normalized)) continue;
-      counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
-    }
-  }
-
-  const top = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([k]) => titleCase(k))
-    .slice(0, 2);
-
-  const midTerm = top[0] ?? (news[0]?.symbol ? `${news[0].symbol} Momentum` : "Market Momentum");
-  const longTerm = top[1] ?? "Macro & Rates";
-
-  return { midTerm, longTerm };
-}
 
 export function DashboardScreen() {
   const [fearGreed, setFearGreed] = useState<{ value: number | null; classification: string | null }>({
@@ -139,7 +86,8 @@ export function DashboardScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [indicators, setIndicators] = useState<IndicatorsResponse | null>(null);
   const [events, setEvents] = useState<EventsResponse | null>(null);
-  const [signalsBySymbol, setSignalsBySymbol] = useState<Record<string, SignalsResponse | null>>({});
+  const [snapshot, setSnapshot] = useState<{ title: string; summary: string; updatedAt?: string } | null>(null);
+  const [dynamicData, setDynamicData] = useState<any>(null);
 
   useEffect(() => {
     fetch("/api/fear-greed")
@@ -171,109 +119,67 @@ export function DashboardScreen() {
       .then(r => r.json())
       .then(setEvents)
       .catch(() => {});
+
+    fetch("/api/dashboard/snapshot")
+      .then(r => r.json())
+      .then(setSnapshot)
+      .catch(() => {});
+
+    fetch("/api/dashboard/dynamic-data")
+      .then(r => r.json())
+      .then(setDynamicData)
+      .catch(() => {});
   }, []);
 
-  const topSymbols = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of news) {
-      const symbol = typeof item.symbol === "string" ? item.symbol.trim().toUpperCase() : "";
-      if (!symbol) continue;
-      if (symbol === "N/A") continue;
-      counts.set(symbol, (counts.get(symbol) ?? 0) + 1);
-    }
 
-    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
-    if (sorted.length >= 2) return sorted.slice(0, 2);
-    if (sorted.length === 1) return [sorted[0], sorted[0] === "NVDA" ? "TSLA" : "NVDA"];
-    return ["NVDA", "TSLA"];
-  }, [news]);
 
-  const trends = useMemo(() => deriveTrends(news), [news]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all(
-      topSymbols.slice(0, 2).map(async (symbol) => {
-        try {
-          const res = await fetch(`/api/dashboard/signals?symbol=${encodeURIComponent(symbol)}`);
-          const json = await res.json();
-          if (res.ok) return { symbol, data: json as SignalsResponse };
-          return {
-            symbol,
-            data: { error: typeof json?.error === "string" ? json.error : "Failed to load signals." } as SignalsResponse,
-          };
-        } catch {
-          return { symbol, data: { error: "Failed to load signals." } as SignalsResponse };
-        }
-      })
-    ).then((entries) => {
-      if (cancelled) return;
-      setSignalsBySymbol((prev) => {
-        const next = { ...prev };
-        for (const entry of entries) next[entry.symbol] = entry.data;
-        return next;
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [topSymbols]);
-
-  const mainHeadline =
-    news[0] || {
-      title: "No market snapshot available yet.",
-      summary: "Check back in a moment for the latest headline.",
-      url: null,
-    };
-
-  const mainHeadlineHref = mainHeadline.url || mainHeadline.link || mainHeadline.source_url || null;
+  const snapshotTitle = snapshot?.title || "Loading Snapshot...";
+  const snapshotBody = snapshot?.summary || "Generating market summary...";
   const snapshotUpdated = indicators?.asOf ? formatDateTime(indicators.asOf) : null;
+  const snapshotTime = snapshot?.updatedAt ? formatDateTime(snapshot.updatedAt) : snapshotUpdated;
 
   return (
     <section className="space-y-4 pb-6 pt-1">
       {/* Market Snapshot */}
-      {mainHeadlineHref ? (
-        <a
-          href={mainHeadlineHref}
-          target="_blank"
-          rel="noreferrer"
-          className="glassy block rounded-2xl p-5 hover:bg-white/[0.04]"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-black uppercase tracking-widest text-white/60">MARKET SNAPSHOT</p>
-            <p className="text-xs text-white/40">{snapshotUpdated ? `Updated ${snapshotUpdated}` : "Updated now"}</p>
-          </div>
-          <h2 className="text-[19px] leading-tight font-semibold text-white">{mainHeadline.title}</h2>
-          <p className="mt-3 text-[13px] leading-relaxed text-white/70">{mainHeadline.summary}</p>
-        </a>
-      ) : (
-        <div className="glassy rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-black uppercase tracking-widest text-white/60">MARKET SNAPSHOT</p>
-            <p className="text-xs text-white/40">{snapshotUpdated ? `Updated ${snapshotUpdated}` : "Updated now"}</p>
-          </div>
-          <h2 className="text-[19px] leading-tight font-semibold text-white">{mainHeadline.title}</h2>
-          <p className="mt-3 text-[13px] leading-relaxed text-white/70">{mainHeadline.summary}</p>
+      <div className="glassy rounded-2xl p-5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-10">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
         </div>
-      )}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+          <p className="text-xs font-semibold text-white/60">
+            Market Snapshot <span className="text-white/30 font-normal mx-1">&bull;</span> <span className="text-white/40 font-normal">Updated {snapshotTime || "now"}</span>
+          </p>
+        </div>
+        <h2 className="text-[20px] leading-[1.15] font-bold text-white mt-3 mb-2">{snapshotTitle}</h2>
+        <p className="text-[14px] leading-relaxed text-white/70">{snapshotBody}</p>
+      </div>
 
       {/* Fear & Greed + Indicators */}
       <div className="glassy rounded-2xl p-5">
         <div className="flex justify-between items-baseline mb-3">
           <p className="text-xs font-black uppercase tracking-widest text-white/60">FEAR & GREED INDEX</p>
-          <p className="text-lg font-bold text-orange-400">
+          <p className={cn("text-[13px] font-bold uppercase tracking-wide", (fearGreed.value || 50) > 50 ? "text-emerald-400" : "text-red-400")}>
             {fearGreed.value ?? "\u2014"} {fearGreed.classification ?? ""}
           </p>
         </div>
 
-        <div className="relative h-2.5 bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-full mb-5">
-          <motion.div
-            initial={{ left: "50%" }}
-            animate={{ left: `${fearGreed.value ?? 50}%` }}
-            className="absolute -top-1.5 h-5 w-5 -translate-x-1/2 rounded-full border-2 border-white bg-[#070A11]"
+        <div className="relative mb-5">
+          <div 
+            className="h-2.5 bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-sm overflow-hidden"
+            style={{ WebkitMaskImage: "repeating-linear-gradient(to right, black, black 2px, transparent 2px, transparent 4px)", maskImage: "repeating-linear-gradient(to right, black, black 2px, transparent 2px, transparent 4px)" }}
           />
+          <div className="absolute inset-x-0 -top-1.5 bottom-0 pointer-events-none">
+            <motion.div
+              initial={{ left: "50%" }}
+              animate={{ left: `${fearGreed.value ?? 50}%` }}
+              className="absolute top-0 h-5 w-1 -translate-x-1/2 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+            />
+          </div>
+          <div className="flex justify-between text-[11px] text-white/40 font-medium px-0.5 pt-1.5 uppercase tracking-wide">
+            <span>Fear</span>
+            <span>Greed</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 text-center">
@@ -345,80 +251,97 @@ export function DashboardScreen() {
       {/* Market Trends */}
       <div className="glassy rounded-2xl p-5">
         <SectionTitle>Market Trends</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div className="rounded-xl bg-white/5 p-4">
-            <p className="text-xs text-white/50">Mid-Term (1-3 mo)</p>
-            <p className="mt-1 font-medium text-white">{trends.midTerm}</p>
+        {!dynamicData ? (
+          <div className="mt-3 text-sm text-white/50">Loading trends...</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="rounded-xl bg-white/5 p-4">
+              <div className="flex justify-between items-baseline mb-3">
+                <p className="font-semibold text-white">Mid-Term</p>
+                <p className="text-xs text-white/40">1-3 mo</p>
+              </div>
+              <ul className="space-y-2.5">
+                {(dynamicData?.trends?.midTerm || []).map((t: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-white/80">
+                    <span className="text-emerald-400 text-[10px] mt-1">▲</span> {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl bg-white/5 p-4">
+              <div className="flex justify-between items-baseline mb-3">
+                <p className="font-semibold text-white">Long-Term</p>
+                <p className="text-xs text-white/40">6-12 mo</p>
+              </div>
+              <ul className="space-y-2.5">
+                {(dynamicData?.trends?.longTerm || []).map((t: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-white/80">
+                    <span className="text-emerald-400 text-[10px] mt-1">▲</span> {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="rounded-xl bg-white/5 p-4">
-            <p className="text-xs text-white/50">Long-Term (6-12 mo)</p>
-            <p className="mt-1 font-medium text-white">{trends.longTerm}</p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Potential Early Signals */}
       <div className="glassy rounded-2xl p-5">
         <SectionTitle>Potential Early Signals</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          {topSymbols.slice(0, 2).map((symbol) => {
-            const signal = signalsBySymbol[symbol] ?? null;
-            const loading = !signal;
-            const error = typeof signal?.error === "string" ? signal.error : null;
-
-            const upside = signal?.priceTarget?.upsidePercent ?? null;
-            const upsideText = formatPercent(upside);
-
-            const score =
-              (signal?.recommendations?.strongBuy ?? 0) +
-              (signal?.recommendations?.buy ?? 0) -
-              (signal?.recommendations?.sell ?? 0) -
-              (signal?.recommendations?.strongSell ?? 0);
-
-            const stance = error ? "Error" : score > 0 ? "Bullish" : score < 0 ? "Bearish" : "Neutral";
-
-            return (
-              <div key={symbol} className="rounded-xl bg-white/5 p-4">
-                <p className="text-xs text-white/60">{symbol}</p>
-                {loading ? (
-                  <p className="mt-1 text-sm font-semibold text-white/50">Loading...</p>
-                ) : error ? (
-                  <p className="mt-1 text-sm font-semibold text-red-400">{error}</p>
-                ) : (
-                  <>
-                    <p
-                      className={cn(
-                        "mt-1 font-semibold",
-                        (upside ?? 0) > 0 ? "text-green-400" : (upside ?? 0) < 0 ? "text-red-400" : "text-white"
-                      )}
-                    >
-                      {signal?.priceTarget?.mean
-                        ? `Target ${formatNumber(signal.priceTarget.mean, {
-                            style: "currency",
-                            currency: "USD",
-                            maximumFractionDigits: 0,
-                          })}${upsideText ? ` (${upsideText})` : ""}`
-                        : "Target \u2014"}
-                    </p>
-                    <p className="mt-1 text-xs text-white/50">
-                      {signal?.quote?.price
-                        ? `Price ${formatNumber(signal.quote.price, {
-                            style: "currency",
-                            currency: "USD",
-                            maximumFractionDigits: 2,
-                          })} ${formatPercent(signal.quote.changePercent) ?? ""}`.trim()
-                        : "Price \u2014"}
-                    </p>
-                    <p className="mt-1 text-xs text-white/50">
-                      {stance}
-                      {signal?.recommendations?.period ? ` \u00b7 ${signal.recommendations.period}` : ""}
-                    </p>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {!dynamicData ? (
+          <div className="mt-3 text-sm text-white/50">Loading signals...</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {/* Congress */}
+            <div className="rounded-xl bg-white/5 p-4 relative">
+              <div className="absolute top-3 right-3 text-white/20">↗</div>
+              <p className="font-semibold text-white">Congress</p>
+              <p className="text-xs text-white/40 mb-2">Most recent</p>
+              <p className="font-bold text-white mb-1">{dynamicData?.signals?.congress?.symbol}</p>
+              <p className="text-[13px] font-semibold mb-2">
+                <span className={dynamicData?.signals?.congress?.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
+                  {dynamicData?.signals?.congress?.action}
+                </span> <span className="text-white/60">{dynamicData?.signals?.congress?.amount}</span>
+              </p>
+              <p className="text-xs text-white/40">{dynamicData?.signals?.congress?.person}</p>
+            </div>
+            {/* Reddit */}
+            <div className="rounded-xl bg-white/5 p-4 relative">
+              <div className="absolute top-3 right-3 text-white/20">↗</div>
+              <p className="font-semibold text-white">Reddit</p>
+              <p className="text-xs text-white/40 mb-2">Trending</p>
+              <p className="font-bold text-white mb-1">{dynamicData?.signals?.reddit?.symbol}</p>
+              <p className="text-[13px] font-semibold text-emerald-400 mb-2">
+                {dynamicData?.signals?.reddit?.rankChange}
+              </p>
+              <p className="text-xs text-white/40">{dynamicData?.signals?.reddit?.mentions}</p>
+            </div>
+            {/* Insider */}
+            <div className="rounded-xl bg-white/5 p-4 relative">
+              <div className="absolute top-3 right-3 text-white/20">↗</div>
+              <p className="font-semibold text-white">Insider</p>
+              <p className="text-xs text-white/40 mb-2">Most recent</p>
+              <p className="font-bold text-white mb-1">{dynamicData?.signals?.insider?.symbol}</p>
+              <p className="text-[13px] font-semibold mb-2">
+                <span className={dynamicData?.signals?.insider?.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
+                  {dynamicData?.signals?.insider?.action}
+                </span> <span className="text-white/60">{dynamicData?.signals?.insider?.price}</span>
+              </p>
+              <p className="text-xs text-white/40">{dynamicData?.signals?.insider?.person}</p>
+            </div>
+            {/* Super Investors */}
+            <div className="rounded-xl bg-white/5 p-4 relative">
+              <div className="absolute top-3 right-3 text-white/20">↗</div>
+              <p className="font-semibold text-white">Super Investors</p>
+              <p className="text-xs text-white/40 mb-2">Added to</p>
+              <p className="font-bold text-white mb-1">{dynamicData?.signals?.superInvestors?.symbol}</p>
+              <p className="text-[13px] font-semibold text-emerald-400 mb-2">
+                {dynamicData?.signals?.superInvestors?.action}
+              </p>
+              <p className="text-xs text-white/40 truncate">{dynamicData?.signals?.superInvestors?.firm}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Upcoming Events */}

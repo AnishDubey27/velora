@@ -1,4 +1,5 @@
 export const NVIDIA_ALLOWED_MODELS = [
+  "meta/llama-3.1-8b-instruct",
   "google/gemma-3n-e4b-it",
   "google/gemma-3n-e2b-it",
   "mistralai/mistral-nemotron",
