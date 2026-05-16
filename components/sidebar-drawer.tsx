@@ -1,6 +1,6 @@
 "use client";
 
-import { Atom, LayoutDashboard, FileText, PieChart, X } from "lucide-react";
+import { Atom, LayoutDashboard, FileText, PieChart, X, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
@@ -17,9 +17,10 @@ type SidebarDrawerProps = {
   onNavigate: (key: NavKey) => void;
   isOpen: boolean;
   onClose: () => void;
+  onOpenTour: () => void;
 };
 
-export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDrawerProps) {
+export function SidebarDrawer({ active, onNavigate, isOpen, onClose, onOpenTour }: SidebarDrawerProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -39,9 +40,10 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDr
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-0 top-0 z-50 h-full w-72 bg-[#0A0F1C] border-r border-white/10 shadow-2xl md:w-80"
+            className="fixed left-0 top-0 z-50 h-full w-72 bg-[#0A0F1C] border-r border-white/10 shadow-2xl md:w-80 flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-white/10 p-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 p-5 flex-none">
               <div className="flex items-center gap-2">
                 <div className="text-xl font-bold tracking-[0.12em]">VELORA</div>
               </div>
@@ -50,7 +52,8 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDr
               </button>
             </div>
 
-            <nav className="p-3 pt-6">
+            {/* Scrollable Navigation */}
+            <nav className="p-3 pt-6 flex-1 overflow-y-auto no-scrollbar">
               {navItems.map(({ key, label, icon: Icon }) => {
                 const isActive = active === key;
                 return (
@@ -73,6 +76,20 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose }: SidebarDr
                 );
               })}
             </nav>
+
+            {/* Footer Walkthrough Button */}
+            <div className="p-4 border-t border-white/10 bg-[#0A0F1C]/50 flex-none">
+              <button
+                onClick={() => {
+                  onOpenTour();
+                  onClose();
+                }}
+                className="flex w-full items-center gap-3.5 rounded-2xl px-5 py-3.5 text-left text-[14px] font-medium text-cyan-400/80 hover:bg-white/5 hover:text-cyan-400 transition-all border border-cyan-500/10 bg-cyan-500/[0.02]"
+              >
+                <HelpCircle size={20} strokeWidth={2.1} />
+                <span>App Walkthrough</span>
+              </button>
+            </div>
           </motion.div>
         </>
       )}

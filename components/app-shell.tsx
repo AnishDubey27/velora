@@ -1,10 +1,11 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { TopBar } from "@/components/top-bar";
 import { SidebarDrawer } from "@/components/sidebar-drawer";
 import { GlobalSearchModal } from "@/components/global-search";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import type { NavKey } from "@/lib/types";
 
 type AppShellProps = {
@@ -24,6 +25,17 @@ export function AppShell({
 }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  useEffect(() => {
+    // Check if it's the first visit to open drawer & tour automatically
+    const hasVisited = localStorage.getItem("velora_has_visited");
+    if (hasVisited !== "true") {
+      setDrawerOpen(true);
+      setOnboardingOpen(true);
+      localStorage.setItem("velora_has_visited", "true");
+    }
+  }, []);
 
   return (
     <div className="h-dvh overflow-hidden bg-[#05070C] text-vel-text">
@@ -55,6 +67,13 @@ export function AppShell({
           onNavigate={onNavigate}
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+          onOpenTour={() => setOnboardingOpen(true)}
+        />
+
+        <OnboardingModal
+          isOpen={onboardingOpen}
+          onClose={() => setOnboardingOpen(false)}
+          onNavigate={onNavigate}
         />
 
         <GlobalSearchModal
