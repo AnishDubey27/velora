@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { SectionTitle } from "@/components/ui/section-title";
 import { cn } from "@/lib/utils";
+import type { NavKey } from "@/lib/types";
 
 type NewsItem = {
   title?: string;
@@ -45,6 +46,33 @@ type EventsResponse = {
   error?: string;
 };
 
+// Signal preview types
+type RedditPreview = {
+  symbol: string;
+  rankChange: string;
+  mentions: string;
+};
+
+type InsiderPreview = {
+  symbol: string;
+  action: string;
+  price: string;
+  person: string;
+};
+
+type CongressPreview = {
+  symbol: string;
+  action: string;
+  amount: string;
+  person: string;
+};
+
+type SuperInvestorPreview = {
+  symbol: string;
+  action: string;
+  firm: string;
+};
+
 function formatNumber(value: number | null | undefined, options?: Intl.NumberFormatOptions) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
   return new Intl.NumberFormat("en-US", options).format(value);
@@ -75,9 +103,11 @@ function titleCase(value: string) {
     .join(" ");
 }
 
+type DashboardScreenProps = {
+  onNavigate?: (key: NavKey) => void;
+};
 
-
-export function DashboardScreen() {
+export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const [fearGreed, setFearGreed] = useState<{ value: number | null; classification: string | null }>({
     value: null,
     classification: null,
@@ -88,6 +118,13 @@ export function DashboardScreen() {
   const [events, setEvents] = useState<EventsResponse | null>(null);
   const [snapshot, setSnapshot] = useState<{ title: string; summary: string; updatedAt?: string } | null>(null);
   const [dynamicData, setDynamicData] = useState<any>(null);
+
+  // Signal preview states
+  const [redditPreview, setRedditPreview] = useState<RedditPreview | null>(null);
+  const [insiderPreview, setInsiderPreview] = useState<InsiderPreview | null>(null);
+  const [congressPreview, setCongressPreview] = useState<CongressPreview | null>(null);
+  const [superInvestorPreview, setSuperInvestorPreview] = useState<SuperInvestorPreview | null>(null);
+  const [signalsLoaded, setSignalsLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/fear-greed")
@@ -129,7 +166,91 @@ export function DashboardScreen() {
       .then(r => r.json())
       .then(setDynamicData)
       .catch(() => {});
+
+    // Fetch real signal previews
+    fetchSignalPreviews();
   }, []);
+
+  async function fetchSignalPreviews() {
+    try {
+      // Fetch Reddit trending
+      fetch("/api/signals/reddit")
+        .then(r => r.json())
+        .then(data => {
+          if (data?.results?.[0]) {
+            const top = data.results[0];
+            const rankChange = (top.rank_24h_ago || top.rankChange24h || 0) - (top.rank || 1);
+            setRedditPreview({
+              symbol: top.ticker || top.symbol || "—",
+              rankChange: rankChange > 0 ? `+${rankChange} to #${top.rank}` : `${rankChange} to #${top.rank}`,
+              mentions: `${Number(top.mentions || 0).toLocaleString()} mentions`,
+            });
+          }
+        })
+        .catch(() => {});
+
+      // Fetch insider trading
+      fetch("/api/signals/insider")
+        .then(r => r.json())
+        .then(data => {
+          const trades = data?.trades || data?.data || data;
+          if (Array.isArray(trades) && trades[0]) {
+            const t = trades[0];
+            const isBuy = (t.change > 0) || t.transactionCode === "P" || t.action === "BUY";
+            setInsiderPreview({
+              symbol: t.symbol || "—",
+              action: isBuy ? "BUY" : "SELL",
+              price: t.transactionPrice ? `$${Number(t.transactionPrice).toFixed(2)}` : "—",
+              person: `${(t.name || t.insiderName || "Unknown").split(" ").slice(0, 2).join(" ")} • ${t.filingDate ? new Date(t.filingDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
+            });
+          }
+        })
+        .catch(() => {});
+
+      // Fetch congress trading
+      fetch("/api/signals/congress")
+        .then(r => r.json())
+        .then(data => {
+          const trades = data?.trades || data;
+          if (Array.isArray(trades) && trades[0]) {
+            const t = trades[0];
+            const isBuy = (t.action || t.transaction_type || "").toLowerCase().includes("purchase") ||
+                          (t.action || "").toUpperCase() === "BUY";
+            setCongressPreview({
+              symbol: t.ticker || t.symbol || "—",
+              action: isBuy ? "BUY" : "SELL",
+              amount: t.amount || "—",
+              person: `${t.politician || t.representative || t.senator || "Unknown"} • ${t.date ? new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
+            });
+          }
+        })
+        .catch(() => {});
+
+      // Fetch super investors
+      fetch("/api/signals/super-investors")
+        .then(r => r.json())
+        .then(data => {
+          const plays = data?.convictionPlays || data?.topPlays;
+          if (plays && plays[0]) {
+            const p = plays[0];
+            setSuperInvestorPreview({
+              symbol: p.ticker || p.symbol || "—",
+              action: p.investorCount ? `${p.investorCount} investors added` : p.action || "Added",
+              firm: p.investors?.join(", ") || p.firm || "—",
+            });
+          } else if (data?.investors?.[0]) {
+            setSuperInvestorPreview({
+              symbol: data.investors[0].topHolding || "—",
+              action: "Portfolio updated",
+              firm: data.investors[0].name || "—",
+            });
+          }
+        })
+        .catch(() => {});
+    } finally {
+      setSignalsLoaded(true);
+    }
+  }
 
 
 
@@ -137,6 +258,35 @@ export function DashboardScreen() {
   const snapshotBody = snapshot?.summary || "Generating market summary...";
   const snapshotUpdated = indicators?.asOf ? formatDateTime(indicators.asOf) : null;
   const snapshotTime = snapshot?.updatedAt ? formatDateTime(snapshot.updatedAt) : snapshotUpdated;
+
+  // Build signal card data — prefer real data, fall back to AI-generated
+  const congressData = congressPreview || {
+    symbol: dynamicData?.signals?.congress?.symbol || "—",
+    action: dynamicData?.signals?.congress?.action || "—",
+    amount: dynamicData?.signals?.congress?.amount || "—",
+    person: dynamicData?.signals?.congress?.person || "—",
+  };
+
+  const redditData = redditPreview || {
+    symbol: dynamicData?.signals?.reddit?.symbol || "—",
+    rankChange: dynamicData?.signals?.reddit?.rankChange || "—",
+    mentions: dynamicData?.signals?.reddit?.mentions || "—",
+  };
+
+  const insiderData = insiderPreview || {
+    symbol: dynamicData?.signals?.insider?.symbol || "—",
+    action: dynamicData?.signals?.insider?.action || "—",
+    price: dynamicData?.signals?.insider?.price || "—",
+    person: dynamicData?.signals?.insider?.person || "—",
+  };
+
+  const superInvestorData = superInvestorPreview || {
+    symbol: dynamicData?.signals?.superInvestors?.symbol || "—",
+    action: dynamicData?.signals?.superInvestors?.action || "—",
+    firm: dynamicData?.signals?.superInvestors?.firm || "—",
+  };
+
+  const hasSignals = signalsLoaded || dynamicData;
 
   return (
     <section className="space-y-4 pb-6 pt-1">
@@ -288,58 +438,78 @@ export function DashboardScreen() {
       {/* Potential Early Signals */}
       <div className="glassy rounded-2xl p-5">
         <SectionTitle>Potential Early Signals</SectionTitle>
-        {!dynamicData ? (
+        {!hasSignals ? (
           <div className="mt-3 text-sm text-white/50">Loading signals...</div>
         ) : (
           <div className="grid grid-cols-2 gap-3 mt-3">
             {/* Congress */}
-            <div className="rounded-xl bg-white/5 p-4 relative">
-              <div className="absolute top-3 right-3 text-white/20">↗</div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate?.("congress-trading")}
+              className="rounded-xl bg-white/5 p-4 relative text-left transition-colors hover:bg-white/[0.08] cursor-pointer group"
+            >
+              <div className="absolute top-3 right-3 text-white/20 group-hover:text-white/40 transition-colors">↗</div>
               <p className="font-semibold text-white">Congress</p>
               <p className="text-xs text-white/40 mb-2">Most recent</p>
-              <p className="font-bold text-white mb-1">{dynamicData?.signals?.congress?.symbol}</p>
+              <p className="font-bold text-white mb-1">{congressData.symbol}</p>
               <p className="text-[13px] font-semibold mb-2">
-                <span className={dynamicData?.signals?.congress?.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
-                  {dynamicData?.signals?.congress?.action}
-                </span> <span className="text-white/60">{dynamicData?.signals?.congress?.amount}</span>
+                <span className={congressData.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
+                  {congressData.action}
+                </span> <span className="text-white/60">{congressData.amount}</span>
               </p>
-              <p className="text-xs text-white/40">{dynamicData?.signals?.congress?.person}</p>
-            </div>
+              <p className="text-xs text-white/40">{congressData.person}</p>
+            </motion.button>
             {/* Reddit */}
-            <div className="rounded-xl bg-white/5 p-4 relative">
-              <div className="absolute top-3 right-3 text-white/20">↗</div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate?.("reddit-trending")}
+              className="rounded-xl bg-white/5 p-4 relative text-left transition-colors hover:bg-white/[0.08] cursor-pointer group"
+            >
+              <div className="absolute top-3 right-3 text-white/20 group-hover:text-white/40 transition-colors">↗</div>
               <p className="font-semibold text-white">Reddit</p>
               <p className="text-xs text-white/40 mb-2">Trending</p>
-              <p className="font-bold text-white mb-1">{dynamicData?.signals?.reddit?.symbol}</p>
+              <p className="font-bold text-white mb-1">{redditData.symbol}</p>
               <p className="text-[13px] font-semibold text-emerald-400 mb-2">
-                {dynamicData?.signals?.reddit?.rankChange}
+                {redditData.rankChange}
               </p>
-              <p className="text-xs text-white/40">{dynamicData?.signals?.reddit?.mentions}</p>
-            </div>
+              <p className="text-xs text-white/40">{redditData.mentions}</p>
+            </motion.button>
             {/* Insider */}
-            <div className="rounded-xl bg-white/5 p-4 relative">
-              <div className="absolute top-3 right-3 text-white/20">↗</div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate?.("insider-trading")}
+              className="rounded-xl bg-white/5 p-4 relative text-left transition-colors hover:bg-white/[0.08] cursor-pointer group"
+            >
+              <div className="absolute top-3 right-3 text-white/20 group-hover:text-white/40 transition-colors">↗</div>
               <p className="font-semibold text-white">Insider</p>
               <p className="text-xs text-white/40 mb-2">Most recent</p>
-              <p className="font-bold text-white mb-1">{dynamicData?.signals?.insider?.symbol}</p>
+              <p className="font-bold text-white mb-1">{insiderData.symbol}</p>
               <p className="text-[13px] font-semibold mb-2">
-                <span className={dynamicData?.signals?.insider?.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
-                  {dynamicData?.signals?.insider?.action}
-                </span> <span className="text-white/60">{dynamicData?.signals?.insider?.price}</span>
+                <span className={insiderData.action === "BUY" ? "text-emerald-400" : "text-red-400"}>
+                  {insiderData.action}
+                </span> <span className="text-white/60">{insiderData.price}</span>
               </p>
-              <p className="text-xs text-white/40">{dynamicData?.signals?.insider?.person}</p>
-            </div>
+              <p className="text-xs text-white/40">{insiderData.person}</p>
+            </motion.button>
             {/* Super Investors */}
-            <div className="rounded-xl bg-white/5 p-4 relative">
-              <div className="absolute top-3 right-3 text-white/20">↗</div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate?.("super-investors")}
+              className="rounded-xl bg-white/5 p-4 relative text-left transition-colors hover:bg-white/[0.08] cursor-pointer group"
+            >
+              <div className="absolute top-3 right-3 text-white/20 group-hover:text-white/40 transition-colors">↗</div>
               <p className="font-semibold text-white">Super Investors</p>
               <p className="text-xs text-white/40 mb-2">Added to</p>
-              <p className="font-bold text-white mb-1">{dynamicData?.signals?.superInvestors?.symbol}</p>
+              <p className="font-bold text-white mb-1">{superInvestorData.symbol}</p>
               <p className="text-[13px] font-semibold text-emerald-400 mb-2">
-                {dynamicData?.signals?.superInvestors?.action}
+                {superInvestorData.action}
               </p>
-              <p className="text-xs text-white/40 truncate">{dynamicData?.signals?.superInvestors?.firm}</p>
-            </div>
+              <p className="text-xs text-white/40 truncate">{superInvestorData.firm}</p>
+            </motion.button>
           </div>
         )}
       </div>

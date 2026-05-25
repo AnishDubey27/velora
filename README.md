@@ -1,7 +1,6 @@
 # Velora
 
-**AI-powered finance research platform** — a mobile-first web app that delivers real-time market intelligence, AI-driven analysis skills, portfolio tracking, and curated headlines. Inspired by [Barebone.ai](https://barebone.ai), rebuilt as a responsive web experience under the name **Velora**.
-
+**AI-powered finance research platform** — a web app that delivers real-time market intelligence, AI-driven analysis skills, portfolio tracking, and curated headlines.
 ## Features
 
 ### 🔬 Research
@@ -48,7 +47,55 @@
 | Search | Brave Search API |
 | PWA | Service Worker + Web App Manifest |
 
+## DevOps & Production Infrastructure
+
+Velora is engineered for enterprise-grade stability, automated delivery, and low-footprint operations. The entire infrastructure is designed to run efficiently on resource-constrained environments (such as a 1GB RAM VM).
+
+### Architecture & Pipeline Overview
+
+```mermaid
+graph TD
+    Developer[Developer] -->|git push| GitHub[GitHub Repository]
+    
+    subgraph CI/CD (GitHub Actions)
+        GitHub --> Workflow[Production Pipeline]
+        Workflow --> Scan[Trivy Security Scan]
+        Scan -->|No Criticals| Build[Multi-Stage Build & Cache]
+        Build --> Push[Push to GHCR]
+    end
+    
+    subgraph Target Host (Always-Free 1GB VM)
+        GHCR[GitHub Container Registry] -->|Polls & Pulls| Watchtower[Watchtower Container]
+        Watchtower -->|Auto-Recreate| Velora[Velora Standalone App]
+        Velora -->|700MB Hard Limit| VM[Docker Runtime]
+    end
+    
+    Push -->|latest tag| GHCR
+```
+
+### Core DevOps Features
+
+1. **GitOps & Continuous Delivery (CD)**
+   - **GitHub Actions Integration**: Commits to `main` trigger a full pipeline run.
+   - **GitHub Container Registry (GHCR)**: Images are automatically compiled and published to `ghcr.io/anishdubey27/velora:latest` with built-in caching (`type=gha`) for ultra-fast build times.
+   - **Containrrr Watchtower Daemon**: Runs on the host VM, checking GHCR for updates every 5 minutes. Upon detecting a new image, it performs a zero-downtime rolling update.
+
+2. **Automated Security Guardrails**
+   - **Trivy Vulnerability Scanning**: Integrated directly into the CI/CD workflow. The pipeline runs a security scan against the container image's OS packages and libraries and **blocks/fails** if any `CRITICAL` vulnerability is detected.
+
+3. **Ultra-Lean Containerization**
+   - **Multi-Stage builds**: Implements a 3-stage `Dockerfile` (`deps` -> `builder` -> `runner`) utilizing a slim `node:22-alpine` base.
+   - **Next.js Standalone Mode**: Configured to export Next.js in `standalone` output mode. This strips away `node_modules` and files that are not strictly necessary for production, reducing the runtime bundle to a fraction of its normal size.
+   - **Security Hardening**: The runner image drops root privileges, executing the application under a custom system user and group (`nextjs:nodejs`).
+
+4. **Resource & Memory Optimization**
+   - **Hard Limits**: Enforced `memory: 700M` limitation at the orchestrator layer (Docker Compose) to guarantee the host VM's kernel remains stable.
+   - **Dynamic Runtime Config**: A custom runtime helper (`lib/env.ts`) bypasses Next.js 15's static compiler env-inlining, allowing secrets and host-specific parameters to be injected purely at container start via the environment.
+
+---
+
 ## Setup
+
 
 ### 1. Install dependencies
 
@@ -109,6 +156,30 @@ create policy "Users manage own holdings"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 ```
+
+### 5. Production Deployment (Docker Compose)
+
+To run the production-ready stack (Velora + Watchtower auto-updater) on your VPS or local machine:
+
+1. **Configure Environment File**:
+   Create a `.env` file in the root directory (Note: This is read by Docker Compose; do not prefix client variables with `NEXT_PUBLIC_` unless they are required at build time, but keep them matched to your app environment needs):
+   ```env
+   # Database & Auth
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+   
+   # Secrets & APIs
+   NVIDIA_API_KEY=your_nvidia_api_key
+   MARKETAUX_API_KEY=your_marketaux_api_key
+   FINNHUB_API_KEY=your_finnhub_api_key
+   BRAVE_SEARCH_API_KEY=your_brave_search_api_key
+   ```
+
+2. **Run the stack**:
+   ```bash
+   docker compose up -d
+   ```
+   This will pull the latest pre-built image from GHCR, apply the 700MB memory restriction, and spin up Watchtower to keep the app up to date automatically on subsequent pushes to `main`.
 
 ## API Routes
 

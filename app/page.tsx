@@ -9,6 +9,11 @@ import { PortfolioScreen } from "@/components/screens/portfolio-screen";
 import { ResearchScreen } from "@/components/screens/research-screen";
 import { SkillLibraryScreen } from "@/components/screens/skill-library-screen";
 import { ChatScreen } from "@/components/screens/chat-screen";
+import { RedditTrendingScreen } from "@/components/screens/reddit-trending-screen";
+import { InsiderTradingScreen } from "@/components/screens/insider-trading-screen";
+import { CongressTradingScreen } from "@/components/screens/congress-trading-screen";
+import { SuperInvestorsScreen } from "@/components/screens/super-investors-screen";
+import { SuperInvestorProfileScreen } from "@/components/screens/super-investor-profile-screen";
 import type { NavKey, Skill } from "@/lib/types";
 
 const screenVariants = {
@@ -22,6 +27,7 @@ export default function Home() {
   const [skillLibraryOpen, setSkillLibraryOpen] = useState(false);
   const [chatPrompt, setChatPrompt] = useState<string>("");
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [selectedInvestorCik, setSelectedInvestorCik] = useState<string>("");
 
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
@@ -47,6 +53,11 @@ export default function Home() {
     };
   }, []);
 
+  const handleNavigate = (key: NavKey) => {
+    setSkillLibraryOpen(false);
+    setActive(key);
+  };
+
   const screen = useMemo(() => {
     if (skillLibraryOpen) {
       return <SkillLibraryScreen skills={skills} onClose={() => setSkillLibraryOpen(false)} />;
@@ -54,7 +65,7 @@ export default function Home() {
 
     switch (active) {
       case "dashboard":
-        return <DashboardScreen />;
+        return <DashboardScreen onNavigate={handleNavigate} />;
       case "headlines":
         return <HeadlinesScreen />;
       case "portfolio":
@@ -69,6 +80,29 @@ export default function Home() {
             }} 
           />
         );
+      case "reddit-trending":
+        return <RedditTrendingScreen onBack={() => setActive("dashboard")} />;
+      case "insider-trading":
+        return <InsiderTradingScreen onBack={() => setActive("dashboard")} />;
+      case "congress-trading":
+        return <CongressTradingScreen onBack={() => setActive("dashboard")} />;
+      case "super-investors":
+        return (
+          <SuperInvestorsScreen 
+            onBack={() => setActive("dashboard")} 
+            onViewProfile={(cik: string) => {
+              setSelectedInvestorCik(cik);
+              setActive("super-investor-profile");
+            }}
+          />
+        );
+      case "super-investor-profile":
+        return (
+          <SuperInvestorProfileScreen 
+            cik={selectedInvestorCik} 
+            onBack={() => setActive("super-investors")} 
+          />
+        );
       default:
         return (
           <ResearchScreen
@@ -81,12 +115,12 @@ export default function Home() {
           />
         );
     }
-  }, [active, skillLibraryOpen, skills]);
+  }, [active, skillLibraryOpen, skills, selectedInvestorCik]);
 
   return (
     <AppShell 
       active={active} 
-      onNavigate={setActive}
+      onNavigate={handleNavigate}
       onDashboard={() => setActive("dashboard")}
       onStartChat={(prompt) => {
         setChatPrompt(prompt);
@@ -95,7 +129,7 @@ export default function Home() {
     >
       <AnimatePresence mode="wait">
         <motion.main
-          key={`${active}-${skillLibraryOpen ? "library" : "main"}`}
+          key={`${active}-${skillLibraryOpen ? "library" : "main"}-${active === "super-investor-profile" ? selectedInvestorCik : ""}`}
           variants={screenVariants}
           initial="enter"
           animate="center"

@@ -1,4 +1,4 @@
-export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat";
+export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat" | "reddit-trending" | "super-investors" | "congress-trading" | "insider-trading" | "super-investor-profile";
 
 export type Skill = {
   id: string;
