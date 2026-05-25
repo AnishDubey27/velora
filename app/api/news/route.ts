@@ -132,7 +132,7 @@ export async function GET(request: Request) {
 
     if (!MARKETAUX_KEY) {
       return NextResponse.json(
-        [{ title: "News API key not configured.", summary: "Set MARKETAUX_API_KEY in .env.local." }],
+        [{ title: "Market API Keys Missing", summary: `Available env keys: ${Object.keys(process.env).filter(k => k.includes('MARKET') || k.includes('FINN') || k.includes('SUPA') || k.includes('NEXT')).join(', ') || 'NONE'}` }],
         { status: 500 }
       );
     }
