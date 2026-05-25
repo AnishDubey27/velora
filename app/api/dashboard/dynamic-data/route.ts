@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
 export const revalidate = 3600; // Cache for 1 hour
 
-export async function GET() {
-  const nvidiaKey = process.env['NVIDIA_API_KEY'];
+export async function GET(request: Request) {
+  // Opt into dynamic rendering to prevent build-time static generation with missing keys
+  const _url = request.url;
+  const nvidiaKey = getEnv('NVIDIA_API_KEY');
 
   if (!nvidiaKey) {
     return NextResponse.json(
@@ -33,7 +36,7 @@ Make the data look like real, current financial market activity.
 `;
 
   try {
-    const aiRes = await fetch(process.env['NVIDIA_API_URL'] ?? "https://integrate.api.nvidia.com/v1/chat/completions", {
+    const aiRes = await fetch(getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${nvidiaKey}`,

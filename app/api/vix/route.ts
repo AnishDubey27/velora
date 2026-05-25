@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
   // Public fallback (Finnhub or mock)
   try {
     const res = await fetch(
-      `https://finnhub.io/api/v1/quote?symbol=VIX&token=${process.env['FINNHUB_API_KEY']}`
+      `https://finnhub.io/api/v1/quote?symbol=VIX&token=${getEnv('FINNHUB_API_KEY')}`
     );
     const data = await res.json();
     return NextResponse.json({ value: data.c || 19.5, source: "Finnhub" });

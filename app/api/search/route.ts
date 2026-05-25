@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
-const FINNHUB_KEY = process.env['FINNHUB_API_KEY'];
+const FINNHUB_KEY = getEnv('FINNHUB_API_KEY');
 
 export async function GET(request: Request) {
   if (!FINNHUB_KEY) {

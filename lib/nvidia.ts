@@ -1,3 +1,4 @@
+import { getEnv } from "./env";
 export const NVIDIA_ALLOWED_MODELS = [
   "meta/llama-3.1-8b-instruct",
   "google/gemma-3n-e4b-it",
@@ -18,7 +19,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;
-  const fromEnv = process.env['NVIDIA_DEFAULT_MODEL'];
+  const fromEnv = getEnv('NVIDIA_DEFAULT_MODEL');
 
   const candidate = fromRequest ?? fromEnv ?? NVIDIA_ALLOWED_MODELS[0];
   if (!isAllowedNvidiaModel(candidate)) {

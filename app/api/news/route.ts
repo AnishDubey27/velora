@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
-const MARKETAUX_KEY = process.env['MARKETAUX_API_KEY'];
-const FINNHUB_KEY = process.env['FINNHUB_API_KEY'];
-const BRAVE_KEY = process.env['BRAVE_SEARCH_API_KEY'];
+const MARKETAUX_KEY = getEnv('MARKETAUX_API_KEY');
+const FINNHUB_KEY = getEnv('FINNHUB_API_KEY');
+const BRAVE_KEY = getEnv('BRAVE_SEARCH_API_KEY');
 
 function isProbablyEnglish(text: string) {
   if (!text) return true;
