@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  velora-app:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-anishdubey27}/velora:latest
+    ports:
+      - "80:3000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 700M
+    environment:
+      - NODE_ENV=production
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup
+    restart: unless-stopped
