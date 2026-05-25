@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
+const FINNHUB_KEY = process.env['FINNHUB_API_KEY'];
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;

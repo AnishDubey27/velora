@@ -1,7 +1,7 @@
 // app/api/portfolio/route.ts
 import { NextResponse } from "next/server";
 
-const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
+const FINNHUB_KEY = process.env['FINNHUB_API_KEY'];
 
 export async function GET(request: Request) {
   if (!FINNHUB_KEY) {

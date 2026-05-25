@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Skill } from "@/lib/types";
 
-const MARKETAUX_KEY = process.env.MARKETAUX_API_KEY;
+const MARKETAUX_KEY = process.env['MARKETAUX_API_KEY'];
 
 const BASE_SKILLS: Skill[] = [
   {

@@ -4,8 +4,8 @@ import { resolveNvidiaModel } from "@/lib/nvidia";
 export const revalidate = 300; // Cache for 5 minutes
 
 export async function GET() {
-  const marketauxKey = process.env.MARKETAUX_API_KEY;
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
+  const marketauxKey = process.env['MARKETAUX_API_KEY'];
+  const nvidiaKey = process.env['NVIDIA_API_KEY'];
 
   if (!marketauxKey || !nvidiaKey) {
     return NextResponse.json(
@@ -43,7 +43,7 @@ export async function GET() {
 
     const model = "meta/llama-3.1-8b-instruct";
     
-    const aiRes = await fetch(process.env.NVIDIA_API_URL ?? "https://integrate.api.nvidia.com/v1/chat/completions", {
+    const aiRes = await fetch(process.env['NVIDIA_API_URL'] ?? "https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${nvidiaKey}`,

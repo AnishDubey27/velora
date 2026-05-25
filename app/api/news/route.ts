@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-const MARKETAUX_KEY = process.env.MARKETAUX_API_KEY;
-const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
-const BRAVE_KEY = process.env.BRAVE_SEARCH_API_KEY;
+const MARKETAUX_KEY = process.env['MARKETAUX_API_KEY'];
+const FINNHUB_KEY = process.env['FINNHUB_API_KEY'];
+const BRAVE_KEY = process.env['BRAVE_SEARCH_API_KEY'];
 
 function isProbablyEnglish(text: string) {
   if (!text) return true;

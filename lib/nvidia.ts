@@ -18,7 +18,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;
-  const fromEnv = process.env.NVIDIA_DEFAULT_MODEL;
+  const fromEnv = process.env['NVIDIA_DEFAULT_MODEL'];
 
   const candidate = fromRequest ?? fromEnv ?? NVIDIA_ALLOWED_MODELS[0];
   if (!isAllowedNvidiaModel(candidate)) {

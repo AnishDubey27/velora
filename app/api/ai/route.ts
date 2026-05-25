@@ -4,10 +4,10 @@ import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 
 const NVIDIA_API_URL =
-  process.env.NVIDIA_API_URL ?? "https://integrate.api.nvidia.com/v1/chat/completions";
+  process.env['NVIDIA_API_URL'] ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 
 function getApiKey() {
-  return process.env.NVIDIA_API_KEY ?? "";
+  return process.env['NVIDIA_API_KEY'] ?? "";
 }
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const braveApiKey = process.env.BRAVE_SEARCH_API_KEY;
-    const braveApiUrl = process.env.BRAVE_SEARCH_API_URL || "https://api.search.brave.com/res/v1/web/search";
+    const braveApiKey = process.env['BRAVE_SEARCH_API_KEY'];
+    const braveApiUrl = process.env['BRAVE_SEARCH_API_URL'] || "https://api.search.brave.com/res/v1/web/search";
     
     if (braveApiKey && messages.length > 0) {
       const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
