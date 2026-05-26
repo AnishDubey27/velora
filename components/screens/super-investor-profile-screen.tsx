@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Briefcase, PieChart as PieChartIcon, Activity, Info } from "lucide-react";
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Briefcase, PieChart as PieChartIcon, Activity, Info, X, Copy, Check } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -26,6 +26,24 @@ type InvestorProfile = {
   reportDate: string;
   holdings: Holding[];
   totalValue: number;
+};
+
+type SourceArticle = {
+  title: string;
+  url: string;
+  source: string;
+  pubDate: string;
+};
+
+type SourceCategory = {
+  category: string;
+  articles: SourceArticle[];
+};
+
+type SourcesData = {
+  investor: { name: string; person: string; cik: string };
+  categories: SourceCategory[];
+  fetchedAt: string;
 };
 
 /* ─────────────────── Constants ─────────────────── */
@@ -170,6 +188,10 @@ export function SuperInvestorProfileScreen({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('Stock Holdings');
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [showSourcesModal, setShowSourcesModal] = useState(false);
+  const [sourcesData, setSourcesData] = useState<SourcesData | null>(null);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -275,15 +297,22 @@ export function SuperInvestorProfileScreen({
             Super Investor Profile
           </h1>
         </div>
-        <a
-          href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=13F-HR&dateb=&owner=include&count=10`}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={() => {
+            setShowSourcesModal(true);
+            if (!sourcesData && !sourcesLoading) {
+              setSourcesLoading(true);
+              fetch(`/api/signals/super-investors/${cik}/sources`)
+                .then(r => r.json())
+                .then(d => { setSourcesData(d); setSourcesLoading(false); })
+                .catch(() => setSourcesLoading(false));
+            }
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-[11px] font-semibold text-white/60 hover:text-white hover:border-[#00D4FF]/30 transition-all"
         >
-          Source
           <ExternalLink size={10} />
-        </a>
+          Source
+        </button>
       </motion.div>
 
       {/* ─── Investor Identity ─── */}
@@ -642,6 +671,123 @@ export function SuperInvestorProfileScreen({
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+      {/* ─── Sources Modal ─── */}
+      <AnimatePresence>
+        {showSourcesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            onClick={() => setShowSourcesModal(false)}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg bg-[#0A0E17] border-t border-white/10 rounded-t-3xl max-h-[85vh] flex flex-col"
+            >
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+                <h2 className="text-xl font-bold text-white">All Data Sources</h2>
+                <button
+                  onClick={() => setShowSourcesModal(false)}
+                  className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  <X size={20} className="text-white/60" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto px-6 pb-8">
+                {sourcesLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                    <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#00D4FF] animate-spin" />
+                    <p className="text-sm text-white/40">Fetching real news sources...</p>
+                  </div>
+                ) : sourcesData?.categories && sourcesData.categories.length > 0 ? (
+                  <div className="space-y-2 pt-2">
+                    {sourcesData.categories.map((cat, ci) => (
+                      <div key={ci}>
+                        {/* Category Header */}
+                        <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#00D4FF] mt-6 mb-3">
+                          {cat.category}
+                        </p>
+
+                        {/* Articles */}
+                        <div className="space-y-1">
+                          {cat.articles.map((article, ai) => (
+                            <div
+                              key={ai}
+                              className="group flex items-start justify-between gap-3 py-3 border-b border-white/[0.04] last:border-b-0"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-semibold text-white/90 leading-snug mb-1">
+                                  {article.source}
+                                </p>
+                                <p className="text-[11px] text-white/35 truncate">
+                                  {article.url}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(article.url);
+                                  setCopiedUrl(article.url);
+                                  setTimeout(() => setCopiedUrl(null), 2000);
+                                }}
+                                className="flex-shrink-0 p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                title="Copy URL"
+                              >
+                                {copiedUrl === article.url ? (
+                                  <Check size={14} className="text-emerald-400" />
+                                ) : (
+                                  <Copy size={14} className="text-white/30 group-hover:text-white/60" />
+                                )}
+                              </button>
+                              <a
+                                href={article.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-shrink-0 p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                title="Open article"
+                              >
+                                <ExternalLink size={14} className="text-white/30 group-hover:text-white/60" />
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <p className="text-sm text-white/40">No sources found</p>
+                    <a
+                      href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=13F-HR&dateb=&owner=include&count=10`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#00D4FF] text-sm hover:underline flex items-center gap-1"
+                    >
+                      View SEC Filings <ExternalLink size={12} />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </motion.section>
   );
