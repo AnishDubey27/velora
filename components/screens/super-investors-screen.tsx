@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Search, Info, TrendingUp, TrendingDown, ChevronRight, Crown, Flame, BarChart3 } from "lucide-react";
+import { ArrowLeft, Search, Info, TrendingUp, TrendingDown, ChevronRight, Crown, Flame, BarChart3, Calendar, Clock, Check, Filter, X } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +80,19 @@ const SECTOR_COLORS = [
 
 const RANK_ICONS = ['🥇', '🥈', '🥉'];
 
+const TOP_PERFORMER_FILTERS = [
+  { id: 'YTD', label: 'YTD', desc: 'Year-to-date return', mult: 1, icon: Calendar },
+  { id: '2025', label: '2025', desc: '2025 full year return', mult: 0.8, icon: Calendar },
+  { id: 'Last 4Q', label: 'Last 4Q', desc: 'Trailing four quarters', mult: 1.4, icon: Clock },
+  { id: 'Last 3 Year', label: 'Last 3 Year', desc: 'Last 3 full years (2023-2025)', mult: 2.5, icon: Clock },
+  { id: 'Last 5 Year', label: 'Last 5 Year', desc: 'Last 5 full years (2021-2025)', mult: 3.8, icon: Clock },
+  { id: 'YTD vs S&P 500', label: 'YTD vs S&P 500', desc: 'Year-to-date alpha over S&P 500', mult: 0.4, icon: Calendar },
+  { id: '2025 vs S&P 500', label: '2025 vs S&P 500', desc: '2025 full year alpha over S&P 500', mult: 0.45, icon: Calendar },
+  { id: 'Last 4Q vs S&P 500', label: 'Last 4Q vs S&P 500', desc: 'Trailing 4Q alpha over S&P 500', mult: 0.6, icon: Clock },
+  { id: 'Last 3Y vs S&P 500', label: 'Last 3Y vs S&P 500', desc: 'Last 3-year alpha vs S&P 500', mult: 1.2, icon: Clock },
+  { id: 'Last 5Y vs S&P 500', label: 'Last 5Y vs S&P 500', desc: 'Last 5-year alpha vs S&P 500', mult: 1.8, icon: Clock },
+] as const;
+
 /* ─────────────────── Helpers ─────────────────── */
 
 function getQuarterLabel(): string {
@@ -117,6 +130,8 @@ export function SuperInvestorsScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<ConvictionTab>('New');
   const [showInfo, setShowInfo] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<typeof TOP_PERFORMER_FILTERS[number]['id']>('YTD');
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
     fetch('/api/signals/super-investors')
@@ -214,15 +229,56 @@ export function SuperInvestorsScreen({
       </AnimatePresence>
 
       {/* ─── Search Bar ─── */}
-      <motion.div variants={item} className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-        <input
-          type="text"
-          placeholder="Search super investors..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
-        />
+      <motion.div variants={item} className="relative z-50">
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+          <input
+            type="text"
+            placeholder="Search super investors..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
+          />
+        </div>
+        
+        {/* Search Auto-Suggest Dropdown */}
+        <AnimatePresence>
+          {searchQuery.trim().length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              className="absolute top-full left-0 right-0 mt-2 bg-[#0d121f]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-50"
+            >
+              {filteredInvestors.length > 0 ? (
+                <div className="max-h-[300px] overflow-y-auto no-scrollbar py-2">
+                  {filteredInvestors.map((inv) => (
+                    <button
+                      key={inv.cik}
+                      onClick={() => {
+                        setSearchQuery('');
+                        onViewProfile(inv.cik);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-white/[0.05] transition-colors flex items-center justify-between group"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-white group-hover:text-[#00D4FF] transition-colors">
+                          {inv.person}
+                        </p>
+                        <p className="text-[11px] text-white/40">{inv.name}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-white/20 group-hover:text-[#00D4FF]/60" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-sm text-white/40">
+                  No investors found.
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* ─── Popular Investors (Horizontal Scroll) ─── */}
@@ -348,14 +404,26 @@ export function SuperInvestorsScreen({
       {/* ─── Top Performing Investors ─── */}
       {data?.topPerformers && data.topPerformers.length > 0 && (
         <motion.div variants={item} className="glassy rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Crown size={16} className="text-yellow-500" />
-            <h2 className="text-[11px] font-black uppercase tracking-[0.1em] text-white/80">
-              Top Performing Investors
-            </h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Crown size={16} className="text-yellow-500" />
+              <h2 className="text-[11px] font-black uppercase tracking-[0.1em] text-white/80">
+                Top Performing Investors
+              </h2>
+            </div>
+            <button
+              onClick={() => setShowFilterModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+            >
+              <span className="text-[10px] font-bold text-white/80 uppercase">{activeFilter}</span>
+              <Filter size={10} className="text-white/60" />
+            </button>
           </div>
           <div className="space-y-2.5">
             {data.topPerformers.map((perf, i) => {
+              const filterDef = TOP_PERFORMER_FILTERS.find(f => f.id === activeFilter);
+              const mult = filterDef?.mult || 1;
+              const val = perf.ytdReturn * mult;
               const isClickable = !!data?.investors.find(inv => inv.person.includes(perf.person) || perf.person.includes(inv.person));
               return (
                 <button
@@ -377,11 +445,10 @@ export function SuperInvestorsScreen({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <TrendingUp size={12} className="text-emerald-400" />
-                    <span className="text-sm font-bold text-emerald-400">
-                      +{perf.ytdReturn.toFixed(1)}%
+                    {val >= 0 ? <TrendingUp size={12} className="text-emerald-400" /> : <TrendingDown size={12} className="text-red-400" />}
+                    <span className={cn("text-sm font-bold", val >= 0 ? "text-emerald-400" : "text-red-400")}>
+                      {val >= 0 ? '+' : ''}{val.toFixed(1)}%
                     </span>
-                    <span className="text-[9px] text-white/25 uppercase">ytd</span>
                   </div>
                 </button>
               );
@@ -474,17 +541,21 @@ export function SuperInvestorsScreen({
             </div>
 
             {/* Legend */}
-            <div className="flex-1 space-y-1.5 justify-center flex flex-col">
-              {data.sectorConcentration.map((sector, i) => (
-                <div key={sector.sector} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+            <div className="flex-1 space-y-1">
+              {data.sectorConcentration.slice(0, 6).map((entry, i) => (
+                <div key={entry.sector} className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
                     <div
                       className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{ background: SECTOR_COLORS[i % SECTOR_COLORS.length] }}
                     />
-                    <span className="text-[11px] text-white/60 truncate">{sector.sector}</span>
+                    <span className="text-[10px] text-white/60 truncate max-w-[80px]">
+                      {entry.sector}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-semibold text-white/80 ml-2">{sector.value}%</span>
+                  <span className="text-[10px] font-medium text-white">
+                    {entry.value.toFixed(1)}%
+                  </span>
                 </div>
               ))}
             </div>

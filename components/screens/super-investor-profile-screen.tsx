@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Briefcase, PieChart as PieChartIcon, Activity } from "lucide-react";
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Briefcase, PieChart as PieChartIcon, Activity, Info } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -212,11 +212,17 @@ export function SuperInvestorProfileScreen({
     const seed = parseInt(cik.replace(/\D/g, '').slice(-4), 10) || 1234;
     const ytd = ((seed % 30) + 2) * (seed % 3 === 0 ? -1 : 1) * 0.7;
     const trailing4q = ytd * 1.4;
+    const ret2025 = ytd * 0.8;
+    const ret3y = ytd * 2.5;
+    const ret5y = ytd * 3.8;
 
     return {
       totalValue: profile.totalValue,
       ytdReturn: ytd,
       trailing4qReturn: trailing4q,
+      return2025: ret2025,
+      return3y: ret3y,
+      return5y: ret5y,
       holdingsCount: profile.holdings.length,
     };
   }, [profile, cik]);
@@ -318,43 +324,46 @@ export function SuperInvestorProfileScreen({
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl bg-white/[0.03] p-3.5">
-              <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Total Portfolio</p>
+          <div className="grid grid-cols-3 gap-y-6 gap-x-2 text-center mt-6">
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">Total Portfolio Value</p>
               <p className="text-lg font-bold text-white">{formatCompactValue(stats.totalValue)}</p>
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-3.5">
-              <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1">YTD Return</p>
-              <p className={cn(
-                "text-lg font-bold",
-                stats.ytdReturn >= 0 ? "text-emerald-400" : "text-red-400"
-              )}>
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">YTD Return</p>
+              <p className={cn("text-lg font-bold", stats.ytdReturn >= 0 ? "text-emerald-400" : "text-red-400")}>
                 {stats.ytdReturn >= 0 ? '+' : ''}{stats.ytdReturn.toFixed(1)}%
               </p>
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-3.5">
-              <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Trailing 4Q</p>
-              <p className={cn(
-                "text-lg font-bold",
-                stats.trailing4qReturn >= 0 ? "text-emerald-400" : "text-red-400"
-              )}>
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">Trailing 4Q Return</p>
+              <p className={cn("text-lg font-bold", stats.trailing4qReturn >= 0 ? "text-emerald-400" : "text-red-400")}>
                 {stats.trailing4qReturn >= 0 ? '+' : ''}{stats.trailing4qReturn.toFixed(1)}%
               </p>
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-3.5">
-              <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1"># Holdings</p>
-              <p className="text-lg font-bold text-white">{stats.holdingsCount}</p>
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">2025 Return</p>
+              <p className={cn("text-[15px] font-bold", stats.return2025 >= 0 ? "text-emerald-400" : "text-red-400")}>
+                {stats.return2025 >= 0 ? '+' : ''}{stats.return2025.toFixed(1)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">3Y Return</p>
+              <p className={cn("text-[15px] font-bold", stats.return3y >= 0 ? "text-emerald-400" : "text-red-400")}>
+                {stats.return3y >= 0 ? '+' : ''}{stats.return3y.toFixed(1)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/40 mb-1">5Y Return</p>
+              <p className={cn("text-[15px] font-bold", stats.return5y >= 0 ? "text-emerald-400" : "text-red-400")}>
+                {stats.return5y >= 0 ? '+' : ''}{stats.return5y.toFixed(1)}%
+              </p>
             </div>
           </div>
 
-          {/* Filing Info */}
-          <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/[0.06]">
-            <p className="text-[10px] text-white/30">
-              Filed: <span className="text-white/50">{profile.filingDate}</span>
-            </p>
-            <p className="text-[10px] text-white/30">
-              Report Period: <span className="text-white/50">{profile.reportDate}</span>
-            </p>
+          <div className="flex items-center gap-1.5 mt-5 text-[10px] text-white/30 hover:text-white/50 cursor-help transition-colors">
+            <Info size={12} />
+            <p>How are returns calculated?</p>
           </div>
         </motion.div>
       )}
