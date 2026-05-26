@@ -35,10 +35,9 @@ type TopPerformer = {
 type NotableTrade = {
   investor: string;
   ticker: string;
-  company: string;
+  details: string;
   action: string;
   value: string;
-  date: string;
 };
 
 type SectorData = {
@@ -459,14 +458,20 @@ export function SuperInvestorsScreen({
 
       {/* ─── Latest Notable Trades ─── */}
       {data?.notableTrades && data.notableTrades.length > 0 && (
-        <motion.div variants={item} className="glassy rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={16} className="text-[#00D4FF]" />
-            <h2 className="text-[11px] font-black uppercase tracking-[0.1em] text-white/80">
-              Latest Notable Trades
-            </h2>
+        <motion.div variants={item} className="p-1 mt-6 mb-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-white/80" />
+              <h2 className="text-[13px] font-medium text-white/90">
+                Latest Notable Trades
+              </h2>
+            </div>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] transition-colors">
+              <span className="text-[11px] font-semibold text-white">All</span>
+              <Filter size={12} className="text-white/60" />
+            </button>
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {data.notableTrades.map((trade, i) => {
               const isClickable = !!data?.investors.find(inv => inv.person.includes(trade.investor) || trade.investor.includes(inv.person));
               return (
@@ -474,34 +479,40 @@ export function SuperInvestorsScreen({
                   key={`${trade.ticker}-${i}`}
                   onClick={() => handleInvestorClick(trade.investor)}
                   className={cn(
-                    "w-full flex items-center justify-between p-3 rounded-xl transition-colors",
-                    isClickable ? "bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer" : "bg-white/[0.02] cursor-default"
+                    "w-full text-left p-4 rounded-xl transition-colors border border-white/[0.04]",
+                    isClickable ? "bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.1] cursor-pointer" : "bg-white/[0.02] cursor-default"
                   )}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">{trade.ticker}</span>
-                        <span className={cn(
-                          "text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
-                          ACTION_COLORS[trade.action] || 'bg-white/10 text-white/60'
-                        )}>
-                          {trade.action}
-                        </span>
-                      </div>
-                      <p className={cn("text-[11px] mt-0.5", isClickable ? "text-[#00D4FF]/80 hover:text-[#00D4FF]" : "text-white/40")}>
-                        {trade.investor} · {trade.company}
-                      </p>
-                    </div>
+                  <div className="flex items-start justify-between mb-2">
+                    <p className={cn("text-[13px] font-medium", isClickable ? "text-white hover:text-[#00D4FF]" : "text-white/90")}>
+                      {trade.investor}
+                    </p>
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border",
+                      trade.action === 'New Position' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                      trade.action === 'Exited' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                      "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                    )}>
+                      {trade.action}
+                    </span>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <p className="text-sm font-bold text-white">{trade.value}</p>
-                    <p className="text-[10px] text-white/25">{trade.date}</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/80">
+                      {trade.ticker.slice(0,1)}
+                    </div>
+                    <span className="text-[13px] font-bold text-white/90">{trade.ticker}</span>
+                  </div>
+                  <div className="flex items-end justify-between mt-2">
+                    <p className="text-[11px] text-white/40">{trade.details}</p>
+                    <p className={cn("text-[13px] font-bold", trade.value.startsWith('+') ? "text-white" : "text-white")}>{trade.value}</p>
                   </div>
                 </button>
               );
             })}
           </div>
+          <button className="w-full mt-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] transition-colors text-[13px] font-semibold text-white/80">
+            See More {'>'}
+          </button>
         </motion.div>
       )}
 
