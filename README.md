@@ -78,7 +78,7 @@ graph TD
 1. **GitOps & Continuous Delivery (CD)**
    - **GitHub Actions Integration**: Commits to `main` trigger a full pipeline run.
    - **GitHub Container Registry (GHCR)**: Images are automatically compiled and published to `ghcr.io/anishdubey27/velora:latest` with built-in caching (`type=gha`) for ultra-fast build times.
-   - **Containrrr Watchtower Daemon**: Runs on the host VM, checking GHCR for updates every 5 minutes. Upon detecting a new image, it performs a zero-downtime rolling update.
+   - **Instant SSH Deployment**: The pipeline securely connects to the Oracle Cloud VPS via SSH and immediately triggers a zero-downtime rolling update via Docker Compose, completely eliminating polling delays.
 
 2. **Automated Security Guardrails**
    - **Trivy Vulnerability Scanning**: Integrated directly into the CI/CD workflow. The pipeline runs a security scan against the container image's OS packages and libraries and **blocks/fails** if any `CRITICAL` vulnerability is detected.
@@ -159,10 +159,8 @@ create policy "Users manage own holdings"
 
 ### 5. Production Deployment (Docker Compose)
 
-To run the production-ready stack (Velora + Watchtower auto-updater) on your VPS or local machine:
-
 1. **Configure Environment File**:
-   Create a `.env` file in the root directory (Note: This is read by Docker Compose; do not prefix client variables with `NEXT_PUBLIC_` unless they are required at build time, but keep them matched to your app environment needs):
+   Create a `.env` file in the root directory:
    ```env
    # Database & Auth
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -179,7 +177,7 @@ To run the production-ready stack (Velora + Watchtower auto-updater) on your VPS
    ```bash
    docker compose up -d
    ```
-   This will pull the latest pre-built image from GHCR, apply the 700MB memory restriction, and spin up Watchtower to keep the app up to date automatically on subsequent pushes to `main`.
+   This will pull the pre-built image from GHCR and apply the 700MB memory restriction. Future updates will be pushed automatically via GitHub Actions SSH deployment!
 
 ## API Routes
 
