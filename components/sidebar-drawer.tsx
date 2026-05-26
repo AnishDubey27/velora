@@ -1,7 +1,9 @@
 "use client";
 
-import { Atom, LayoutDashboard, FileText, PieChart, X, HelpCircle } from "lucide-react";
+import { Atom, LayoutDashboard, FileText, PieChart, X, HelpCircle, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
 
@@ -21,6 +23,14 @@ type SidebarDrawerProps = {
 };
 
 export function SidebarDrawer({ active, onNavigate, isOpen, onClose, onOpenTour }: SidebarDrawerProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -88,6 +98,16 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose, onOpenTour 
               >
                 <HelpCircle size={20} strokeWidth={2.1} />
                 <span>App Walkthrough</span>
+              </button>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  onClose();
+                }}
+                className="flex w-full mt-2 items-center gap-3.5 rounded-2xl px-5 py-3.5 text-left text-[14px] font-medium text-red-400/80 hover:bg-white/5 hover:text-red-400 transition-all border border-red-500/10 bg-red-500/[0.02]"
+              >
+                <LogOut size={20} strokeWidth={2.1} />
+                <span>Log Out</span>
               </button>
             </div>
           </motion.div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import useSWR from "swr";
 import { SectionTitle } from "@/components/ui/section-title";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
@@ -107,150 +108,100 @@ type DashboardScreenProps = {
   onNavigate?: (key: NavKey) => void;
 };
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
-  const [fearGreed, setFearGreed] = useState<{ value: number | null; classification: string | null }>({
-    value: null,
-    classification: null,
-  });
-  const [vix, setVix] = useState<number | null>(null);
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [indicators, setIndicators] = useState<IndicatorsResponse | null>(null);
-  const [events, setEvents] = useState<EventsResponse | null>(null);
-  const [snapshot, setSnapshot] = useState<{ title: string; summary: string; updatedAt?: string } | null>(null);
-  const [dynamicData, setDynamicData] = useState<any>(null);
+  // Use SWR for standard API calls to enable client-side caching
+  const { data: fearGreedRaw } = useSWR("/api/fear-greed", fetcher, { revalidateOnFocus: false });
+  const { data: vixRaw } = useSWR("/api/vix", fetcher, { revalidateOnFocus: false });
+  const { data: news = [] } = useSWR<NewsItem[]>("/api/news", fetcher, { revalidateOnFocus: false });
+  const { data: indicators } = useSWR<IndicatorsResponse>("/api/dashboard/indicators", fetcher, { revalidateOnFocus: false });
+  const { data: events } = useSWR<EventsResponse>("/api/dashboard/events", fetcher, { revalidateOnFocus: false });
+  const { data: snapshot } = useSWR<{ title: string; summary: string; updatedAt?: string }>("/api/dashboard/snapshot", fetcher, { revalidateOnFocus: false });
+  const { data: dynamicData } = useSWR<any>("/api/dashboard/dynamic-data", fetcher, { revalidateOnFocus: false });
+
+  // Pre-process SWR data where necessary
+  const fearGreed = {
+    value: typeof fearGreedRaw?.value === "number" ? fearGreedRaw.value : null,
+    classification: typeof fearGreedRaw?.classification === "string" ? fearGreedRaw.classification : null,
+  };
+  const vix = typeof vixRaw?.value === "number" ? vixRaw.value : null;
 
   // Signal preview states
   const [redditPreview, setRedditPreview] = useState<RedditPreview | null>(null);
   const [insiderPreview, setInsiderPreview] = useState<InsiderPreview | null>(null);
   const [congressPreview, setCongressPreview] = useState<CongressPreview | null>(null);
   const [superInvestorPreview, setSuperInvestorPreview] = useState<SuperInvestorPreview | null>(null);
-  const [signalsLoaded, setSignalsLoaded] = useState(false);
+
+  // We keep signal previews in a useEffect with a simple local cache or just fetch directly 
+  // since SWR for 4 separate signal fetches might be overkill to type out, but let's just use SWR for them too.
+  const { data: redditDataRaw } = useSWR("/api/signals/reddit", fetcher, { revalidateOnFocus: false });
+  const { data: insiderDataRaw } = useSWR("/api/signals/insider", fetcher, { revalidateOnFocus: false });
+  const { data: congressDataRaw } = useSWR("/api/signals/congress", fetcher, { revalidateOnFocus: false });
+  const { data: superInvestorsDataRaw } = useSWR("/api/signals/super-investors", fetcher, { revalidateOnFocus: false });
 
   useEffect(() => {
-    fetch("/api/fear-greed")
-      .then(r => r.json())
-      .then(d =>
-        setFearGreed({
-          value: typeof d?.value === "number" ? d.value : null,
-          classification: typeof d?.classification === "string" ? d.classification : null,
-        })
-      )
-      .catch(() => {});
-
-    fetch("/api/vix")
-      .then(r => r.json())
-      .then(d => setVix(typeof d?.value === "number" ? d.value : null))
-      .catch(() => {});
-
-    fetch("/api/news")
-      .then(r => r.json())
-      .then(setNews)
-      .catch(() => {});
-
-    fetch("/api/dashboard/indicators")
-      .then(r => r.json())
-      .then(setIndicators)
-      .catch(() => {});
-
-    fetch("/api/dashboard/events")
-      .then(r => r.json())
-      .then(setEvents)
-      .catch(() => {});
-
-    fetch("/api/dashboard/snapshot")
-      .then(r => r.json())
-      .then(setSnapshot)
-      .catch(() => {});
-
-    fetch("/api/dashboard/dynamic-data")
-      .then(r => r.json())
-      .then(setDynamicData)
-      .catch(() => {});
-
-    // Fetch real signal previews
-    fetchSignalPreviews();
-  }, []);
-
-  async function fetchSignalPreviews() {
-    try {
-      // Fetch Reddit trending
-      fetch("/api/signals/reddit")
-        .then(r => r.json())
-        .then(data => {
-          if (data?.results?.[0]) {
-            const top = data.results[0];
-            const rankChange = (top.rank_24h_ago || top.rankChange24h || 0) - (top.rank || 1);
-            setRedditPreview({
-              symbol: top.ticker || top.symbol || "—",
-              rankChange: rankChange > 0 ? `+${rankChange} to #${top.rank}` : `${rankChange} to #${top.rank}`,
-              mentions: `${Number(top.mentions || 0).toLocaleString()} mentions`,
-            });
-          }
-        })
-        .catch(() => {});
-
-      // Fetch insider trading
-      fetch("/api/signals/insider")
-        .then(r => r.json())
-        .then(data => {
-          const trades = data?.trades || data?.data || data;
-          if (Array.isArray(trades) && trades[0]) {
-            const t = trades[0];
-            const isBuy = (t.change > 0) || t.transactionCode === "P" || t.action === "BUY";
-            setInsiderPreview({
-              symbol: t.symbol || "—",
-              action: isBuy ? "BUY" : "SELL",
-              price: t.transactionPrice ? `$${Number(t.transactionPrice).toFixed(2)}` : "—",
-              person: `${(t.name || t.insiderName || "Unknown").split(" ").slice(0, 2).join(" ")} • ${t.filingDate ? new Date(t.filingDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
-            });
-          }
-        })
-        .catch(() => {});
-
-      // Fetch congress trading
-      fetch("/api/signals/congress")
-        .then(r => r.json())
-        .then(data => {
-          const trades = data?.trades || data;
-          if (Array.isArray(trades) && trades[0]) {
-            const t = trades[0];
-            const isBuy = (t.action || t.transaction_type || "").toLowerCase().includes("purchase") ||
-                          (t.action || "").toUpperCase() === "BUY";
-            setCongressPreview({
-              symbol: t.ticker || t.symbol || "—",
-              action: isBuy ? "BUY" : "SELL",
-              amount: t.amount || "—",
-              person: `${t.politician || t.representative || t.senator || "Unknown"} • ${t.date ? new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
-            });
-          }
-        })
-        .catch(() => {});
-
-      // Fetch super investors
-      fetch("/api/signals/super-investors")
-        .then(r => r.json())
-        .then(data => {
-          const plays = data?.convictionPlays || data?.topPlays;
-          if (plays && plays[0]) {
-            const p = plays[0];
-            setSuperInvestorPreview({
-              symbol: p.ticker || p.symbol || "—",
-              action: p.investorCount ? `${p.investorCount} investors added` : p.action || "Added",
-              firm: p.investors?.join(", ") || p.firm || "—",
-            });
-          } else if (data?.investors?.[0]) {
-            setSuperInvestorPreview({
-              symbol: data.investors[0].topHolding || "—",
-              action: "Portfolio updated",
-              firm: data.investors[0].name || "—",
-            });
-          }
-        })
-        .catch(() => {});
-    } finally {
-      setSignalsLoaded(true);
+    // Process Reddit
+    if (redditDataRaw?.results?.[0]) {
+      const top = redditDataRaw.results[0];
+      const rankChange = (top.rank_24h_ago || top.rankChange24h || 0) - (top.rank || 1);
+      setRedditPreview({
+        symbol: top.ticker || top.symbol || "—",
+        rankChange: rankChange > 0 ? `+${rankChange} to #${top.rank}` : `${rankChange} to #${top.rank}`,
+        mentions: `${Number(top.mentions || 0).toLocaleString()} mentions`,
+      });
     }
-  }
+  }, [redditDataRaw]);
+
+  useEffect(() => {
+    // Process Insider
+    const trades = insiderDataRaw?.trades || insiderDataRaw?.data || insiderDataRaw;
+    if (Array.isArray(trades) && trades[0]) {
+      const t = trades[0];
+      const isBuy = (t.change > 0) || t.transactionCode === "P" || t.action === "BUY";
+      setInsiderPreview({
+        symbol: t.symbol || "—",
+        action: isBuy ? "BUY" : "SELL",
+        price: t.transactionPrice ? `$${Number(t.transactionPrice).toFixed(2)}` : "—",
+        person: `${(t.name || t.insiderName || "Unknown").split(" ").slice(0, 2).join(" ")} • ${t.filingDate ? new Date(t.filingDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
+      });
+    }
+  }, [insiderDataRaw]);
+
+  useEffect(() => {
+    // Process Congress
+    const trades = congressDataRaw?.trades || congressDataRaw;
+    if (Array.isArray(trades) && trades[0]) {
+      const t = trades[0];
+      const isBuy = (t.action || t.transaction_type || "").toLowerCase().includes("purchase") ||
+                    (t.action || "").toUpperCase() === "BUY";
+      setCongressPreview({
+        symbol: t.ticker || t.symbol || "—",
+        action: isBuy ? "BUY" : "SELL",
+        amount: t.amount || "—",
+        person: `${t.politician || t.representative || t.senator || "Unknown"} • ${t.date ? new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
+      });
+    }
+  }, [congressDataRaw]);
+
+  useEffect(() => {
+    // Process Super Investors
+    const plays = superInvestorsDataRaw?.convictionPlays || superInvestorsDataRaw?.topPlays;
+    if (plays && plays[0]) {
+      const p = plays[0];
+      setSuperInvestorPreview({
+        symbol: p.ticker || p.symbol || "—",
+        action: p.investorCount ? `${p.investorCount} investors added` : p.action || "Added",
+        firm: p.investors?.join(", ") || p.firm || "—",
+      });
+    }
+  }, [superInvestorsDataRaw]);
+
+  useEffect(() => {
+    // Scroll to top when dashboard mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+  }, []);
 
 
 
@@ -286,6 +237,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
     firm: dynamicData?.signals?.superInvestors?.firm || "—",
   };
 
+  const signalsLoaded = Boolean(redditPreview || insiderPreview || congressPreview || superInvestorPreview);
   const hasSignals = signalsLoaded || dynamicData;
 
   return (

@@ -194,6 +194,10 @@ export function SuperInvestorProfileScreen({
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    // Scroll to top when this screen mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+
     setLoading(true);
     fetch(`/api/signals/super-investors/${cik}`)
       .then(r => r.json())
@@ -695,23 +699,23 @@ export function SuperInvestorProfileScreen({
               className="relative w-full max-w-lg bg-[#0A0E17] border-t border-white/10 rounded-t-3xl max-h-[85vh] flex flex-col"
             >
               {/* Handle bar */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
+              <div className="flex justify-center pt-3 pb-2 border-b border-white/[0.06]">
+                <div className="w-10 h-1.5 rounded-full bg-white/20" />
               </div>
 
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] bg-black/20">
                 <h2 className="text-xl font-bold text-white">All Data Sources</h2>
                 <button
                   onClick={() => setShowSourcesModal(false)}
-                  className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+                  className="p-2 rounded-xl hover:bg-white/10 transition-colors bg-white/5"
                 >
-                  <X size={20} className="text-white/60" />
+                  <X size={20} className="text-white/80" />
                 </button>
               </div>
 
               {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto px-6 pb-8">
+              <div className="flex-1 overflow-y-auto px-6 pb-8 bg-black/10">
                 {sourcesLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-4">
                     <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#00D4FF] animate-spin" />

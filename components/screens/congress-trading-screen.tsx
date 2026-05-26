@@ -224,9 +224,14 @@ export function CongressTradingScreen({ onBack }: { onBack: () => void }) {
                 {/* Details Row */}
                 <div className="flex items-center gap-3 text-xs text-white/60 flex-wrap">
                   {/* Ticker */}
-                  <span className="text-sm font-bold text-white tracking-wide">
+                  <a 
+                    href={`https://finance.yahoo.com/quote/${trade.ticker}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-bold text-white tracking-wide hover:text-[#00D4FF] hover:underline cursor-pointer"
+                  >
                     {trade.ticker}
-                  </span>
+                  </a>
 
                   <span className="text-white/20">•</span>
 

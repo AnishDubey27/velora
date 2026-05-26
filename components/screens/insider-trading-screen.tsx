@@ -141,9 +141,14 @@ export function InsiderTradingScreen({ onBack }: { onBack: () => void }) {
                       )}
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-white tracking-wide">
+                      <a 
+                        href={`https://finance.yahoo.com/quote/${trade.symbol}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-lg font-bold text-white tracking-wide hover:text-[#00D4FF] hover:underline cursor-pointer"
+                      >
                         {trade.symbol}
-                      </p>
+                      </a>
                       <p className="text-xs text-white/50 max-w-[180px] truncate">
                         {trade.name}
                       </p>

@@ -156,9 +156,14 @@ export function RedditTrendingScreen({ onBack }: { onBack: () => void }) {
                   {/* Ticker + Name */}
                   <div className="min-w-0 pl-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[15px] text-white tracking-wide">
+                      <a 
+                        href={`https://finance.yahoo.com/quote/${stock.ticker}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-[15px] text-white tracking-wide hover:text-[#00D4FF] hover:underline cursor-pointer"
+                      >
                         {stock.ticker}
-                      </span>
+                      </a>
                       <span className="text-[10px] text-white/25 font-medium px-1.5 py-0.5 bg-white/[0.04] rounded-md">
                         {stock.mentions} mentions
                       </span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import useSWR from "swr";
 import { ArrowLeft, Search, Info, TrendingUp, TrendingDown, ChevronRight, Crown, Flame, BarChart3, Calendar, Clock, Check, Filter, X } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
@@ -115,7 +116,7 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-/* ─────────────────── Component ─────────────────── */
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function SuperInvestorsScreen({
   onBack,
@@ -124,8 +125,9 @@ export function SuperInvestorsScreen({
   onBack: () => void;
   onViewProfile: (cik: string) => void;
 }) {
-  const [data, setData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, error } = useSWR<ApiResponse>('/api/signals/super-investors', fetcher, { revalidateOnFocus: false });
+  const loading = !data && !error;
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<ConvictionTab>('New');
   const [showInfo, setShowInfo] = useState(false);
@@ -133,13 +135,9 @@ export function SuperInvestorsScreen({
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
-    fetch('/api/signals/super-investors')
-      .then(r => r.json())
-      .then((d) => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    // Scroll to top when this screen mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
   }, []);
 
   const filteredInvestors = useMemo(() => {
