@@ -2,58 +2,44 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
-    return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
-      { status: 500 }
-    );
-  }
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
-
-  if (!symbol) {
-    return NextResponse.json(
-      { error: "Query parameter 'symbol' is required." },
-      { status: 400 }
-    );
-  }
+  if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
   try {
-    const [ratiosRes, profileRes, quoteRes] = await Promise.all([
-      fetch(`${BASE}/stable/ratios-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(FMP_KEY)}`, { next: { revalidate: 300 } }),
-      fetch(`${BASE}/stable/profile?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(FMP_KEY)}`, { next: { revalidate: 300 } }),
-      fetch(`${BASE}/stable/quote?symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(FMP_KEY)}`, { next: { revalidate: 300 } })
+    const [profileRes, metricRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`, { next: { revalidate: 300 } }),
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${FINNHUB_KEY}`, { next: { revalidate: 300 } })
     ]);
 
-    const ratios = await ratiosRes.json().then(d => Array.isArray(d) ? d[0] : null).catch(() => null);
-    const profile = await profileRes.json().then(d => Array.isArray(d) ? d[0] : null).catch(() => null);
-    const quote = await quoteRes.json().then(d => Array.isArray(d) ? d[0] : null).catch(() => null);
+    const profile = await profileRes.json();
+    const metricData = await metricRes.json();
+    const metric = metricData?.metric || {};
+    
+    const sharesOutstanding = profile?.shareOutstanding ? profile.shareOutstanding * 1000000 : 0;
+    const eps = metric["epsTTM"] || 0;
+    const revPerShare = metric["revenuePerShareTTM"] || 0;
 
     const stats = {
-      avgVolume: profile?.averageVolume || quote?.volume || 0,
-      marketCap: profile?.marketCap || quote?.marketCap || 0,
-      peRatio: ratios?.priceToEarningsRatioTTM || 0,
-      weekRange52: profile?.range || `${quote?.yearLow || 0}-${quote?.yearHigh || 0}`,
-      eps: ratios?.netIncomePerShareTTM || 0,
-      beta: profile?.beta || 0,
-      dividendYield: ratios?.dividendYieldTTM || 0,
-      revenue: 0,
-      netIncome: 0,
-      profitMargin: ratios?.netProfitMarginTTM || 0,
+      avgVolume: metric["3MonthAverageTradingVolume"] ? metric["3MonthAverageTradingVolume"] * 1000000 : 0,
+      marketCap: profile?.marketCapitalization ? profile.marketCapitalization * 1000000 : 0,
+      peRatio: metric["peTTM"] || 0,
+      weekRange52: `${metric["52WeekLow"]?.toFixed(2) || '0'} - ${metric["52WeekHigh"]?.toFixed(2) || '0'}`,
+      eps: eps,
+      revenue: revPerShare * sharesOutstanding,
+      netIncome: eps * sharesOutstanding,
+      beta: metric["beta"] || 0,
+      dividendYield: metric["dividendYieldIndicatedAnnual"] || 0,
+      profitMargin: (metric["netProfitMarginTTM"] || 0) / 100
     };
 
-    return NextResponse.json([stats]);
+    return NextResponse.json(stats);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to fetch key metrics.",
-      },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
   }
 }

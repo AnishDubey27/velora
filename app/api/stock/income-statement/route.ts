@@ -2,48 +2,57 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
-    return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
-      { status: 500 }
-    );
-  }
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
-  const period = searchParams.get("period") || "annual";
-  const limit = searchParams.get("limit") || "20";
-
-  if (!symbol) {
-    return NextResponse.json(
-      { error: "Query parameter 'symbol' is required." },
-      { status: 400 }
-    );
-  }
+  if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
   try {
-    const url = `${BASE}/stable/income-statement?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}&limit=${encodeURIComponent(limit)}&apikey=${encodeURIComponent(FMP_KEY)}`;
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const [profileRes, metricRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`, { next: { revalidate: 300 } }),
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${FINNHUB_KEY}`, { next: { revalidate: 300 } })
+    ]);
 
-    if (!res.ok) {
-      throw new Error(`FMP request failed with status ${res.status}`);
-    }
+    const profile = await profileRes.json();
+    const metricData = await metricRes.json();
+    
+    const sharesOutstanding = profile?.shareOutstanding ? profile.shareOutstanding * 1000000 : 0;
+    
+    const salesData = metricData?.series?.annual?.salesPerShare || [];
+    const epsData = metricData?.series?.annual?.eps || [];
+    const marginData = metricData?.series?.annual?.netMargin || [];
+    
+    // Sort descending by period to get newest first
+    salesData.sort((a: any, b: any) => new Date(b.period).getTime() - new Date(a.period).getTime());
+    
+    // Take up to 5 years
+    const recent = salesData.slice(0, 5);
+    
+    const incomeStatement = recent.map((item: any) => {
+      const year = item.period.split('-')[0];
+      const epsItem = epsData.find((e: any) => e.period === item.period);
+      const marginItem = marginData.find((m: any) => m.period === item.period);
+      
+      const rev = item.v * sharesOutstanding;
+      const netInc = (epsItem?.v || 0) * sharesOutstanding;
+      const margin = marginItem?.v ? marginItem.v / 100 : (rev ? netInc / rev : 0);
+      
+      return {
+        date: item.period,
+        period: "FY",
+        calendarYear: year,
+        revenue: rev,
+        netIncome: netInc,
+        netIncomeRatio: margin
+      };
+    });
 
-    const data = await res.json();
-    return NextResponse.json(Array.isArray(data) ? data : []);
+    return NextResponse.json(incomeStatement);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch income statement.",
-      },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch income statement." }, { status: 502 });
   }
 }
