@@ -2,20 +2,44 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
+
+interface FinnhubNewsItem {
+  category: string;
+  datetime: number;
+  headline: string;
+  id: number;
+  image: string;
+  related: string;
+  source: string;
+  summary: string;
+  url: string;
+}
+
+interface StockNewsItem {
+  title: string;
+  url: string;
+  publishedDate: string;
+  site: string;
+  text: string;
+  image: string;
+  symbol: string;
+}
+
+function formatDate(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
+  if (!FINNHUB_KEY) {
     return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
+      { error: "FINNHUB_API_KEY not configured." },
       { status: 500 }
     );
   }
 
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
-  const limit = searchParams.get("limit") || "20";
 
   if (!symbol) {
     return NextResponse.json(
@@ -25,18 +49,40 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `${BASE}/stable/stock-news?symbol=${encodeURIComponent(symbol)}&limit=${encodeURIComponent(limit)}&apikey=${encodeURIComponent(FMP_KEY)}`;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const from = formatDate(thirtyDaysAgo);
+    const to = formatDate(now);
+
+    const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${encodeURIComponent(FINNHUB_KEY)}`;
     const res = await fetch(url, { cache: "no-store" });
 
     if (!res.ok) {
-      if (res.status === 404 || res.status === 403 || res.status === 402) {
+      if (res.status === 404 || res.status === 403 || res.status === 429) {
         return NextResponse.json([]);
       }
-      throw new Error(`FMP request failed with status ${res.status}`);
+      throw new Error(`Finnhub request failed with status ${res.status}`);
     }
 
-    const data = await res.json();
-    return NextResponse.json(Array.isArray(data) ? data : []);
+    const data: FinnhubNewsItem[] = await res.json();
+
+    if (!Array.isArray(data)) {
+      return NextResponse.json([]);
+    }
+
+    const mapped: StockNewsItem[] = data.slice(0, 20).map((item) => ({
+      title: item.headline,
+      url: item.url,
+      publishedDate: new Date(item.datetime * 1000).toISOString(),
+      site: item.source,
+      text: item.summary,
+      image: item.image,
+      symbol: item.related,
+    }));
+
+    return NextResponse.json(mapped);
   } catch (error) {
     return NextResponse.json(
       {

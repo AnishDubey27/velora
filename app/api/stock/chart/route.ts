@@ -1,56 +1,41 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
-import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+type YahooParams = { interval: string; range: string };
 
-type RangeConfig = {
-  interval: string;
-  type: "intraday" | "daily";
-  daysBack: number;
-};
-
-function getRangeConfig(range: string): RangeConfig {
+function getYahooParams(range: string): YahooParams {
   switch (range) {
     case "1D":
-      return { interval: "5min", type: "intraday", daysBack: 1 };
+      return { interval: "5m", range: "1d" };
     case "1W":
-      return { interval: "daily", type: "daily", daysBack: 7 };
+      return { interval: "15m", range: "5d" };
     case "1M":
-      return { interval: "daily", type: "daily", daysBack: 30 };
+      return { interval: "1h", range: "1mo" };
     case "3M":
-      return { interval: "daily", type: "daily", daysBack: 90 };
+      return { interval: "1d", range: "3mo" };
     case "6M":
-      return { interval: "daily", type: "daily", daysBack: 180 };
-    case "YTD": {
-      const now = new Date();
-      const startOfYear = new Date(now.getFullYear(), 0, 1);
-      const diffMs = now.getTime() - startOfYear.getTime();
-      const daysBack = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      return { interval: "daily", type: "daily", daysBack };
-    }
+      return { interval: "1d", range: "6mo" };
+    case "YTD":
+      return { interval: "1d", range: "ytd" };
     case "1Y":
-      return { interval: "daily", type: "daily", daysBack: 365 };
+      return { interval: "1d", range: "1y" };
     case "2Y":
-      return { interval: "daily", type: "daily", daysBack: 730 };
+      return { interval: "1wk", range: "2y" };
     default:
-      return { interval: "5min", type: "intraday", daysBack: 1 };
+      return { interval: "5m", range: "1d" };
   }
 }
 
-function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
+interface ChartEntry {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
-    return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
-      { status: 500 }
-    );
-  }
-
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   const range = searchParams.get("range") || "1D";
@@ -62,50 +47,57 @@ export async function GET(request: Request) {
     );
   }
 
-  const config = getRangeConfig(range);
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - config.daysBack);
-
-  const fromStr = formatDate(from);
-  const toStr = formatDate(to);
+  const params = getYahooParams(range);
 
   try {
-    let url: string;
-
-    if (config.type === "intraday") {
-      url = `${BASE}/stable/historical-chart/${config.interval}?symbol=${encodeURIComponent(symbol)}&from=${fromStr}&to=${toStr}&apikey=${encodeURIComponent(FMP_KEY)}`;
-    } else {
-      url = `${BASE}/stable/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}&from=${fromStr}&to=${toStr}&apikey=${encodeURIComponent(FMP_KEY)}`;
-    }
-
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${params.interval}&range=${params.range}`;
     const res = await fetch(url, { cache: "no-store" });
 
     if (!res.ok) {
-      if (res.status === 402 || res.status === 403 || res.status === 404) {
+      if (res.status === 404 || res.status === 422) {
         return NextResponse.json([]);
       }
-      throw new Error(`FMP request failed with status ${res.status}`);
+      throw new Error(`Yahoo Finance request failed with status ${res.status}`);
     }
 
     const data = await res.json();
+    const result = data?.chart?.result?.[0];
 
-    // Intraday returns an array directly; daily EOD returns { symbol, historical: [...] }
-    let chartData: unknown[];
-    if (Array.isArray(data)) {
-      chartData = data;
-    } else if (data && Array.isArray(data.historical)) {
-      chartData = data.historical;
-    } else {
-      chartData = [];
+    if (!result || !result.timestamp) {
+      return NextResponse.json([]);
     }
 
-    // Sort oldest-first for charting
-    chartData.sort((a: unknown, b: unknown) => {
-      const dateA = (a as { date: string }).date;
-      const dateB = (b as { date: string }).date;
-      return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
-    });
+    const timestamps: number[] = result.timestamp;
+    const quote = result.indicators?.quote?.[0];
+
+    if (!quote) {
+      return NextResponse.json([]);
+    }
+
+    const opens: (number | null)[] = quote.open ?? [];
+    const highs: (number | null)[] = quote.high ?? [];
+    const lows: (number | null)[] = quote.low ?? [];
+    const closes: (number | null)[] = quote.close ?? [];
+    const volumes: (number | null)[] = quote.volume ?? [];
+
+    const chartData: ChartEntry[] = [];
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const close = closes[i];
+      if (close == null) continue;
+
+      chartData.push({
+        date: new Date(timestamps[i] * 1000).toISOString(),
+        open: opens[i] ?? close,
+        high: highs[i] ?? close,
+        low: lows[i] ?? close,
+        close,
+        volume: volumes[i] ?? 0,
+      });
+    }
+
+    // Sort oldest first
+    chartData.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
     return NextResponse.json(chartData);
   } catch (error) {

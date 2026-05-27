@@ -2,21 +2,42 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
+
+const TRANSACTION_CODE_MAP: Record<string, string> = {
+  P: "Purchase",
+  S: "Sale",
+  G: "Gift",
+  M: "Exercise",
+  A: "Award",
+  F: "Tax",
+};
+
+interface FinnhubInsiderTransaction {
+  change: number;
+  currency: string;
+  filingDate: string;
+  id: string;
+  isDerivative: boolean;
+  name: string;
+  share: number;
+  source: string;
+  symbol: string;
+  transactionCode: string;
+  transactionDate: string;
+  transactionPrice: number;
+}
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
+  if (!FINNHUB_KEY) {
     return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
+      { error: "FINNHUB_API_KEY not configured." },
       { status: 500 }
     );
   }
 
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
-  const page = searchParams.get("page") || "0";
-  const limit = searchParams.get("limit") || "50";
 
   if (!symbol) {
     return NextResponse.json(
@@ -26,18 +47,43 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `${BASE}/stable/insider-trading?symbol=${encodeURIComponent(symbol)}&page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}&apikey=${encodeURIComponent(FMP_KEY)}`;
+    const url = `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(FINNHUB_KEY)}`;
     const res = await fetch(url, { next: { revalidate: 300 } });
 
     if (!res.ok) {
-      if (res.status === 404 || res.status === 403 || res.status === 402) {
+      if (res.status === 404 || res.status === 403 || res.status === 429) {
         return NextResponse.json([]);
       }
-      throw new Error(`FMP request failed with status ${res.status}`);
+      throw new Error(`Finnhub request failed with status ${res.status}`);
     }
 
-    const data = await res.json();
-    return NextResponse.json(Array.isArray(data) ? data : []);
+    const json = await res.json();
+    const raw: FinnhubInsiderTransaction[] = Array.isArray(json?.data)
+      ? json.data
+      : [];
+
+    const mapped = raw
+      .filter(
+        (t) =>
+          !t.isDerivative &&
+          t.transactionPrice != null &&
+          t.transactionPrice > 0
+      )
+      .slice(0, 30)
+      .map((t) => ({
+        symbol: t.symbol,
+        reportingName: t.name,
+        transactionType:
+          TRANSACTION_CODE_MAP[t.transactionCode] ?? t.transactionCode,
+        securitiesTransacted: Math.abs(t.change),
+        price: t.transactionPrice ?? 0,
+        transactionDate: t.transactionDate,
+        filingDate: t.filingDate,
+        typeOfOwner: "officer",
+        link: "",
+      }));
+
+    return NextResponse.json(mapped);
   } catch (error) {
     return NextResponse.json(
       {

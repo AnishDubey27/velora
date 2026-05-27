@@ -21,7 +21,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 const RANGES: ChartRange[] = ["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "2Y"];
 
 export function StockChart({ symbol }: { symbol: string }) {
-  const [range, setRange] = useState<ChartRange>("1M");
+  const [range, setRange] = useState<ChartRange>("1D");
   
   const { data, isLoading } = useSWR<ChartDataPoint[]>(
     `/api/stock/chart?symbol=${symbol}&range=${range}`,

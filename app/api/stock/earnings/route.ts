@@ -2,13 +2,37 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
-const FMP_KEY = getEnv("FMP_API_KEY");
-const BASE = "https://financialmodelingprep.com";
+const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
+
+interface FinnhubEarning {
+  actual: number | null;
+  estimate: number | null;
+  period: string;
+  quarter: number;
+  surprise: number | null;
+  surprisePercent: number | null;
+  symbol: string;
+  year: number;
+}
+
+interface EarningsEntry {
+  date: string;
+  symbol: string;
+  fiscalDateEnding: string;
+  epsEstimated: number | null;
+  epsActual: number | null;
+  revenueEstimated: number | null;
+  revenueActual: number | null;
+  epsSurprise: number | null;
+  revenueSurprise: number | null;
+  updatedFromDate: string;
+  fiscalPeriod: string;
+}
 
 export async function GET(request: Request) {
-  if (!FMP_KEY) {
+  if (!FINNHUB_KEY) {
     return NextResponse.json(
-      { error: "FMP_API_KEY not configured." },
+      { error: "FINNHUB_API_KEY not configured." },
       { status: 500 }
     );
   }
@@ -24,18 +48,37 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `${BASE}/api/v3/historical/earning_calendar/${encodeURIComponent(symbol)}?apikey=${encodeURIComponent(FMP_KEY)}`;
+    const url = `https://finnhub.io/api/v1/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(FINNHUB_KEY)}`;
     const res = await fetch(url, { next: { revalidate: 300 } });
 
     if (!res.ok) {
-      if (res.status === 404 || res.status === 403 || res.status === 402) {
+      if (res.status === 404 || res.status === 403 || res.status === 429) {
         return NextResponse.json([]);
       }
-      throw new Error(`FMP request failed with status ${res.status}`);
+      throw new Error(`Finnhub request failed with status ${res.status}`);
     }
 
-    const data = await res.json();
-    return NextResponse.json(Array.isArray(data) ? data : []);
+    const data: FinnhubEarning[] = await res.json();
+
+    if (!Array.isArray(data)) {
+      return NextResponse.json([]);
+    }
+
+    const mapped: EarningsEntry[] = data.map((item) => ({
+      date: item.period,
+      symbol: item.symbol,
+      fiscalDateEnding: item.period,
+      epsEstimated: item.estimate ?? null,
+      epsActual: item.actual ?? null,
+      revenueEstimated: null,
+      revenueActual: null,
+      epsSurprise: item.surprise ?? null,
+      revenueSurprise: null,
+      updatedFromDate: "",
+      fiscalPeriod: `Q${item.quarter} FY${item.year.toString().slice(-2)}`,
+    }));
+
+    return NextResponse.json(mapped);
   } catch (error) {
     return NextResponse.json(
       {
