@@ -41,7 +41,9 @@ export function GlobalSearchModal({ isOpen, onClose, onSelect }: GlobalSearchPro
     const timer = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+          credentials: 'include'
+        });
         if (res.ok) {
           const data = await res.json();
           // Filter for common stock types if desired, or just take first 8

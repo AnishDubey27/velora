@@ -119,8 +119,8 @@ export function StockDetailScreen({ symbol, onBack }: { symbol: string; onBack: 
             </div>
             
             <div className={cn("flex items-center gap-2 text-sm font-medium mt-1", isUp ? "text-vel-green" : "text-vel-red")}>
-              <span>{isUp ? "+" : ""}{quote?.change?.toFixed(2)}</span>
-              <span>({isUp ? "+" : ""}{quote?.changesPercentage?.toFixed(2)}%)</span>
+              <span>{isUp ? "+" : ""}{quote?.change !== undefined && quote?.change !== null ? quote.change.toFixed(2) : "0.00"}</span>
+              <span>({isUp ? "+" : ""}{quote?.changesPercentage !== undefined && quote?.changesPercentage !== null ? quote.changesPercentage.toFixed(2) : "0.00"}%)</span>
               <span className="text-vel-faint ml-1">Today</span>
             </div>
           </>

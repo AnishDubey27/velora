@@ -16,9 +16,9 @@ function getRangeConfig(range: string): RangeConfig {
     case "1D":
       return { interval: "5min", type: "intraday", daysBack: 1 };
     case "1W":
-      return { interval: "15min", type: "intraday", daysBack: 7 };
+      return { interval: "daily", type: "daily", daysBack: 7 };
     case "1M":
-      return { interval: "1hour", type: "intraday", daysBack: 30 };
+      return { interval: "daily", type: "daily", daysBack: 30 };
     case "3M":
       return { interval: "daily", type: "daily", daysBack: 90 };
     case "6M":

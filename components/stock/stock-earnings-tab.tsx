@@ -194,7 +194,12 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
             className="space-y-4"
           >
             {/* ─── Latest quarter summary ─── */}
-            {latest && (
+            {pastEntries.length === 0 ? (
+              <div className="glassy rounded-2xl p-8 text-center">
+                <Calendar size={32} className="text-white/15 mx-auto mb-3" />
+                <p className="text-sm text-white/40">No past earnings data available.</p>
+              </div>
+            ) : latest ? (
               <div className="glassy rounded-2xl p-5">
                 <p className="text-[13px] font-bold text-white mb-1">
                   {getQuarterLabel(latest.fiscalPeriod, latest.fiscalDateEnding)}
@@ -277,7 +282,7 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                   })()}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* ─── EPS Chart ─── */}
             {epsChartData.length > 0 && (

@@ -32,7 +32,7 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function PortfolioScreen() {
+export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string) => void }) {
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
   const [quotes, setQuotes] = useState<Record<string, any>>({});
   const [sp500ChangePercent, setSp500ChangePercent] = useState<number | null>(null);
@@ -378,9 +378,10 @@ export function PortfolioScreen() {
                   {portfolioStats.enrichedHoldings.map((holding, i) => (
                     <motion.div 
                       key={holding.symbol} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                      className="rounded-2xl bg-white/5 p-4 flex justify-between items-center"
+                      className={cn("rounded-2xl bg-white/5 p-4 flex justify-between items-center transition", !isEditing && "cursor-pointer hover:bg-white/10 active:scale-[0.98]")}
+                      onClick={() => !isEditing && onViewStock?.(holding.symbol)}
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 pointer-events-none">
                         <div className="flex items-center gap-2">
                           {!isEditing && <div className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i % colors.length] }} />}
                           <span className="font-semibold text-white">{holding.symbol}</span>
