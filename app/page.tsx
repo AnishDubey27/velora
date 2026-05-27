@@ -14,6 +14,7 @@ import { InsiderTradingScreen } from "@/components/screens/insider-trading-scree
 import { CongressTradingScreen } from "@/components/screens/congress-trading-screen";
 import { SuperInvestorsScreen } from "@/components/screens/super-investors-screen";
 import { SuperInvestorProfileScreen } from "@/components/screens/super-investor-profile-screen";
+import { StockDetailScreen } from "@/components/screens/stock-detail-screen";
 import type { NavKey, Skill } from "@/lib/types";
 
 const screenVariants = {
@@ -28,6 +29,8 @@ export default function Home() {
   const [chatPrompt, setChatPrompt] = useState<string>("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedInvestorCik, setSelectedInvestorCik] = useState<string>("");
+  const [selectedStockSymbol, setSelectedStockSymbol] = useState<string>("");
+  const [previousScreen, setPreviousScreen] = useState<NavKey>("research");
 
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
@@ -56,6 +59,12 @@ export default function Home() {
   const handleNavigate = (key: NavKey) => {
     setSkillLibraryOpen(false);
     setActive(key);
+  };
+
+  const handleViewStock = (symbol: string) => {
+    setPreviousScreen(active);
+    setSelectedStockSymbol(symbol);
+    setActive("stock-detail");
   };
 
   const screen = useMemo(() => {
@@ -103,6 +112,13 @@ export default function Home() {
             onBack={() => setActive("super-investors")} 
           />
         );
+      case "stock-detail":
+        return (
+          <StockDetailScreen
+            symbol={selectedStockSymbol}
+            onBack={() => setActive(previousScreen)}
+          />
+        );
       default:
         return (
           <ResearchScreen
@@ -115,13 +131,14 @@ export default function Home() {
           />
         );
     }
-  }, [active, skillLibraryOpen, skills, selectedInvestorCik]);
+  }, [active, skillLibraryOpen, skills, selectedInvestorCik, selectedStockSymbol, previousScreen]);
 
   return (
     <AppShell 
       active={active} 
       onNavigate={handleNavigate}
       onDashboard={() => setActive("dashboard")}
+      onViewStock={handleViewStock}
       onStartChat={(prompt) => {
         setChatPrompt(prompt);
         setActive("chat");
@@ -129,7 +146,7 @@ export default function Home() {
     >
       <AnimatePresence mode="wait">
         <motion.main
-          key={`${active}-${skillLibraryOpen ? "library" : "main"}-${active === "super-investor-profile" ? selectedInvestorCik : ""}`}
+          key={`${active}-${skillLibraryOpen ? "library" : "main"}-${active === "super-investor-profile" ? selectedInvestorCik : ""}-${active === "stock-detail" ? selectedStockSymbol : ""}`}
           variants={screenVariants}
           initial="enter"
           animate="center"

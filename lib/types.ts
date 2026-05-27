@@ -1,4 +1,4 @@
-export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat" | "reddit-trending" | "super-investors" | "congress-trading" | "insider-trading" | "super-investor-profile";
+export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat" | "reddit-trending" | "super-investors" | "congress-trading" | "insider-trading" | "super-investor-profile" | "stock-detail";
 
 export type Skill = {
   id: string;
@@ -68,4 +68,128 @@ export type Dashboard = {
     title: string;
     date: string;
   }[];
+};
+
+/* ─── Stock Detail Types ─── */
+
+export type StockQuote = {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changesPercentage: number;
+  dayLow: number;
+  dayHigh: number;
+  yearLow: number;
+  yearHigh: number;
+  volume: number;
+  avgVolume: number;
+  marketCap: number;
+  pe: number;
+  eps: number;
+  open: number;
+  previousClose: number;
+  timestamp: number;
+};
+
+export type StockProfile = {
+  symbol: string;
+  companyName: string;
+  description: string;
+  sector: string;
+  industry: string;
+  ceo: string;
+  website: string;
+  image: string;
+  exchange: string;
+  currency: string;
+  country: string;
+  ipoDate: string;
+  fullTimeEmployees: string;
+};
+
+export type ChartDataPoint = {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+export type ChartRange = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "2Y";
+
+export type KeyStats = {
+  avgVolume: number;
+  marketCap: number;
+  peRatio: number;
+  weekRange52: string;
+  eps: number;
+  revenue: number;
+  netIncome: number;
+  beta: number;
+  dividendYield: number;
+  profitMargin: number;
+};
+
+export type IncomeStatementEntry = {
+  date: string;
+  period: string;
+  revenue: number;
+  netIncome: number;
+  netIncomeRatio: number;
+  calendarYear: string;
+};
+
+export type AnalystRating = {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  consensus: string;
+};
+
+export type EarningsEntry = {
+  date: string;
+  symbol: string;
+  fiscalDateEnding: string;
+  epsEstimated: number | null;
+  epsActual: number | null;
+  revenueEstimated: number | null;
+  revenueActual: number | null;
+  epsSurprise: number | null;
+  revenueSurprise: number | null;
+  updatedFromDate: string;
+  fiscalPeriod: string;
+};
+
+export type InsiderTrade = {
+  symbol: string;
+  reportingName: string;
+  transactionType: string;
+  securitiesTransacted: number;
+  price: number;
+  transactionDate: string;
+  filingDate: string;
+  typeOfOwner: string;
+  link: string;
+};
+
+export type StockNewsItem = {
+  title: string;
+  url: string;
+  publishedDate: string;
+  site: string;
+  text: string;
+  image: string;
+  symbol: string;
+};
+
+export type WatchlistItem = {
+  id: string;
+  user_id: string;
+  symbol: string;
+  name: string;
+  added_at: string;
 };

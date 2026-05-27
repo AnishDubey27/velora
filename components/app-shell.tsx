@@ -12,6 +12,7 @@ type AppShellProps = {
   active: NavKey;
   onNavigate: (key: NavKey) => void;
   onDashboard: () => void;
+  onViewStock?: (symbol: string) => void;
   onStartChat?: (prompt: string) => void;
   children: ReactNode;
 };
@@ -20,6 +21,7 @@ export function AppShell({
   active, 
   onNavigate, 
   onDashboard, 
+  onViewStock,
   onStartChat,
   children 
 }: AppShellProps) {
@@ -81,7 +83,9 @@ export function AppShell({
           onClose={() => setSearchOpen(false)}
           onSelect={(symbol) => {
             setSearchOpen(false);
-            if (onStartChat) {
+            if (onViewStock) {
+              onViewStock(symbol);
+            } else if (onStartChat) {
               onStartChat(`Give me an analysis on ${symbol}`);
             }
           }}
