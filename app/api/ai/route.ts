@@ -60,7 +60,32 @@ export async function POST(request: Request) {
         .eq('user_id', user.id);
         
       if (holdings && holdings.length > 0) {
-        const holdingsText = holdings.map(h => `${h.shares} shares of ${h.symbol} at $${h.purchase_price}`).join(", ");
+        // Fetch real-time prices for these holdings
+        const finnhubKey = getEnv('FINNHUB_API_KEY');
+        const holdingsTextPromises = holdings.map(async (h) => {
+          let currentPriceStr = "";
+          if (finnhubKey) {
+            try {
+              const quoteRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${h.symbol}&token=${finnhubKey}`, { cache: "no-store" });
+              if (quoteRes.ok) {
+                const quoteData = await quoteRes.json();
+                if (quoteData && quoteData.c) {
+                  const currentPrice = quoteData.c;
+                  const percentChange = (((currentPrice - h.purchase_price) / h.purchase_price) * 100).toFixed(2);
+                  const isUp = currentPrice >= h.purchase_price;
+                  currentPriceStr = ` (Current Price: $${currentPrice}, Return: ${isUp ? '+' : ''}${percentChange}%)`;
+                }
+              }
+            } catch (e) {
+              console.error(`Failed to fetch quote for ${h.symbol}`);
+            }
+          }
+          return `${h.shares} shares of ${h.symbol} purchased at $${h.purchase_price}${currentPriceStr}`;
+        });
+        
+        const holdingsTexts = await Promise.all(holdingsTextPromises);
+        const holdingsText = holdingsTexts.join(", ");
+        
         const portfolioContext: ChatMessage = {
           role: "system",
           content: `You are Velora AI. The user currently has the following portfolio holdings: ${holdingsText}. Keep this in mind and provide personalized advice if they ask about their portfolio.`

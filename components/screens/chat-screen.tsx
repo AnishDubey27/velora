@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Bot, User, ArrowLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type Message = {
   role: "system" | "user" | "assistant";
@@ -118,7 +120,15 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
                 ? "bg-white/10 text-white" 
                 : "bg-transparent border border-white/10 text-white/90"
             )}>
-              <div className="whitespace-pre-wrap">{msg.content}</div>
+              {msg.role === "user" ? (
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+              ) : (
+                <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10 text-white/90 marker:text-vel-teal">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
