@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { resolveNvidiaModel } from "@/lib/nvidia";
 import { createClient } from "@/utils/supabase/server";

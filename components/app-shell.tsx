@@ -6,6 +6,7 @@ import { TopBar } from "@/components/top-bar";
 import { SidebarDrawer } from "@/components/sidebar-drawer";
 import { GlobalSearchModal } from "@/components/global-search";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { WatchlistDrawer } from "@/components/watchlist-drawer";
 import type { NavKey } from "@/lib/types";
 
 type AppShellProps = {
@@ -28,6 +29,7 @@ export function AppShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
 
   useEffect(() => {
     // Check if it's the first visit to open drawer & tour automatically
@@ -50,6 +52,7 @@ export function AppShell({
             onDashboard={onDashboard} 
             onMenuClick={() => setDrawerOpen(true)} 
             onSearchClick={() => setSearchOpen(true)}
+            onWatchlistClick={() => setWatchlistOpen(true)}
           />
 
           {/* Main scrollable area - this is the critical part */}
@@ -88,6 +91,14 @@ export function AppShell({
             } else if (onStartChat) {
               onStartChat(`Give me an analysis on ${symbol}`);
             }
+          }}
+        />
+
+        <WatchlistDrawer
+          isOpen={watchlistOpen}
+          onClose={() => setWatchlistOpen(false)}
+          onSelect={(symbol) => {
+            if (onViewStock) onViewStock(symbol);
           }}
         />
       </section>

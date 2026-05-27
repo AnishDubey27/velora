@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/portfolio/route.ts
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
