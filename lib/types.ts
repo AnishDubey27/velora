@@ -117,7 +117,7 @@ export type ChartDataPoint = {
   volume: number;
 };
 
-export type ChartRange = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "2Y";
+export type ChartRange = "1m" | "5m" | "15m" | "1h" | "1D" | "1W" | "1M" | "YTD" | "1Y";
 
 export type KeyStats = {
   avgVolume: number;

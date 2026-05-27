@@ -78,7 +78,7 @@ export default function Home() {
       case "headlines":
         return <HeadlinesScreen />;
       case "portfolio":
-        return <PortfolioScreen />;
+        return <PortfolioScreen onViewStock={handleViewStock} />;
       case "chat":
         return (
           <ChatScreen 
@@ -117,6 +117,10 @@ export default function Home() {
           <StockDetailScreen
             symbol={selectedStockSymbol}
             onBack={() => setActive(previousScreen)}
+            onStartChat={(prompt) => {
+              setChatPrompt(prompt);
+              setActive("chat");
+            }}
           />
         );
       default:

@@ -20,7 +20,7 @@ const fetcher = (url: string) => fetch(url).then((res) => {
 type TabKey = "Profile" | "Earnings" | "Insider" | "News";
 const TABS: TabKey[] = ["Profile", "Earnings", "Insider", "News"];
 
-export function StockDetailScreen({ symbol, onBack }: { symbol: string; onBack: () => void }) {
+export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: string; onBack: () => void; onStartChat?: (prompt: string) => void }) {
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [isTogglingWatchlist, setIsTogglingWatchlist] = useState(false);
@@ -90,16 +90,27 @@ export function StockDetailScreen({ symbol, onBack }: { symbol: string; onBack: 
           </div>
         </div>
 
-        <button 
-          onClick={toggleWatchlist}
-          disabled={isTogglingWatchlist}
-          className={cn(
-            "p-2 rounded-full transition-colors",
-            isWatchlisted ? "text-[#F6C45F] hover:bg-[#F6C45F]/10" : "text-vel-muted hover:bg-white/5"
+        <div className="flex items-center gap-2">
+          {onStartChat && (
+            <button
+              onClick={() => onStartChat(`Check if I have ${symbol} in my portfolio. If yes, give me a quick update on my position. If no, give me a brief overview of the stock and whether it looks like a good buy right now.`)}
+              className="flex items-center gap-2 bg-vel-teal/10 text-vel-teal hover:bg-vel-teal/20 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border border-vel-teal/20"
+            >
+              <Star className="w-3.5 h-3.5" />
+              Ask Velora AI
+            </button>
           )}
-        >
-          <Star className="w-6 h-6" fill={isWatchlisted ? "currentColor" : "none"} />
-        </button>
+          <button 
+            onClick={toggleWatchlist}
+            disabled={isTogglingWatchlist}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              isWatchlisted ? "text-[#F6C45F] hover:bg-[#F6C45F]/10" : "text-vel-muted hover:bg-white/5"
+            )}
+          >
+            <Star className="w-5 h-5" fill={isWatchlisted ? "currentColor" : "none"} />
+          </button>
+        </div>
       </div>
 
       {/* Price Section */}
