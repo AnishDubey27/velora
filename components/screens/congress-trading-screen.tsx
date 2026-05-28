@@ -94,6 +94,10 @@ export function CongressTradingScreen({ onBack }: { onBack: () => void }) {
   const [chamberFilter, setChamberFilter] = useState<ChamberFilter>("All");
 
   useEffect(() => {
+    // Scroll to top when this screen mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+
     fetch("/api/signals/congress")
       .then((res) => res.json())
       .then((data) => {

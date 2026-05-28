@@ -60,6 +60,10 @@ export function InsiderTradingScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Scroll to top when this screen mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+
     fetch("/api/signals/insider")
       .then((res) => res.json())
       .then((data) => {

@@ -5,22 +5,24 @@ type YahooParams = { interval: string; range: string };
 
 function getYahooParams(range: string): YahooParams {
   switch (range) {
+    case "1m":
+      return { interval: "1m", range: "1d" };
+    case "5m":
+      return { interval: "5m", range: "1d" };
+    case "15m":
+      return { interval: "15m", range: "5d" };
+    case "1h":
+      return { interval: "60m", range: "1mo" };
     case "1D":
       return { interval: "5m", range: "1d" };
     case "1W":
       return { interval: "15m", range: "5d" };
     case "1M":
       return { interval: "1h", range: "1mo" };
-    case "3M":
-      return { interval: "1d", range: "3mo" };
-    case "6M":
-      return { interval: "1d", range: "6mo" };
     case "YTD":
       return { interval: "1d", range: "ytd" };
     case "1Y":
       return { interval: "1d", range: "1y" };
-    case "2Y":
-      return { interval: "1wk", range: "2y" };
     default:
       return { interval: "5m", range: "1d" };
   }

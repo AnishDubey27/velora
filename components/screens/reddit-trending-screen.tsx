@@ -18,6 +18,10 @@ export function RedditTrendingScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Scroll to top when this screen mounts
+    const scrollContainer = document.querySelector('.app-scroll');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+
     async function fetchData() {
       try {
         const res = await fetch('/api/signals/reddit');
