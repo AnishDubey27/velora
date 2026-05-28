@@ -183,6 +183,7 @@ export function StockChart({ symbol }: { symbol: string }) {
             >
               Advanced
             </button>
+          </div>
         </div>
       </div>
     </div>
