@@ -23,17 +23,15 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchSc
   const shouldCenterPopular = popular.length <= 3;
 
   return (
-    <div className="min-h-screen bg-[#05080F] pb-20 pt-2 md:pb-12">
-      <div className="h-3" />
+    <div className="bg-[#05080F] pb-24 pt-1 md:pb-12">
+      <div className="h-2" />
 
       {/* Logo + Title */}
-      <div className="flex flex-col items-center justify-center pt-6 pb-8">
+      <div className="flex flex-col items-center justify-center pt-3 pb-4 md:pt-6 md:pb-8">
         <motion.svg
-          width="76"
-          height="76"
           viewBox="0 0 88 88"
           fill="none"
-          className="mb-5 drop-shadow-[0_0_26px_rgba(220,236,255,0.22)]"
+          className="w-14 h-14 md:w-[76px] md:h-[76px] mb-3 md:mb-5 drop-shadow-[0_0_26px_rgba(220,236,255,0.22)]"
           animate={{ y: [0, -5, 0], opacity: [0.86, 1, 0.86] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
         >
@@ -53,20 +51,20 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchSc
           </defs>
         </motion.svg>
 
-        <h1 className="text-center text-[31px] font-medium leading-[1.16] tracking-[0.01em] text-white">
+        <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white">
           Where should<br />we start?
         </h1>
       </div>
 
       {/* Popular Skills */}
-      <div className="px-4 pb-6">
-        <p className="mb-3 px-1 text-xs font-bold uppercase tracking-[1.5px] text-zinc-400">
+      <div className="px-4 pb-4 md:pb-6">
+        <p className="mb-2 md:mb-3 px-1 text-xs font-bold uppercase tracking-[1.5px] text-zinc-400">
           POPULAR SKILLS
         </p>
 
         <div
           className={cn(
-            "pb-6 no-scrollbar touch-pan-x snap-x snap-mandatory flex gap-3 overflow-x-auto",
+            "pb-3 md:pb-6 no-scrollbar touch-pan-x snap-x snap-mandatory flex gap-3 overflow-x-auto",
             shouldCenterPopular && "sm:justify-center sm:overflow-visible"
           )}
         >
@@ -84,15 +82,15 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchSc
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.08 }}
-                className="snap-start w-[158px] flex-none rounded-2xl bg-zinc-900/70 border border-white/5 p-4 text-left backdrop-blur-xl transition hover:border-teal-500/30 active:scale-[0.985]"
+                className="snap-start w-[158px] flex-none rounded-2xl bg-zinc-900/70 border border-white/5 p-3.5 md:p-4 text-left backdrop-blur-xl transition hover:border-teal-500/30 active:scale-[0.985]"
               >
-                <div className="mb-5 h-9 w-9 rounded-full bg-white/5 flex items-center justify-center">
+                <div className="mb-3 md:mb-5 h-9 w-9 rounded-full bg-white/5 flex items-center justify-center">
                   <Icon className="text-white/70" size={20} strokeWidth={1.8} />
                 </div>
                 <div className="text-[15px] font-semibold leading-tight text-white">
                   {skill.title}
                 </div>
-                <div className="mt-2 text-[13px] leading-snug text-zinc-400 line-clamp-3">
+                <div className="mt-1.5 md:mt-2 text-[13px] leading-snug text-zinc-400 line-clamp-2 md:line-clamp-3">
                   {skill.description}
                 </div>
               </motion.button>

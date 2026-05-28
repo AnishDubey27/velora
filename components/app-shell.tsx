@@ -56,7 +56,7 @@ export function AppShell({
           />
 
           {/* Main scrollable area - this is the critical part */}
-          <main className="flex-1 overflow-y-scroll overscroll-y-contain px-4 pb-20 pt-2 md:px-8 md:pb-12 md:pt-6 app-scroll">
+          <main className="flex-1 overflow-y-auto overscroll-y-contain px-4 pb-20 pt-2 md:px-8 md:pb-12 md:pt-6 app-scroll">
             <div className="mx-auto max-w-5xl">
               {children}
             </div>
