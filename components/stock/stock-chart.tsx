@@ -183,15 +183,6 @@ export function StockChart({ symbol }: { symbol: string }) {
             >
               Advanced
             </button>
-          </div>
-          <a
-            href={`https://www.tradingview.com/symbols/${symbol}/`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 bg-black/40 border border-white/5 px-3 py-1.5 rounded-xl text-xs font-medium text-vel-teal hover:bg-white/5 transition-colors"
-          >
-            TradingView <span className="text-[10px]">↗</span>
-          </a>
         </div>
       </div>
     </div>

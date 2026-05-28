@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       profitMargin: (metric["netProfitMarginTTM"] || 0) / 100
     };
 
-    return NextResponse.json(stats);
+    return NextResponse.json([stats]);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
   }

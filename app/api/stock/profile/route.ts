@@ -22,10 +22,34 @@ export async function GET(request: Request) {
       return NextResponse.json(null);
     }
     
+    let description = data.finnhubIndustry || "";
+    
+    // Attempt to fetch a better description from Wikipedia
+    if (data.name) {
+      try {
+        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(data.name)}&utf8=&format=json`;
+        const searchRes = await fetch(searchUrl, { next: { revalidate: 86400 } });
+        const searchData = await searchRes.json();
+        
+        if (searchData?.query?.search?.[0]?.title) {
+          const title = searchData.query.search[0].title;
+          const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+          const summaryRes = await fetch(summaryUrl, { next: { revalidate: 86400 } });
+          const summaryData = await summaryRes.json();
+          
+          if (summaryData?.extract) {
+            description = summaryData.extract;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch Wikipedia description", e);
+      }
+    }
+    
     const profile = {
       symbol: data.ticker,
       companyName: data.name,
-      description: data.finnhubIndustry || "",
+      description: description,
       sector: data.finnhubIndustry || "",
       industry: data.finnhubIndustry || "",
       ceo: "",
