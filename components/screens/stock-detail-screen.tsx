@@ -93,7 +93,7 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
         <div className="flex items-center gap-2">
           {onStartChat && (
             <button
-              onClick={() => onStartChat(`Check if I have ${symbol} in my portfolio. If yes, give me a quick update on my position. If no, give me a brief overview of the stock. Then, proactively ask me what I want to know next. You must offer these exact options as suggested prompts for me to choose from: "suggest buying points", "suggest selling points", "can I hold it", "whats your overall bias", "tell me more what this company does".`)}
+              onClick={() => onStartChat(`Check if I have ${symbol} in my portfolio. If yes, give me a quick update on my position including current price, my return, and a brief outlook. If no, give me a brief overview of the stock and whether it looks like a good entry right now. Keep the response concise and actionable. Do not list any suggest buying points or suggest selling points options at the end.`)}
               className="flex items-center gap-2 bg-vel-teal/10 text-vel-teal hover:bg-vel-teal/20 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border border-vel-teal/20"
             >
               <Star className="w-3.5 h-3.5" />

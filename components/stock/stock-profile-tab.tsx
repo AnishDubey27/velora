@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { BarChart3, FileText, Users, FileBarChart } from "lucide-react";
+import { BarChart3, FileText, Users, FileBarChart, ChevronDown, Globe, MapPin, Calendar } from "lucide-react";
 import { formatLargeNumber } from "@/lib/utils";
 import { AnalystGauge } from "./analyst-gauge";
 import type { KeyStats, IncomeStatementEntry, AnalystRating, StockProfile } from "@/lib/types";
@@ -146,32 +146,7 @@ export function StockProfileTab({ symbol }: { symbol: string }) {
         </section>
 
         {/* About Section */}
-        <section className="glassy p-5 rounded-2xl flex flex-col">
-          <h3 className="flex items-center gap-2 font-medium text-vel-text mb-4 text-lg">
-            <FileText className="w-5 h-5 text-vel-teal" />
-            About
-          </h3>
-          
-          {isLoadingProfile ? (
-            <div className="animate-pulse space-y-2 flex-1">
-              <div className="h-4 bg-white/5 rounded w-3/4"></div>
-              <div className="h-4 bg-white/5 rounded w-full"></div>
-              <div className="h-4 bg-white/5 rounded w-5/6"></div>
-              <div className="h-4 bg-white/5 rounded w-full"></div>
-              <div className="h-4 bg-white/5 rounded w-2/3"></div>
-            </div>
-          ) : (
-            <div className="flex flex-col h-full">
-              <div className="mb-2">
-                <span className="font-medium text-vel-text block">{companyProfile?.companyName}</span>
-                <span className="text-vel-muted text-sm">{companyProfile?.sector} • {companyProfile?.industry}</span>
-              </div>
-              <p className="text-sm text-vel-faint mt-2 line-clamp-6 leading-relaxed">
-                {companyProfile?.description || "No description available."}
-              </p>
-            </div>
-          )}
-        </section>
+        <AboutSection profile={companyProfile} isLoading={isLoadingProfile} />
       </div>
     </div>
   );
@@ -183,5 +158,83 @@ function StatRow({ label, value, border = true }: { label: string; value: string
       <span className="text-vel-muted">{label}</span>
       <span className="font-medium text-vel-text">{value}</span>
     </div>
+  );
+}
+
+function AboutSection({ profile, isLoading }: { profile: StockProfile | undefined; isLoading: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const desc = profile?.description || "";
+  const hasLongDesc = desc.length > 200;
+
+  return (
+    <section className="glassy p-5 rounded-2xl flex flex-col">
+      <h3 className="flex items-center gap-2 font-medium text-vel-text mb-4 text-lg">
+        <FileText className="w-5 h-5 text-vel-teal" />
+        About
+      </h3>
+
+      {isLoading ? (
+        <div className="animate-pulse space-y-2 flex-1">
+          <div className="h-4 bg-white/5 rounded w-3/4"></div>
+          <div className="h-4 bg-white/5 rounded w-full"></div>
+          <div className="h-4 bg-white/5 rounded w-5/6"></div>
+          <div className="h-4 bg-white/5 rounded w-full"></div>
+          <div className="h-4 bg-white/5 rounded w-2/3"></div>
+        </div>
+      ) : (
+        <div className="flex flex-col h-full">
+          <div className="mb-2">
+            <span className="font-medium text-vel-text block">{profile?.companyName}</span>
+            <span className="text-vel-muted text-sm">{profile?.sector} • {profile?.industry}</span>
+          </div>
+
+          {desc ? (
+            <div className="mt-2">
+              <p className={cn("text-sm text-vel-faint leading-relaxed", !expanded && hasLongDesc && "line-clamp-4")}>
+                {desc}
+              </p>
+              {hasLongDesc && (
+                <button
+                  onClick={() => setExpanded(!expanded)}
+                  className="flex items-center gap-1 text-xs text-vel-teal hover:text-vel-teal/80 mt-2 transition-colors"
+                >
+                  {expanded ? "Show less" : "Show more"}
+                  <ChevronDown size={12} className={cn("transition-transform", expanded && "rotate-180")} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-vel-faint mt-2">No description available.</p>
+          )}
+
+          {/* Company details */}
+          <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-white/5">
+            {profile?.website && (
+              <a
+                href={profile.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-vel-teal hover:text-vel-teal/80 transition-colors"
+              >
+                <Globe size={12} />
+                Website
+              </a>
+            )}
+            {profile?.country && (
+              <span className="flex items-center gap-1.5 text-xs text-vel-muted">
+                <MapPin size={12} />
+                {profile.country}
+              </span>
+            )}
+            {profile?.ipoDate && (
+              <span className="flex items-center gap-1.5 text-xs text-vel-muted">
+                <Calendar size={12} />
+                IPO: {profile.ipoDate}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

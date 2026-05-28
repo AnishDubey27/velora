@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, User, ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -17,16 +17,46 @@ type ChatScreenProps = {
   onBack: () => void;
 };
 
+// Suggestion buttons shown after stock-context AI responses
+const STOCK_SUGGESTIONS = [
+  { label: "Suggest buying points", icon: "📈" },
+  { label: "Suggest selling points", icon: "📉" },
+  { label: "Can I hold it?", icon: "🤔" },
+  { label: "What's your overall bias?", icon: "🎯" },
+  { label: "Tell me more about this company", icon: "🏢" },
+];
+
 export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState(initialPrompt || "");
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isStockContext, setIsStockContext] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
-  
-  // Auto-submit initial prompt if provided
+  const hasSubmittedInitial = useRef(false);
+
+  // Auto-submit initial prompt if provided (only once)
   useEffect(() => {
-    if (initialPrompt && messages.length === 0) {
-      sendMessage(initialPrompt);
+    if (initialPrompt && messages.length === 0 && !hasSubmittedInitial.current) {
+      hasSubmittedInitial.current = true;
+
+      // Detect if this is a stock-context prompt (from "Ask Velora AI" button)
+      const isStock = initialPrompt.includes("portfolio") && initialPrompt.includes("suggest buying points");
+      setIsStockContext(isStock);
+
+      if (isStock) {
+        // Extract the stock symbol from the prompt
+        const symbolMatch = initialPrompt.match(/have (\w+) in my portfolio/);
+        const symbol = symbolMatch ? symbolMatch[1] : "";
+
+        // Send a clean display message but hide the full instruction
+        const displayMessage = symbol ? `Analyze ${symbol} for me` : "Analyze this stock for me";
+        
+        // The hidden prompt goes to the AI but isn't shown to the user
+        sendMessageWithHiddenContext(displayMessage, initialPrompt);
+      } else {
+        sendMessage(initialPrompt);
+      }
     }
   }, [initialPrompt]);
 
@@ -34,10 +64,53 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  const sendMessageWithHiddenContext = async (displayContent: string, hiddenPrompt: string) => {
+    if (isLoading) return;
+
+    setInput("");
+    // Show the clean display message to user
+    const displayMessages: Message[] = [
+      { role: "user", content: displayContent }
+    ];
+    setMessages(displayMessages);
+    setIsLoading(true);
+
+    try {
+      // Send the full hidden prompt to the API
+      const apiMessages: Message[] = [
+        { role: "user", content: hiddenPrompt }
+      ];
+
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: apiMessages })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data?.choices?.[0]?.message) {
+        setMessages((prev) => [...prev, data.choices[0].message]);
+        setShowSuggestions(true);
+      } else {
+        throw new Error(data.error || "Failed to get response");
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Sorry, I encountered an error. Please try again." }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
-    
+
     setInput("");
+    setShowSuggestions(false);
     const newMessages: Message[] = [
       ...messages,
       { role: "user", content: content.trim() }
@@ -51,9 +124,9 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages })
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok && data?.choices?.[0]?.message) {
         setMessages((prev) => [...prev, data.choices[0].message]);
       } else {
@@ -73,6 +146,10 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    sendMessage(suggestion);
   };
 
   return (
@@ -132,6 +209,36 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
             </div>
           </motion.div>
         ))}
+
+        {/* Suggestion Buttons */}
+        {showSuggestions && !isLoading && isStockContext && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="flex flex-col gap-2 pl-11"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={12} className="text-vel-teal" />
+              <span className="text-[11px] text-vel-muted font-medium uppercase tracking-wider">Quick Actions</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {STOCK_SUGGESTIONS.map((s, i) => (
+                <motion.button
+                  key={s.label}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 + i * 0.08 }}
+                  onClick={() => handleSuggestionClick(s.label)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[13px] text-white/80 hover:bg-vel-teal/10 hover:border-vel-teal/30 hover:text-vel-teal transition-all duration-200"
+                >
+                  <span>{s.icon}</span>
+                  <span>{s.label}</span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
         
         {isLoading && (
           <motion.div 
