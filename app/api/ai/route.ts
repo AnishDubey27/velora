@@ -47,6 +47,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "messages[] is required." }, { status: 400 });
   }
 
+  // Inject skill system prompt if provided (gives the AI a specific persona)
+  if (typeof payload?.systemPrompt === "string" && payload.systemPrompt.trim()) {
+    messages.unshift({ role: "system", content: payload.systemPrompt.trim() });
+  }
+
   // Fetch Portfolio Context
   try {
     const cookieStore = await cookies();

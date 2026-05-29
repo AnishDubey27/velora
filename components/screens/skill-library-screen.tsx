@@ -9,27 +9,48 @@ import {
   Newspaper,
   Search,
   Sparkles,
-  X
+  X,
+  MessageCircle,
+  Globe,
+  Briefcase,
+  DollarSign,
+  Shield,
+  Rocket,
+  PieChart,
+  Layers,
+  Bitcoin,
+  Receipt
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { Skill } from "@/lib/types";
+import type { Skill, SkillIcon } from "@/lib/types";
 
 type SkillLibraryScreenProps = {
   skills: Skill[];
   onClose: () => void;
+  onSelectSkill: (skill: Skill) => void;
 };
 
-const iconMap = {
+const iconMap: Record<SkillIcon, any> = {
   compare: GitCompare,
   timing: BarChart3,
   quality: LineChart,
-  news: Newspaper
+  news: Newspaper,
+  sentiment: MessageCircle,
+  macro: Globe,
+  portfolio: Briefcase,
+  dividend: DollarSign,
+  risk: Shield,
+  ipo: Rocket,
+  sector: PieChart,
+  options: Layers,
+  crypto: Bitcoin,
+  tax: Receipt
 };
 
 const tabs = ["Popular", "Explore", "Analyze"] as const;
 
-export function SkillLibraryScreen({ skills, onClose }: SkillLibraryScreenProps) {
+export function SkillLibraryScreen({ skills, onClose, onSelectSkill }: SkillLibraryScreenProps) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof tabs)[number]>("Popular");
 
@@ -115,6 +136,7 @@ export function SkillLibraryScreen({ skills, onClose }: SkillLibraryScreenProps)
                 return (
                   <button
                     key={skill.id}
+                    onClick={() => onSelectSkill(skill)}
                     className="flex w-full items-center gap-3 rounded-lg px-1 py-2.5 text-left transition hover:bg-white/[0.035]"
                   >
                     <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-white/[0.045] text-white/75">

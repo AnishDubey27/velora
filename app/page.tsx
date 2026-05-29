@@ -8,7 +8,8 @@ import { HeadlinesScreen } from "@/components/screens/headlines-screen";
 import { PortfolioScreen } from "@/components/screens/portfolio-screen";
 import { ResearchScreen } from "@/components/screens/research-screen";
 import { SkillLibraryScreen } from "@/components/screens/skill-library-screen";
-import { ChatScreen } from "@/components/screens/chat-screen";
+import { ChatScreen, type SkillContext } from "@/components/screens/chat-screen";
+import { SkillIntakeScreen } from "@/components/screens/skill-intake-screen";
 import { RedditTrendingScreen } from "@/components/screens/reddit-trending-screen";
 import { InsiderTradingScreen } from "@/components/screens/insider-trading-screen";
 import { CongressTradingScreen } from "@/components/screens/congress-trading-screen";
@@ -27,6 +28,8 @@ export default function Home() {
   const [active, setActive] = useState<NavKey>("research");
   const [skillLibraryOpen, setSkillLibraryOpen] = useState(false);
   const [chatPrompt, setChatPrompt] = useState<string>("");
+  const [skillContext, setSkillContext] = useState<SkillContext | undefined>(undefined);
+  const [selectedSkill, setSelectedSkill] = useState<Skill | undefined>(undefined);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedInvestorCik, setSelectedInvestorCik] = useState<string>("");
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string>("");
@@ -67,9 +70,57 @@ export default function Home() {
     setActive("stock-detail");
   };
 
+  const handleSelectSkill = (skill: Skill) => {
+    setSkillLibraryOpen(false);
+    setSelectedSkill(skill);
+
+    if (skill.inputType === "none") {
+      setChatPrompt("");
+      setSkillContext({
+        systemPrompt: skill.systemPrompt,
+        displayMessage: skill.displayMessage,
+        hiddenPrompt: skill.hiddenPrompt,
+        suggestions: skill.suggestions,
+      });
+      setActive("chat");
+    } else {
+      setActive("skill-intake");
+    }
+  };
+
+  const handleSkillIntakeSubmit = (symbols: string[]) => {
+    if (!selectedSkill) return;
+
+    let { displayMessage, hiddenPrompt } = selectedSkill;
+    
+    // Replace {symbol} or {symbol1}, {symbol2}
+    if (selectedSkill.inputType === "single_stock" && symbols[0]) {
+      displayMessage = displayMessage.replace(/{symbol}/g, symbols[0]);
+      hiddenPrompt = hiddenPrompt.replace(/{symbol}/g, symbols[0]);
+    } else if (selectedSkill.inputType === "two_stocks" && symbols.length === 2) {
+      displayMessage = displayMessage.replace(/{symbol1}/g, symbols[0]).replace(/{symbol2}/g, symbols[1]);
+      hiddenPrompt = hiddenPrompt.replace(/{symbol1}/g, symbols[0]).replace(/{symbol2}/g, symbols[1]);
+    }
+
+    setChatPrompt("");
+    setSkillContext({
+      systemPrompt: selectedSkill.systemPrompt,
+      displayMessage,
+      hiddenPrompt,
+      suggestions: selectedSkill.suggestions,
+    });
+    setActive("chat");
+  };
+
   const screen = useMemo(() => {
     if (skillLibraryOpen) {
-      return <SkillLibraryScreen skills={skills} onClose={() => setSkillLibraryOpen(false)} />;
+      return (
+        <SkillLibraryScreen 
+          skills={skills} 
+          onClose={() => setSkillLibraryOpen(false)} 
+          onSelectSkill={handleSelectSkill}
+        />
+      );
     }
 
     switch (active) {
@@ -79,13 +130,27 @@ export default function Home() {
         return <HeadlinesScreen />;
       case "portfolio":
         return <PortfolioScreen onViewStock={handleViewStock} />;
+      case "skill-intake":
+        if (!selectedSkill) {
+          setActive("research");
+          return null;
+        }
+        return (
+          <SkillIntakeScreen 
+            skill={selectedSkill}
+            onSubmit={handleSkillIntakeSubmit}
+            onBack={() => setActive("research")}
+          />
+        );
       case "chat":
         return (
           <ChatScreen 
-            initialPrompt={chatPrompt} 
+            initialPrompt={chatPrompt}
+            skillContext={skillContext}
             onBack={() => {
               setActive("research");
               setChatPrompt("");
+              setSkillContext(undefined);
             }} 
           />
         );
@@ -118,6 +183,7 @@ export default function Home() {
             symbol={selectedStockSymbol}
             onBack={() => setActive(previousScreen)}
             onStartChat={(prompt) => {
+              setSkillContext(undefined);
               setChatPrompt(prompt);
               setActive("chat");
             }}
@@ -128,14 +194,16 @@ export default function Home() {
           <ResearchScreen
             skills={skills}
             onOpenSkills={() => setSkillLibraryOpen(true)}
+            onSelectSkill={handleSelectSkill}
             onStartChat={(prompt) => {
+              setSkillContext(undefined);
               setChatPrompt(prompt);
               setActive("chat");
             }}
           />
         );
     }
-  }, [active, skillLibraryOpen, skills, selectedInvestorCik, selectedStockSymbol, previousScreen]);
+  }, [active, skillLibraryOpen, skills, selectedInvestorCik, selectedStockSymbol, previousScreen, selectedSkill, chatPrompt, skillContext]);
 
   return (
     <AppShell 
@@ -144,6 +212,7 @@ export default function Home() {
       onDashboard={() => setActive("dashboard")}
       onViewStock={handleViewStock}
       onStartChat={(prompt) => {
+        setSkillContext(undefined);
         setChatPrompt(prompt);
         setActive("chat");
       }}

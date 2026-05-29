@@ -1,4 +1,6 @@
-export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat" | "reddit-trending" | "super-investors" | "congress-trading" | "insider-trading" | "super-investor-profile" | "stock-detail";
+export type NavKey = "research" | "skills" | "headlines" | "portfolio" | "dashboard" | "chat" | "reddit-trending" | "super-investors" | "congress-trading" | "insider-trading" | "super-investor-profile" | "stock-detail" | "skill-intake";
+
+export type SkillIcon = "compare" | "timing" | "quality" | "news" | "sentiment" | "macro" | "portfolio" | "dividend" | "risk" | "ipo" | "sector" | "options" | "crypto" | "tax";
 
 export type Skill = {
   id: string;
@@ -7,7 +9,13 @@ export type Skill = {
   category: string;
   mode: "Explore" | "Analyze";
   popular: boolean;
-  icon: "compare" | "timing" | "quality" | "news";
+  icon: SkillIcon;
+  inputType: "none" | "single_stock" | "two_stocks";
+  inputPrompt?: string;
+  systemPrompt: string;
+  displayMessage: string;
+  hiddenPrompt: string;
+  suggestions: string[];
 };
 
 export type Holding = {

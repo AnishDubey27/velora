@@ -9,6 +9,7 @@ type ResearchScreenProps = {
   skills: Skill[];
   onOpenSkills: () => void;
   onStartChat: (prompt: string) => void;
+  onSelectSkill: (skill: Skill) => void;
 };
 
 const iconMap: any = {
@@ -18,7 +19,7 @@ const iconMap: any = {
   news: Sparkles,
 };
 
-export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchScreenProps) {
+export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkill }: ResearchScreenProps) {
   const popular = skills.filter((skill) => skill.popular).slice(0, 3);
   const shouldCenterPopular = popular.length <= 3;
 
@@ -79,7 +80,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat }: ResearchSc
               return (
                 <motion.button
                   key={skill.id}
-                  onClick={() => onStartChat(skill.description)}
+                  onClick={() => onSelectSkill(skill)}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.08 }}

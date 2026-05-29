@@ -12,12 +12,20 @@ type Message = {
   content: string;
 };
 
+export type SkillContext = {
+  systemPrompt: string;
+  displayMessage: string;
+  hiddenPrompt: string;
+  suggestions: string[];
+};
+
 type ChatScreenProps = {
   initialPrompt?: string;
+  skillContext?: SkillContext;
   onBack: () => void;
 };
 
-// Suggestion buttons shown after stock-context AI responses
+// Suggestion buttons shown after stock-context AI responses (from Ask Velora AI button)
 const STOCK_SUGGESTIONS = [
   { label: "Suggest buying points", icon: "📈" },
   { label: "Suggest selling points", icon: "📉" },
@@ -26,49 +34,58 @@ const STOCK_SUGGESTIONS = [
   { label: "Tell me more about this company", icon: "🏢" },
 ];
 
-export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
+export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isStockContext, setIsStockContext] = useState(false);
+  const [activeSuggestions, setActiveSuggestions] = useState<{ label: string; icon?: string }[]>([]);
+  const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>("");
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
 
-  // Auto-submit initial prompt if provided (only once)
+  // Auto-submit initial prompt or skill context (only once)
   useEffect(() => {
-    if (initialPrompt && messages.length === 0 && !hasSubmittedInitial.current) {
+    if (hasSubmittedInitial.current) return;
+    if (messages.length > 0) return;
+
+    // Skill context takes priority
+    if (skillContext) {
       hasSubmittedInitial.current = true;
+      setActiveSystemPrompt(skillContext.systemPrompt);
+      setActiveSuggestions(skillContext.suggestions.map(s => ({ label: s })));
+      sendMessageWithHiddenContext(
+        skillContext.displayMessage,
+        skillContext.hiddenPrompt,
+        skillContext.systemPrompt
+      );
+      return;
+    }
 
-      // Detect if this is a stock-context prompt (from "Ask Velora AI" button)
-      const isStock = initialPrompt.includes("portfolio") && initialPrompt.includes("suggest buying points");
-      setIsStockContext(isStock);
-
+    // Legacy: stock-context from Ask Velora AI button
+    if (initialPrompt) {
+      hasSubmittedInitial.current = true;
+      const isStock = initialPrompt.includes("portfolio") && initialPrompt.includes("Do not list any suggest buying");
       if (isStock) {
-        // Extract the stock symbol from the prompt
         const symbolMatch = initialPrompt.match(/have (\w+) in my portfolio/);
         const symbol = symbolMatch ? symbolMatch[1] : "";
-
-        // Send a clean display message but hide the full instruction
         const displayMessage = symbol ? `Analyze ${symbol} for me` : "Analyze this stock for me";
-        
-        // The hidden prompt goes to the AI but isn't shown to the user
-        sendMessageWithHiddenContext(displayMessage, initialPrompt);
+        setActiveSuggestions(STOCK_SUGGESTIONS);
+        sendMessageWithHiddenContext(displayMessage, initialPrompt, "");
       } else {
         sendMessage(initialPrompt);
       }
     }
-  }, [initialPrompt]);
+  }, [initialPrompt, skillContext]);
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const sendMessageWithHiddenContext = async (displayContent: string, hiddenPrompt: string) => {
+  const sendMessageWithHiddenContext = async (displayContent: string, hiddenPrompt: string, systemPrompt: string) => {
     if (isLoading) return;
 
     setInput("");
-    // Show the clean display message to user
     const displayMessages: Message[] = [
       { role: "user", content: displayContent }
     ];
@@ -76,15 +93,19 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
     setIsLoading(true);
 
     try {
-      // Send the full hidden prompt to the API
       const apiMessages: Message[] = [
         { role: "user", content: hiddenPrompt }
       ];
 
+      const body: any = { messages: apiMessages };
+      if (systemPrompt) {
+        body.systemPrompt = systemPrompt;
+      }
+
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages })
+        body: JSON.stringify(body)
       });
 
       const data = await res.json();
@@ -119,10 +140,15 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
     setIsLoading(true);
 
     try {
+      const body: any = { messages: newMessages };
+      if (activeSystemPrompt) {
+        body.systemPrompt = activeSystemPrompt;
+      }
+
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages })
+        body: JSON.stringify(body)
       });
 
       const data = await res.json();
@@ -211,7 +237,7 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
         ))}
 
         {/* Suggestion Buttons */}
-        {showSuggestions && !isLoading && isStockContext && (
+        {showSuggestions && !isLoading && activeSuggestions.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -223,7 +249,7 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
               <span className="text-[11px] text-vel-muted font-medium uppercase tracking-wider">Quick Actions</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {STOCK_SUGGESTIONS.map((s, i) => (
+              {activeSuggestions.map((s, i) => (
                 <motion.button
                   key={s.label}
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -232,7 +258,7 @@ export function ChatScreen({ initialPrompt, onBack }: ChatScreenProps) {
                   onClick={() => handleSuggestionClick(s.label)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[13px] text-white/80 hover:bg-vel-teal/10 hover:border-vel-teal/30 hover:text-vel-teal transition-all duration-200"
                 >
-                  <span>{s.icon}</span>
+                  {s.icon && <span>{s.icon}</span>}
                   <span>{s.label}</span>
                 </motion.button>
               ))}
