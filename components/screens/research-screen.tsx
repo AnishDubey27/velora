@@ -24,7 +24,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   const shouldCenterPopular = popular.length <= 3;
 
   return (
-    <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-1 md:pb-12">
+    <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-1 md:pb-6">
       <div className="flex-1 flex flex-col justify-center">
         <div className="h-2" />
 
