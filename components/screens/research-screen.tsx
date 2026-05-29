@@ -106,7 +106,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="w-full px-4 pb-2 mx-auto max-w-md md:fixed md:bottom-20 md:left-4 md:right-4 md:z-40 md:max-w-lg md:px-0 md:pb-0"
+        className="w-full px-4 pb-2 mx-auto max-w-md md:max-w-lg md:pb-4"
       >
         <div className="rounded-2xl border border-[#00D4FF]/30 bg-[#0A0F1C]/95 p-4 shadow-2xl shadow-black/80 backdrop-blur-2xl">
           <form
