@@ -24,35 +24,10 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   const shouldCenterPopular = popular.length <= 3;
 
   return (
-    <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-1 md:pb-6">
+    <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
       <div className="flex-1 flex flex-col justify-center">
-        <div className="h-2" />
-
-        {/* Logo + Title */}
-        <div className="flex flex-col items-center justify-center pt-3 pb-4 md:pt-6 md:pb-8">
-          <motion.svg
-            viewBox="0 0 88 88"
-            fill="none"
-            className="w-14 h-14 md:w-[76px] md:h-[76px] mb-3 md:mb-5 drop-shadow-[0_0_26px_rgba(220,236,255,0.22)]"
-            animate={{ y: [0, -5, 0], opacity: [0.86, 1, 0.86] }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <path d="M44 7L76 57L44 42L12 57L44 7Z" fill="url(#homeMarkA)" />
-            <path d="M44 39L68 81L44 61L20 81L44 39Z" fill="url(#homeMarkB)" />
-            <defs>
-              <linearGradient id="homeMarkA" x1="44" x2="44" y1="7" y2="57" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#F8FAFC" />
-                <stop offset=".5" stopColor="#8C96A8" />
-                <stop offset="1" stopColor="#0B0F19" />
-              </linearGradient>
-              <linearGradient id="homeMarkB" x1="44" x2="44" y1="39" y2="81" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#F8FAFC" />
-                <stop offset=".52" stopColor="#CBD5E1" />
-                <stop offset="1" stopColor="#111827" />
-              </linearGradient>
-            </defs>
-          </motion.svg>
-
+        {/* Title */}
+        <div className="flex flex-col items-center justify-center pt-0 pb-3 md:pt-0 md:pb-4">
           <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white">
             Where should<br />we start?
           </h1>
