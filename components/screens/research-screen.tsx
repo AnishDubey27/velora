@@ -28,12 +28,10 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
       <div className="flex-1 flex flex-col justify-center">
         {/* Logo + Title */}
         <div className="flex flex-col items-center justify-center pt-0 pb-3 md:pt-0 md:pb-4">
-          <motion.svg
+          <svg
             viewBox="0 0 88 88"
             fill="none"
-            className="w-11 h-11 md:w-14 md:h-14 mb-2.5 md:mb-4 drop-shadow-[0_0_26px_rgba(0,212,255,0.25)]"
-            animate={{ rotate: 45, y: [0, -4, 0] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            className="w-11 h-11 md:w-14 md:h-14 mb-2.5 md:mb-4 rotate-45 drop-shadow-[0_0_26px_rgba(0,212,255,0.25)]"
           >
             <path d="M44 7L76 57L44 42L12 57L44 7Z" fill="url(#homeMarkA)" />
             <path d="M44 39L68 81L44 61L20 81L44 39Z" fill="url(#homeMarkB)" />
@@ -49,7 +47,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
                 <stop offset="1" stopColor="#111827" />
               </linearGradient>
             </defs>
-          </motion.svg>
+          </svg>
 
           <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white">
             Where should<br />we start?
@@ -58,9 +56,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
 
         {/* Popular Skills */}
         <div className="px-4 pb-4 md:pb-6">
-          <p className="mb-2 md:mb-3 px-1 text-xs font-bold uppercase tracking-[1.5px] text-zinc-400">
-            POPULAR SKILLS
-          </p>
+
 
           <div
             className={cn(
