@@ -17,12 +17,12 @@ export function TopBar({
     <header className="sticky top-0 z-40 flex h-[64px] items-center justify-between bg-[#070A11]/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl border-b border-white/10">
       <button
         onClick={onMenuClick}
-        className="grid h-10 w-10 place-items-center rounded-xl text-white/80 transition hover:bg-white/5"
+        className="grid h-10 w-10 place-items-center rounded-xl text-white/80 transition hover:bg-white/5 md:hidden"
       >
         <Menu size={20} strokeWidth={2.4} />
       </button>
 
-      <span className="text-[13px] font-bold tracking-[0.16em] text-white">VELORA</span>
+      <span className="text-[15px] md:text-[18px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">VELORA</span>
 
       <div className="flex items-center gap-2">
         <button 
