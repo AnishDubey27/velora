@@ -48,9 +48,10 @@ function StockSearchBar({
       try {
         setLoading(true);
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data: SearchResult[] = await res.json();
-        setResults(data);
-        setOpen(data.length > 0);
+        const data = await res.json();
+        const searchResults: SearchResult[] = data.results || [];
+        setResults(searchResults);
+        setOpen(searchResults.length > 0);
       } catch {
         setResults([]);
       } finally {
