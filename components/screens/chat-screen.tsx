@@ -207,7 +207,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           <option value="z-ai/glm-5.1" className="bg-[#05080F]">GLM 5.1</option>
           <option value="meta/llama-4-maverick-17b-128e-instruct" className="bg-[#05080F]">Llama 4 Maverick</option>
           <option value="minimaxai/minimax-m2.7" className="bg-[#05080F]">MiniMax M2.7</option>
-          <option value="stepfun-ai/step-3.5-flash" className="bg-[#05080F]">Step 3.5 Flash</option>
+          <option value="stepfun-ai/step-3.7-flash" className="bg-[#05080F]">Step 3.7 Flash</option>
           <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
           <option value="mistralai/mistral-large-3-675b-instruct-2512" className="bg-[#05080F]">Mistral Large 3</option>
           <option value="bytedance/seed-oss-36b-instruct" className="bg-[#05080F]">Seed OSS 36B</option>
