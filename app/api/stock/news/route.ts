@@ -1,8 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
-import _yahooFinance from "yahoo-finance2";
-const yahooFinance = new (_yahooFinance as any)() as any;
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
@@ -37,15 +35,26 @@ function isIndianExchangeSymbol(symbol: string) {
 }
 
 async function getYahooNews(symbol: string): Promise<StockNewsItem[]> {
-  const search = await yahooFinance.search(symbol).catch(() => null);
-  if (!search || !search.news) return [];
-  
-  return search.news.slice(0, 20).map((item: any) => ({
-    title: item.title,
-    url: item.link,
-    publishedDate: item.providerPublishTime ? new Date(item.providerPublishTime * 1000).toISOString() : new Date().toISOString(),
+  // Use Yahoo Finance search API which works without authentication
+  const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=0&newsCount=20`;
+  const res = await fetch(searchUrl, {
+    cache: "no-store",
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+
+  if (!res.ok) throw new Error(`Yahoo search request failed: ${res.status}`);
+
+  const data = await res.json();
+  const news = data?.news || [];
+
+  return news.slice(0, 20).map((item: any) => ({
+    title: item.title || "",
+    url: item.link || "",
+    publishedDate: item.providerPublishTime
+      ? new Date(item.providerPublishTime * 1000).toISOString()
+      : new Date().toISOString(),
     site: item.publisher || "Yahoo Finance",
-    text: "", 
+    text: "",
     image: item.thumbnail?.resolutions?.[0]?.url || "",
     symbol,
   }));

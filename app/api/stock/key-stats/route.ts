@@ -8,26 +8,30 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
-import _yahooFinance from "yahoo-finance2";
-const yahooFinance = new (_yahooFinance as any)() as any;
-
 async function getYahooKeyStats(symbol: string) {
-  const quote = await yahooFinance.quote(symbol);
-  if (!quote) throw new Error("Yahoo key stats quote not found");
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1y`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
 
-  const weekLow = quote.fiftyTwoWeekLow || 0;
-  const weekHigh = quote.fiftyTwoWeekHigh || 0;
+  if (!res.ok) throw new Error(`Yahoo chart request failed: ${res.status}`);
+
+  const data = await res.json();
+  const meta = data?.chart?.result?.[0]?.meta || {};
+  const weekLow = meta.fiftyTwoWeekLow || 0;
+  const weekHigh = meta.fiftyTwoWeekHigh || 0;
 
   return [{
-    avgVolume: quote.averageDailyVolume10Day || quote.averageDailyVolume3Month || 0,
-    marketCap: quote.marketCap || 0,
-    peRatio: quote.trailingPE || 0,
+    avgVolume: meta.averageDailyVolume3Month || 0,
+    marketCap: 0,
+    peRatio: 0,
     weekRange52: weekLow || weekHigh ? `${weekLow.toFixed(2)} - ${weekHigh.toFixed(2)}` : "0 - 0",
-    eps: quote.epsTrailingTwelveMonths || 0,
+    eps: 0,
     revenue: 0,
     netIncome: 0,
-    beta: 0, // Not typically in basic quote, would need summary
-    dividendYield: quote.trailingAnnualDividendYield || 0,
+    beta: 0,
+    dividendYield: 0,
     profitMargin: 0,
   }];
 }

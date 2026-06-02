@@ -8,33 +8,38 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
-import _yahooFinance from "yahoo-finance2";
-const yahooFinance = new (_yahooFinance as any)() as any;
-
 async function getYahooProfile(symbol: string) {
-  const [quote, summary] = await Promise.all([
-    yahooFinance.quote(symbol).catch(() => null),
-    yahooFinance.quoteSummary(symbol, { modules: ['assetProfile'] }).catch(() => null)
-  ]);
-  
-  if (!quote) throw new Error("Yahoo profile quote not found");
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=1&newsCount=0`;
 
-  const assetProfile = summary?.assetProfile || {};
+  const [chartRes, searchRes] = await Promise.all([
+    fetch(chartUrl, { cache: "no-store", headers: { "User-Agent": "Mozilla/5.0" } }),
+    fetch(searchUrl, { cache: "no-store", headers: { "User-Agent": "Mozilla/5.0" } }),
+  ]);
+
+  if (!chartRes.ok) throw new Error(`Yahoo chart request failed: ${chartRes.status}`);
+
+  const chartData = await chartRes.json();
+  const searchData = searchRes.ok ? await searchRes.json() : null;
+  const meta = chartData?.chart?.result?.[0]?.meta || {};
+  const searchQuote = Array.isArray(searchData?.quotes) ? searchData.quotes[0] : null;
+  const companyName = meta.longName || meta.shortName || searchQuote?.longname || searchQuote?.shortname || symbol.toUpperCase();
+  const exchange = meta.fullExchangeName || searchQuote?.exchDisp || meta.exchangeName || "";
 
   return {
     symbol: symbol.toUpperCase(),
-    companyName: quote.longName || quote.shortName || symbol.toUpperCase(),
-    description: assetProfile.longBusinessSummary || assetProfile.industry || assetProfile.sector || "",
-    sector: assetProfile.sector || "",
-    industry: assetProfile.industry || "",
-    ceo: assetProfile.companyOfficers?.find((o: any) => o.title?.toLowerCase().includes("ceo"))?.name || "",
-    website: assetProfile.website || "",
+    companyName,
+    description: searchQuote?.sector || searchQuote?.industry || exchange || "",
+    sector: searchQuote?.sector || "",
+    industry: searchQuote?.industry || "",
+    ceo: "",
+    website: "",
     image: "",
-    exchange: quote.fullExchangeName || quote.exchange || "",
-    currency: quote.currency || "USD",
-    country: assetProfile.country || (isIndianExchangeSymbol(symbol) ? "IN" : ""),
+    exchange,
+    currency: meta.currency || "USD",
+    country: isIndianExchangeSymbol(symbol) ? "IN" : "",
     ipoDate: "",
-    fullTimeEmployees: assetProfile.fullTimeEmployees || "",
+    fullTimeEmployees: "",
   };
 }
 

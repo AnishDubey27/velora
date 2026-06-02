@@ -8,32 +8,58 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
-import _yahooFinance from "yahoo-finance2";
-const yahooFinance = new (_yahooFinance as any)() as any;
-
 async function getYahooQuote(symbol: string) {
-  const quote = await yahooFinance.quote(symbol);
-  if (!quote) throw new Error("Yahoo quote not found");
-  
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+
+  if (!res.ok) throw new Error(`Yahoo chart request failed: ${res.status}`);
+
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error("No chart result");
+
+  const meta = result.meta || {};
+  const quote = result.indicators?.quote?.[0] || {};
+  const timestamps: number[] = result.timestamp || [];
+  const closes: (number | null)[] = quote.close || [];
+  const opens: (number | null)[] = quote.open || [];
+  const highs: (number | null)[] = quote.high || [];
+  const lows: (number | null)[] = quote.low || [];
+  const volumes: (number | null)[] = quote.volume || [];
+
+  // Find the latest valid index
+  let latestIndex = -1;
+  for (let i = closes.length - 1; i >= 0; i--) {
+    if (closes[i] != null) { latestIndex = i; break; }
+  }
+
+  const price = meta.regularMarketPrice || (latestIndex >= 0 ? closes[latestIndex] : 0) || 0;
+  const previousClose = meta.previousClose || meta.chartPreviousClose || 0;
+  const change = previousClose ? price - previousClose : 0;
+  const changesPercentage = previousClose ? (change / previousClose) * 100 : 0;
+
   return {
     symbol: symbol.toUpperCase(),
-    name: quote.longName || quote.shortName || symbol.toUpperCase(),
-    price: quote.regularMarketPrice || 0,
-    change: quote.regularMarketChange || 0,
-    changesPercentage: quote.regularMarketChangePercent || 0,
-    dayLow: quote.regularMarketDayLow || 0,
-    dayHigh: quote.regularMarketDayHigh || 0,
-    yearLow: quote.fiftyTwoWeekLow || 0,
-    yearHigh: quote.fiftyTwoWeekHigh || 0,
-    volume: quote.regularMarketVolume || 0,
-    avgVolume: quote.averageDailyVolume10Day || quote.averageDailyVolume3Month || 0,
-    marketCap: quote.marketCap || 0,
-    pe: quote.trailingPE || 0,
-    eps: quote.epsTrailingTwelveMonths || 0,
-    open: quote.regularMarketOpen || 0,
-    previousClose: quote.regularMarketPreviousClose || 0,
-    timestamp: Math.floor(Date.now() / 1000),
-    currency: quote.currency || "USD",
+    name: meta.longName || meta.shortName || symbol.toUpperCase(),
+    price,
+    change,
+    changesPercentage,
+    dayLow: meta.regularMarketDayLow || (latestIndex >= 0 ? lows[latestIndex] : 0) || 0,
+    dayHigh: meta.regularMarketDayHigh || (latestIndex >= 0 ? highs[latestIndex] : 0) || 0,
+    yearLow: meta.fiftyTwoWeekLow || 0,
+    yearHigh: meta.fiftyTwoWeekHigh || 0,
+    volume: meta.regularMarketVolume || (latestIndex >= 0 ? volumes[latestIndex] : 0) || 0,
+    avgVolume: 0,
+    marketCap: 0,
+    pe: 0,
+    eps: 0,
+    open: meta.regularMarketOpen || (latestIndex >= 0 ? opens[latestIndex] : 0) || 0,
+    previousClose,
+    timestamp: meta.regularMarketTime || (latestIndex >= 0 ? timestamps[latestIndex] : Math.floor(Date.now() / 1000)),
+    currency: meta.currency || "USD",
   };
 }
 

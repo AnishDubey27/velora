@@ -1,8 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
-import _yahooFinance from "yahoo-finance2";
-const yahooFinance = new (_yahooFinance as any)() as any;
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
@@ -34,37 +32,14 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
-async function getYahooInsider(symbol: string) {
-  const summary = await yahooFinance.quoteSummary(symbol, { modules: ['insiderTransactions'] }).catch(() => null);
-  
-  if (!summary) throw new Error("Yahoo insider not found");
-  
-  const transactions = summary.insiderTransactions?.transactions || [];
-  
-  return transactions.map((t: any) => ({
-    symbol,
-    reportingName: t.filerName || "",
-    transactionType: t.transactionText || t.filerRelation || "Unknown",
-    securitiesTransacted: t.shares || 0,
-    price: t.value && t.shares ? (t.value / t.shares) : 0,
-    transactionDate: t.startDate?.toISOString() || "",
-    filingDate: t.startDate?.toISOString() || "",
-    typeOfOwner: t.filerRelation || "officer",
-    link: "",
-  }));
-}
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
+  // For Indian stocks, Finnhub doesn't have insider data — return empty gracefully
   if (isIndianExchangeSymbol(symbol)) {
-    try {
-      return NextResponse.json(await getYahooInsider(symbol));
-    } catch {
-      // Fall through
-    }
+    return NextResponse.json([]);
   }
 
   if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
@@ -100,10 +75,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mapped);
   } catch (error) {
-    try {
-      return NextResponse.json(await getYahooInsider(symbol));
-    } catch {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch insider trading data." }, { status: 502 });
-    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch insider trading data." }, { status: 502 });
   }
 }
