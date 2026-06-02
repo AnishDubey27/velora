@@ -4,12 +4,51 @@ import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
-export async function GET(request: Request) {
-  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
+function isIndianExchangeSymbol(symbol: string) {
+  return /\.(NS|BO)$/i.test(symbol);
+}
 
+async function getYahooKeyStats(symbol: string) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1y`;
+  const res = await fetch(url, { next: { revalidate: 300 } });
+
+  if (!res.ok) {
+    throw new Error(`Yahoo Finance key stats request failed with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const meta = data?.chart?.result?.[0]?.meta || {};
+  const weekLow = meta.fiftyTwoWeekLow || 0;
+  const weekHigh = meta.fiftyTwoWeekHigh || 0;
+
+  return [{
+    avgVolume: meta.averageDailyVolume3Month || 0,
+    marketCap: meta.marketCap || 0,
+    peRatio: meta.trailingPE || 0,
+    weekRange52: weekLow || weekHigh ? `${weekLow.toFixed(2)} - ${weekHigh.toFixed(2)}` : "0 - 0",
+    eps: meta.epsTrailingTwelveMonths || 0,
+    revenue: 0,
+    netIncome: 0,
+    beta: meta.beta || 0,
+    dividendYield: meta.trailingAnnualDividendYield || 0,
+    profitMargin: 0,
+  }];
+}
+
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
+
+  if (isIndianExchangeSymbol(symbol)) {
+    try {
+      return NextResponse.json(await getYahooKeyStats(symbol));
+    } catch {
+      // Fall through to Finnhub when Yahoo is temporarily unavailable.
+    }
+  }
+
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   try {
     const [profileRes, metricRes] = await Promise.all([
@@ -40,6 +79,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json([stats]);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
+    try {
+      return NextResponse.json(await getYahooKeyStats(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
+    }
   }
 }

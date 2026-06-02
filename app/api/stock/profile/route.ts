@@ -4,12 +4,60 @@ import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
+function isIndianExchangeSymbol(symbol: string) {
+  return /\.(NS|BO)$/i.test(symbol);
+}
+
+async function getYahooProfile(symbol: string) {
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=1&newsCount=0`;
+  const [chartRes, searchRes] = await Promise.all([
+    fetch(chartUrl, { next: { revalidate: 300 } }),
+    fetch(searchUrl, { next: { revalidate: 86400 } }),
+  ]);
+
+  if (!chartRes.ok) {
+    throw new Error(`Yahoo Finance profile request failed with status ${chartRes.status}`);
+  }
+
+  const chartData = await chartRes.json();
+  const searchData = searchRes.ok ? await searchRes.json() : null;
+  const meta = chartData?.chart?.result?.[0]?.meta || {};
+  const quote = Array.isArray(searchData?.quotes) ? searchData.quotes[0] : null;
+  const companyName = quote?.longname || quote?.shortname || meta.longName || meta.shortName || symbol.toUpperCase();
+  const exchange = meta.fullExchangeName || quote?.exchDisp || meta.exchangeName || "";
+
+  return {
+    symbol: symbol.toUpperCase(),
+    companyName,
+    description: quote?.sector || quote?.industry || exchange || "",
+    sector: quote?.sector || "",
+    industry: quote?.industry || "",
+    ceo: "",
+    website: "",
+    image: "",
+    exchange,
+    currency: meta.currency || "",
+    country: isIndianExchangeSymbol(symbol) ? "IN" : "",
+    ipoDate: "",
+    fullTimeEmployees: "",
+  };
+}
+
 export async function GET(request: Request) {
-  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
-  
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
+
+  if (isIndianExchangeSymbol(symbol)) {
+    try {
+      return NextResponse.json(await getYahooProfile(symbol));
+    } catch {
+      // Fall through to Finnhub when Yahoo is temporarily unavailable.
+    }
+  }
+
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   try {
     const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`;
@@ -64,6 +112,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(profile);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch profile." }, { status: 502 });
+    try {
+      return NextResponse.json(await getYahooProfile(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch profile." }, { status: 502 });
+    }
   }
 }

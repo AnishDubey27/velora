@@ -4,12 +4,70 @@ import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
+function isIndianExchangeSymbol(symbol: string) {
+  return /\.(NS|BO)$/i.test(symbol);
+}
+
+async function getYahooQuote(symbol: string) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const res = await fetch(url, { cache: "no-store" });
+
+  if (!res.ok) {
+    throw new Error(`Yahoo Finance quote request failed with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  const meta = result?.meta || {};
+  const quote = result?.indicators?.quote?.[0] || {};
+  const timestamps: number[] = result?.timestamp || [];
+  const closes: Array<number | null> = quote.close || [];
+  const opens: Array<number | null> = quote.open || [];
+  const highs: Array<number | null> = quote.high || [];
+  const lows: Array<number | null> = quote.low || [];
+  const volumes: Array<number | null> = quote.volume || [];
+  const latestIndex = closes.map((close, index) => (close == null ? -1 : index)).filter((index) => index >= 0).pop() ?? -1;
+  const price = meta.regularMarketPrice || (latestIndex >= 0 ? closes[latestIndex] : 0) || 0;
+  const previousClose = meta.previousClose || meta.chartPreviousClose || 0;
+  const change = previousClose ? price - previousClose : 0;
+  const changesPercentage = previousClose ? (change / previousClose) * 100 : 0;
+
+  return {
+    symbol: symbol.toUpperCase(),
+    name: meta.longName || meta.shortName || symbol.toUpperCase(),
+    price,
+    change,
+    changesPercentage,
+    dayLow: meta.regularMarketDayLow || (latestIndex >= 0 ? lows[latestIndex] : 0) || 0,
+    dayHigh: meta.regularMarketDayHigh || (latestIndex >= 0 ? highs[latestIndex] : 0) || 0,
+    yearLow: meta.fiftyTwoWeekLow || 0,
+    yearHigh: meta.fiftyTwoWeekHigh || 0,
+    volume: meta.regularMarketVolume || (latestIndex >= 0 ? volumes[latestIndex] : 0) || 0,
+    avgVolume: 0,
+    marketCap: meta.marketCap || 0,
+    pe: meta.trailingPE || 0,
+    eps: 0,
+    open: meta.regularMarketOpen || (latestIndex >= 0 ? opens[latestIndex] : 0) || 0,
+    previousClose,
+    timestamp: meta.regularMarketTime || (latestIndex >= 0 ? timestamps[latestIndex] : Math.floor(Date.now() / 1000)),
+    currency: meta.currency || "",
+  };
+}
+
 export async function GET(request: Request) {
-  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
-  
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
+
+  if (isIndianExchangeSymbol(symbol)) {
+    try {
+      return NextResponse.json(await getYahooQuote(symbol));
+    } catch {
+      // Fall through to Finnhub when Yahoo is temporarily unavailable.
+    }
+  }
+
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   try {
     const [quoteRes, profileRes, metricRes] = await Promise.all([
@@ -47,6 +105,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(stockQuote);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch quote." }, { status: 502 });
+    try {
+      return NextResponse.json(await getYahooQuote(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch quote." }, { status: 502 });
+    }
   }
 }

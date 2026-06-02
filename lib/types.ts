@@ -98,6 +98,7 @@ export type StockQuote = {
   open: number;
   previousClose: number;
   timestamp: number;
+  currency?: string;
 };
 
 export type StockProfile = {

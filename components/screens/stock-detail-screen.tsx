@@ -62,6 +62,7 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
   };
 
   const isUp = quote && quote.change >= 0;
+  const currency = quote?.currency || profile?.currency || "USD";
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto min-h-screen">
@@ -124,9 +125,9 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
           <>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-bold tracking-tight text-vel-text">
-                ${quote?.price?.toFixed(2) || "0.00"}
+                {quote?.price?.toFixed(2) || "0.00"}
               </span>
-              <span className="text-sm font-medium text-vel-muted mb-1 pb-1">USD</span>
+              <span className="text-sm font-medium text-vel-muted mb-1 pb-1">{currency}</span>
             </div>
             
             <div className={cn("flex items-center gap-2 text-sm font-medium mt-1", isUp ? "text-vel-green" : "text-vel-red")}>
