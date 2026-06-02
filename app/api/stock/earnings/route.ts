@@ -42,7 +42,7 @@ async function getYahooEarnings(symbol: string): Promise<EarningsEntry[]> {
   
   const history = summary.earningsHistory?.history || [];
   
-  return history.map(item => ({
+  return history.map((item: any) => ({
     date: item.quarter?.toISOString() || "",
     symbol,
     fiscalDateEnding: item.quarter?.toISOString() || "",
