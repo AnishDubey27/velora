@@ -5,6 +5,9 @@ import useSWR from "swr";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Users } from "lucide-react";
 import { cn, formatLargeNumber } from "@/lib/utils";
+import type { InsiderTrade } from "@/lib/types";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function isBuyType(type: string): boolean {
   const t = type.toLowerCase();

@@ -115,6 +115,8 @@ export type StockProfile = {
   country: string;
   ipoDate: string;
   fullTimeEmployees: string;
+  marketCapitalization?: number;
+  shareOutstanding?: number;
 };
 
 export type ChartDataPoint = {
