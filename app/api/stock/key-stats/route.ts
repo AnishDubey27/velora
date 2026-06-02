@@ -3,37 +3,9 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
-const FMP_KEY = getEnv("FMP_API_KEY");
 
 function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
-}
-
-async function getFmpKeyStats(symbol: string) {
-  const [quoteRes, ratiosRes] = await Promise.all([
-    fetch(`https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(symbol)}?apikey=${FMP_KEY}`, { cache: "no-store" }),
-    fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${encodeURIComponent(symbol)}?apikey=${FMP_KEY}`, { next: { revalidate: 300 } }),
-  ]);
-
-  const quoteData = quoteRes.ok ? await quoteRes.json() : [];
-  const ratiosData = ratiosRes.ok ? await ratiosRes.json() : [];
-  const q = Array.isArray(quoteData) ? quoteData[0] : quoteData;
-  const r = Array.isArray(ratiosData) ? ratiosData[0] : ratiosData;
-
-  if (!q) throw new Error("FMP key stats not found");
-
-  return [{
-    avgVolume: q.avgVolume || 0,
-    marketCap: q.marketCap || 0,
-    peRatio: q.pe || r?.peRatioTTM || 0,
-    weekRange52: `${(q.yearLow || 0).toFixed(2)} - ${(q.yearHigh || 0).toFixed(2)}`,
-    eps: q.eps || 0,
-    revenue: 0,
-    netIncome: 0,
-    beta: 0,
-    dividendYield: r?.dividendYielTTM || r?.dividendYieldTTM || 0,
-    profitMargin: r?.netProfitMarginTTM || 0,
-  }];
 }
 
 async function getYahooKeyStats(symbol: string) {
@@ -70,10 +42,11 @@ export async function GET(request: Request) {
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
   if (isIndianExchangeSymbol(symbol)) {
-    if (FMP_KEY) {
-      try { return NextResponse.json(await getFmpKeyStats(symbol)); } catch { /* fall through */ }
+    try {
+      return NextResponse.json(await getYahooKeyStats(symbol));
+    } catch {
+      // Fall through to Finnhub when Yahoo is temporarily unavailable.
     }
-    try { return NextResponse.json(await getYahooKeyStats(symbol)); } catch { /* fall through */ }
   }
 
   if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
@@ -107,10 +80,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json([stats]);
   } catch (error) {
-    if (FMP_KEY) {
-      try { return NextResponse.json(await getFmpKeyStats(symbol)); } catch { /* continue */ }
+    try {
+      return NextResponse.json(await getYahooKeyStats(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
     }
-    try { return NextResponse.json(await getYahooKeyStats(symbol)); } catch { /* continue */ }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch key stats." }, { status: 502 });
   }
 }
