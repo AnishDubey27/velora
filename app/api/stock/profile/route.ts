@@ -3,9 +3,37 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
+const FMP_KEY = getEnv("FMP_API_KEY");
 
 function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
+}
+
+async function getFmpProfile(symbol: string) {
+  const url = `https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(symbol)}?apikey=${FMP_KEY}`;
+  const res = await fetch(url, { next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`FMP profile request failed: ${res.status}`);
+  const data = await res.json();
+  const p = Array.isArray(data) ? data[0] : data;
+  if (!p || !p.symbol) throw new Error("FMP profile not found");
+
+  return {
+    symbol: p.symbol,
+    companyName: p.companyName || symbol.toUpperCase(),
+    description: p.description || "",
+    sector: p.sector || "",
+    industry: p.industry || "",
+    ceo: p.ceo || "",
+    website: p.website || "",
+    image: p.image || "",
+    exchange: p.exchangeShortName || p.exchange || "",
+    currency: p.currency || "INR",
+    country: p.country || "IN",
+    ipoDate: p.ipoDate || "",
+    fullTimeEmployees: p.fullTimeEmployees?.toString() || "",
+    marketCapitalization: p.mktCap || 0,
+    shareOutstanding: 0,
+  };
 }
 
 async function getYahooProfile(symbol: string) {
@@ -49,11 +77,11 @@ export async function GET(request: Request) {
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
   if (isIndianExchangeSymbol(symbol)) {
-    try {
-      return NextResponse.json(await getYahooProfile(symbol));
-    } catch {
-      // Fall through to Finnhub when Yahoo is temporarily unavailable.
+    // Try FMP first (richer data), then Yahoo as fallback
+    if (FMP_KEY) {
+      try { return NextResponse.json(await getFmpProfile(symbol)); } catch { /* fall through */ }
     }
+    try { return NextResponse.json(await getYahooProfile(symbol)); } catch { /* fall through */ }
   }
 
   if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
@@ -111,10 +139,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(profile);
   } catch (error) {
-    try {
-      return NextResponse.json(await getYahooProfile(symbol));
-    } catch {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch profile." }, { status: 502 });
+    if (FMP_KEY) {
+      try { return NextResponse.json(await getFmpProfile(symbol)); } catch { /* continue */ }
     }
+    try { return NextResponse.json(await getYahooProfile(symbol)); } catch { /* continue */ }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch profile." }, { status: 502 });
   }
 }

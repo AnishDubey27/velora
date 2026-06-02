@@ -3,9 +3,40 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
+const FMP_KEY = getEnv("FMP_API_KEY");
 
 function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
+}
+
+async function getFmpQuote(symbol: string) {
+  const url = `https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(symbol)}?apikey=${FMP_KEY}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`FMP quote request failed: ${res.status}`);
+  const data = await res.json();
+  const q = Array.isArray(data) ? data[0] : data;
+  if (!q || !q.symbol) throw new Error("FMP quote not found");
+
+  return {
+    symbol: q.symbol,
+    name: q.name || symbol.toUpperCase(),
+    price: q.price || 0,
+    change: q.change || 0,
+    changesPercentage: q.changesPercentage || 0,
+    dayLow: q.dayLow || 0,
+    dayHigh: q.dayHigh || 0,
+    yearLow: q.yearLow || 0,
+    yearHigh: q.yearHigh || 0,
+    volume: q.volume || 0,
+    avgVolume: q.avgVolume || 0,
+    marketCap: q.marketCap || 0,
+    pe: q.pe || 0,
+    eps: q.eps || 0,
+    open: q.open || 0,
+    previousClose: q.previousClose || 0,
+    timestamp: q.timestamp || Math.floor(Date.now() / 1000),
+    currency: isIndianExchangeSymbol(symbol) ? "INR" : "USD",
+  };
 }
 
 async function getYahooQuote(symbol: string) {
@@ -30,7 +61,6 @@ async function getYahooQuote(symbol: string) {
   const lows: (number | null)[] = quote.low || [];
   const volumes: (number | null)[] = quote.volume || [];
 
-  // Find the latest valid index
   let latestIndex = -1;
   for (let i = closes.length - 1; i >= 0; i--) {
     if (closes[i] != null) { latestIndex = i; break; }
@@ -69,11 +99,15 @@ export async function GET(request: Request) {
   if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
   if (isIndianExchangeSymbol(symbol)) {
+    // Try FMP first (richer data), then Yahoo chart as fallback
+    if (FMP_KEY) {
+      try {
+        return NextResponse.json(await getFmpQuote(symbol));
+      } catch { /* fall through */ }
+    }
     try {
       return NextResponse.json(await getYahooQuote(symbol));
-    } catch {
-      // Fall through to Finnhub when Yahoo is temporarily unavailable.
-    }
+    } catch { /* fall through */ }
   }
 
   if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
@@ -114,10 +148,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json(stockQuote);
   } catch (error) {
-    try {
-      return NextResponse.json(await getYahooQuote(symbol));
-    } catch {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch quote." }, { status: 502 });
+    // Fallback chain: FMP → Yahoo
+    if (FMP_KEY) {
+      try { return NextResponse.json(await getFmpQuote(symbol)); } catch { /* continue */ }
     }
+    try { return NextResponse.json(await getYahooQuote(symbol)); } catch { /* continue */ }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch quote." }, { status: 502 });
   }
 }
