@@ -112,6 +112,27 @@ export default function Home() {
     setActive("chat");
   };
 
+  const handleAnalyzePortfolio = () => {
+    const portfolioSkill = skills.find((skill) => skill.id === "portfolio-checkup");
+
+    setChatPrompt("");
+    setSkillContext({
+      systemPrompt:
+        portfolioSkill?.systemPrompt ||
+        "You are a personal financial advisor at Velora. Analyze the user's actual portfolio holdings with care, precision, and a constructive tone.",
+      displayMessage: portfolioSkill?.displayMessage || "Analyze my whole portfolio using Velora",
+      hiddenPrompt:
+        portfolioSkill?.hiddenPrompt ||
+        "Analyze my entire portfolio. Assess diversification, concentration risk, overall risk/reward, and suggest specific improvements based on my current holdings.",
+      suggestions: portfolioSkill?.suggestions || [
+        "How should I rebalance this portfolio?",
+        "Which position creates the most risk?",
+        "What should I research next?",
+      ],
+    });
+    setActive("chat");
+  };
+
   const screen = useMemo(() => {
     if (skillLibraryOpen) {
       return (
@@ -129,7 +150,7 @@ export default function Home() {
       case "headlines":
         return <HeadlinesScreen />;
       case "portfolio":
-        return <PortfolioScreen onViewStock={handleViewStock} />;
+        return <PortfolioScreen onViewStock={handleViewStock} onAnalyzePortfolio={handleAnalyzePortfolio} />;
       case "skill-intake":
         if (!selectedSkill) {
           setActive("research");

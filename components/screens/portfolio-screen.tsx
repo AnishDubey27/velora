@@ -3,8 +3,8 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import { Bot, Edit2, Check, Plus, Trash2, TrendingUp, TrendingDown, LogIn } from "lucide-react";
+import { Cell, Pie, PieChart as RechartsPieChart, ResponsiveContainer } from "recharts";
+import { Bot, Edit2, Check, Plus, Trash2, TrendingUp, TrendingDown, LogIn, Sparkles, ShieldCheck, WalletCards } from "lucide-react";
 import { OrbLoader } from "@/components/ui/orb-loader";
 import { cn, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -32,7 +32,13 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string) => void }) {
+export function PortfolioScreen({
+  onViewStock,
+  onAnalyzePortfolio,
+}: {
+  onViewStock?: (symbol: string) => void;
+  onAnalyzePortfolio?: () => void;
+}) {
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
   const [quotes, setQuotes] = useState<Record<string, any>>({});
   const [sp500ChangePercent, setSp500ChangePercent] = useState<number | null>(null);
@@ -299,6 +305,8 @@ export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string
   };
 
   const colors = ["#00D4FF", "#3DF0A4", "#F6C45F", "#FF4D5E", "#A78BFA", "#F4F7FB"];
+  const topHolding = portfolioStats.enrichedHoldings[0];
+  const topHoldingWeight = topHolding && portfolioStats.totalValue > 0 ? (topHolding.value / portfolioStats.totalValue) * 100 : 0;
 
   if (loading) return <section className="grid min-h-[calc(100dvh-164px)] place-items-center"><OrbLoader /></section>;
 
@@ -318,53 +326,94 @@ export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string
 
   return (
     <section className="pb-5 pt-2">
-      <div className="mb-5 flex items-start justify-between px-2">
-        <div>
-          <p className="text-xs font-black uppercase tracking-widest text-white/60">PORTFOLIO</p>
-          <h1 className="text-4xl font-semibold tracking-tighter text-white">
-            {formatCurrency(loadedValue)}
-          </h1>
-          <div className="flex gap-3 mt-1">
-            <p className={cn("text-sm", portfolioStats.dayChangePercent >= 0 ? "text-green-400" : "text-red-400")}>
-              {portfolioStats.dayChangePercent >= 0 ? "+" : ""}{portfolioStats.dayChangePercent.toFixed(2)}% Today
-            </p>
-            <p className={cn("text-sm", portfolioStats.allTimePercent >= 0 ? "text-vel-teal" : "text-red-400")}>
-              {portfolioStats.allTimePercent >= 0 ? "+" : ""}{portfolioStats.allTimePercent.toFixed(2)}% All-Time
-            </p>
+      <div className="mb-4 px-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-widest text-white/60">PORTFOLIO</p>
+            <h1 className="mt-1 text-4xl font-semibold tracking-tighter text-white">
+              {formatCurrency(loadedValue)}
+            </h1>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", portfolioStats.dayChangePercent >= 0 ? "bg-green-400/10 text-green-300" : "bg-red-400/10 text-red-300")}>
+                {portfolioStats.dayChangePercent >= 0 ? "+" : ""}{portfolioStats.dayChangePercent.toFixed(2)}% Today
+              </span>
+              <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", portfolioStats.allTimePercent >= 0 ? "bg-vel-teal/10 text-vel-teal" : "bg-red-400/10 text-red-300")}>
+                {portfolioStats.allTimePercent >= 0 ? "+" : ""}{portfolioStats.allTimePercent.toFixed(2)}% All-Time
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-none items-center gap-2">
+            {!isEditing && (
+              <button
+                onClick={onAnalyzePortfolio}
+                className="group hidden items-center gap-2 rounded-full border border-vel-teal/25 bg-vel-teal px-4 py-2 text-xs font-bold text-[#041018] shadow-glow transition-all hover:-translate-y-0.5 hover:bg-white sm:flex"
+              >
+                <Sparkles size={15} />
+                Analyze using Velora
+              </button>
+            )}
+            <button 
+              onClick={() => setIsEditing(!isEditing)}
+              className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+              aria-label={isEditing ? "Finish editing portfolio" : "Edit portfolio"}
+            >
+              {isEditing ? <Check size={18} className="text-green-400" /> : <Edit2 size={18} />}
+            </button>
           </div>
         </div>
-        <button 
-          onClick={() => setIsEditing(!isEditing)}
-          className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
-        >
-          {isEditing ? <Check size={18} className="text-green-400" /> : <Edit2 size={18} />}
-        </button>
+
+        {!isEditing && (
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <WalletCards size={15} className="mb-2 text-vel-teal" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Holdings</p>
+              <p className="mt-1 text-lg font-semibold text-white">{portfolioStats.enrichedHoldings.length}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <ShieldCheck size={15} className="mb-2 text-vel-green" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Risk</p>
+              <p className="mt-1 text-lg font-semibold text-white">{pulseMetrics.riskScore}/100</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <TrendingUp size={15} className="mb-2 text-vel-amber" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Largest</p>
+              <p className="mt-1 truncate text-lg font-semibold text-white">{topHolding ? `${topHoldingWeight.toFixed(0)}%` : "0%"}</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden touch-pan-y">
         <motion.div
           className="flex"
           drag={!isEditing ? "x" : false}
-          dragConstraints={{ left: -100, right: 100 }}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragDirectionLock
+          dragElastic={0.14}
+          dragMomentum={false}
           animate={{ x: `-${page * 100}%` }}
           onDragEnd={(_, info) => {
-            if (info.offset.x < -80) setPage(1);
-            if (info.offset.x > 80) setPage(0);
+            const absX = Math.abs(info.offset.x);
+            const absY = Math.abs(info.offset.y);
+            if (absX < 72 || absX < absY * 1.25) return;
+            if (info.offset.x < 0) setPage((current) => Math.min(current + 1, 1));
+            if (info.offset.x > 0) setPage((current) => Math.max(current - 1, 0));
           }}
         >
           <div className="w-full flex-none px-1">
-            <div className="glassy rounded-3xl p-5">
+            <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-teal/60 to-transparent" />
               {!isEditing && (
                 <div className="relative h-64 mb-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <RechartsPieChart>
                       <Pie
                         data={portfolioStats.enrichedHoldings} dataKey="value"
                         innerRadius={78} outerRadius={110} paddingAngle={3} cornerRadius={8} stroke="none"
                       >
                         {portfolioStats.enrichedHoldings.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
                       </Pie>
-                    </PieChart>
+                    </RechartsPieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <p className="text-xs uppercase tracking-widest text-white/50">AI Risk Score</p>
@@ -455,8 +504,18 @@ export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string
           </div>
 
           <div className="w-full flex-none px-1">
-             <div className="glassy rounded-3xl p-5">
-              <h2 className="text-xl font-semibold mb-6">Portfolio Pulse</h2>
+             <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-green/60 to-transparent" />
+              <div className="mb-6 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-white/40">Portfolio Pulse</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-white">Risk rhythm</h2>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+                  <p className="text-[10px] uppercase tracking-wider text-white/40">Score</p>
+                  <p className="text-xl font-semibold text-white">{pulseMetrics.riskScore}</p>
+                </div>
+              </div>
               <div className="space-y-6">
                 {pulseMetrics.rows.map((metric, i) => (
                   <div key={i}>
@@ -474,6 +533,18 @@ export function PortfolioScreen({ onViewStock }: { onViewStock?: (symbol: string
           </div>
         </motion.div>
       </div>
+
+      {!isEditing && (
+        <div className="mt-4 px-1 sm:hidden">
+          <button
+            onClick={onAnalyzePortfolio}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-vel-teal px-4 py-3 text-sm font-bold text-[#041018] shadow-glow transition active:scale-[0.98]"
+          >
+            <Sparkles size={17} />
+            Analyze using Velora
+          </button>
+        </div>
+      )}
 
       {!isEditing && (
         <div className="mt-4 flex justify-center gap-2">
