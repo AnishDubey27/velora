@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
-import yahooFinance from "yahoo-finance2";
+import _yahooFinance from "yahoo-finance2";
+const yahooFinance = new (_yahooFinance as any)() as any;
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 

@@ -8,7 +8,8 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
-import yahooFinance from "yahoo-finance2";
+import _yahooFinance from "yahoo-finance2";
+const yahooFinance = new (_yahooFinance as any)() as any;
 
 async function getYahooQuote(symbol: string) {
   const quote = await yahooFinance.quote(symbol);
