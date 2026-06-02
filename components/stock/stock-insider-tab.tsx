@@ -4,25 +4,14 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { InsiderTrade } from "@/lib/types";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
-function formatLargeNumber(num: number): string {
-  if (num >= 1e12) return `$${(num / 1e12).toFixed(1)}T`;
-  if (num >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
-  if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-  if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
-  return `$${num.toFixed(2)}`;
-}
+import { cn, formatLargeNumber } from "@/lib/utils";
 
 function isBuyType(type: string): boolean {
   const t = type.toLowerCase();
   return t.includes("purchase") || t.includes("buy") || t.includes("p-purchase") || t === "p";
 }
 
-export function StockInsiderTab({ symbol }: { symbol: string }) {
+export function StockInsiderTab({ symbol, currencySymbol = "$" }: { symbol: string, currencySymbol?: string }) {
   const { data, error, isLoading } = useSWR<InsiderTrade[]>(
     `/api/stock/insider?symbol=${symbol}`,
     fetcher,
@@ -109,7 +98,7 @@ export function StockInsiderTab({ symbol }: { symbol: string }) {
                 {summary.buys} Buy{summary.buys !== 1 ? "s" : ""}
               </span>
             </div>
-            <p className="text-lg font-bold text-white">{formatLargeNumber(summary.buyValue)}</p>
+            <p className="text-lg font-bold text-white">{formatLargeNumber(summary.buyValue, currencySymbol)}</p>
           </div>
           <div className="rounded-xl bg-vel-red/[0.08] border border-vel-red/[0.15] p-3">
             <div className="flex items-center gap-2 mb-1.5">
@@ -118,7 +107,7 @@ export function StockInsiderTab({ symbol }: { symbol: string }) {
                 {summary.sells} Sell{summary.sells !== 1 ? "s" : ""}
               </span>
             </div>
-            <p className="text-lg font-bold text-white">{formatLargeNumber(summary.sellValue)}</p>
+            <p className="text-lg font-bold text-white">{formatLargeNumber(summary.sellValue, currencySymbol)}</p>
           </div>
         </div>
       </div>
@@ -167,13 +156,13 @@ export function StockInsiderTab({ symbol }: { symbol: string }) {
               <div>
                 <p className="text-[9px] text-white/30 uppercase tracking-wider">Price</p>
                 <p className="text-[13px] font-semibold text-white">
-                  ${trade.price.toFixed(2)}
+                  {currencySymbol}{trade.price.toFixed(2)}
                 </p>
               </div>
               <div>
                 <p className="text-[9px] text-white/30 uppercase tracking-wider">Value</p>
                 <p className="text-[13px] font-bold text-white">
-                  {formatLargeNumber(totalValue)}
+                  {formatLargeNumber(totalValue, currencySymbol)}
                 </p>
               </div>
             </div>

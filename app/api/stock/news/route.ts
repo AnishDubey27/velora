@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import yahooFinance from "yahoo-finance2";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
@@ -30,23 +31,39 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-export async function GET(request: Request) {
-  if (!FINNHUB_KEY) {
-    return NextResponse.json(
-      { error: "FINNHUB_API_KEY not configured." },
-      { status: 500 }
-    );
-  }
+function isIndianExchangeSymbol(symbol: string) {
+  return /\.(NS|BO)$/i.test(symbol);
+}
 
+async function getYahooNews(symbol: string): Promise<StockNewsItem[]> {
+  const search = await yahooFinance.search(symbol).catch(() => null);
+  if (!search || !search.news) return [];
+  
+  return search.news.slice(0, 20).map((item: any) => ({
+    title: item.title,
+    url: item.link,
+    publishedDate: item.providerPublishTime ? new Date(item.providerPublishTime * 1000).toISOString() : new Date().toISOString(),
+    site: item.publisher || "Yahoo Finance",
+    text: "", 
+    image: item.thumbnail?.resolutions?.[0]?.url || "",
+    symbol,
+  }));
+}
+
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
+  if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
-  if (!symbol) {
-    return NextResponse.json(
-      { error: "Query parameter 'symbol' is required." },
-      { status: 400 }
-    );
+  if (isIndianExchangeSymbol(symbol)) {
+    try {
+      return NextResponse.json(await getYahooNews(symbol));
+    } catch {
+      // Fall through
+    }
   }
+
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   try {
     const now = new Date();
@@ -67,10 +84,7 @@ export async function GET(request: Request) {
     }
 
     const data: FinnhubNewsItem[] = await res.json();
-
-    if (!Array.isArray(data)) {
-      return NextResponse.json([]);
-    }
+    if (!Array.isArray(data)) return NextResponse.json([]);
 
     const mapped: StockNewsItem[] = data.slice(0, 20).map((item) => ({
       title: item.headline,
@@ -84,14 +98,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mapped);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch stock news.",
-      },
-      { status: 502 }
-    );
+    try {
+      return NextResponse.json(await getYahooNews(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch stock news." }, { status: 502 });
+    }
   }
 }

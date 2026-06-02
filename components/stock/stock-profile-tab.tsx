@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function StockProfileTab({ symbol }: { symbol: string }) {
+export function StockProfileTab({ symbol, currencySymbol = "$" }: { symbol: string; currencySymbol?: string }) {
   const [isAnnual, setIsAnnual] = useState(true);
 
   const { data: keyStats, isLoading: isLoadingStats } = useSWR<KeyStats[]>(`/api/stock/key-stats?symbol=${symbol}`, fetcher);
@@ -62,13 +62,13 @@ export function StockProfileTab({ symbol }: { symbol: string }) {
           </div>
         ) : (
           <div className="flex flex-col text-sm">
-            <StatRow label="Market Cap" value={formatLargeNumber(stats?.marketCap || 0)} />
-            <StatRow label="P/E Ratio (TTM)" value={stats?.peRatio?.toFixed(2) || "-"} />
-            <StatRow label="EPS (TTM)" value={`$${stats?.eps?.toFixed(2) || "-"}`} />
+            <StatRow label="Market Cap" value={companyProfile?.marketCapitalization ? formatLargeNumber(companyProfile.marketCapitalization, currencySymbol) : "-"} />
+            <StatRow label="Outstanding Shares" value={companyProfile?.shareOutstanding ? formatLargeNumber(companyProfile.shareOutstanding, "") : "-"} />
+            <StatRow label="EPS (TTM)" value={`${currencySymbol}${stats?.eps?.toFixed(2) || "-"}`} />
             <StatRow label="Beta" value={stats?.beta?.toFixed(2) || "-"} />
             <StatRow label="52 Week Range" value={stats?.weekRange52 || "-"} />
             <StatRow label="Dividend Yield" value={stats?.dividendYield ? (stats.dividendYield * 100).toFixed(2) + "%" : "-"} />
-            <StatRow label="Average Volume" value={formatLargeNumber(stats?.avgVolume || 0).replace("$", "")} border={false} />
+            <StatRow label="Average Volume" value={formatLargeNumber(stats?.avgVolume || 0, "")} border={false} />
           </div>
         )}
       </section>
@@ -105,12 +105,12 @@ export function StockProfileTab({ symbol }: { symbol: string }) {
               <ComposedChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#252B3E" vertical={false} />
                 <XAxis dataKey="name" stroke="#8E96A7" tick={{ fill: "#8E96A7" }} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="left" stroke="#8E96A7" tick={{ fill: "#8E96A7" }} tickLine={false} axisLine={false} tickFormatter={(value) => formatLargeNumber(value).replace(".00", "")} />
+                <YAxis yAxisId="left" stroke="#8E96A7" tick={{ fill: "#8E96A7" }} tickLine={false} axisLine={false} tickFormatter={(value) => formatLargeNumber(value, currencySymbol).replace(".00", "")} />
                 <YAxis yAxisId="right" orientation="right" stroke="#F6C45F" tick={{ fill: "#F6C45F" }} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: "#101524", border: "1px solid #252B3E", borderRadius: "8px", color: "#F4F7FB" }}
                   itemStyle={{ color: "#F4F7FB" }}
-                  formatter={(value: number, name: string) => [name === "Margin %" ? `${value.toFixed(2)}%` : formatLargeNumber(value), name]}
+                  formatter={(value: number, name: string) => [name === "Margin %" ? `${value.toFixed(2)}%` : formatLargeNumber(value, currencySymbol), name]}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: "10px" }} />
                 <Bar yAxisId="left" dataKey="Revenue" fill="#143E4D" radius={[4, 4, 0, 0]} barSize={20} />

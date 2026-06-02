@@ -8,39 +8,32 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
+import yahooFinance from "yahoo-finance2";
+
 async function getYahooProfile(symbol: string) {
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
-  const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=1&newsCount=0`;
-  const [chartRes, searchRes] = await Promise.all([
-    fetch(chartUrl, { next: { revalidate: 300 } }),
-    fetch(searchUrl, { next: { revalidate: 86400 } }),
+  const [quote, summary] = await Promise.all([
+    yahooFinance.quote(symbol).catch(() => null),
+    yahooFinance.quoteSummary(symbol, { modules: ['assetProfile'] }).catch(() => null)
   ]);
+  
+  if (!quote) throw new Error("Yahoo profile quote not found");
 
-  if (!chartRes.ok) {
-    throw new Error(`Yahoo Finance profile request failed with status ${chartRes.status}`);
-  }
-
-  const chartData = await chartRes.json();
-  const searchData = searchRes.ok ? await searchRes.json() : null;
-  const meta = chartData?.chart?.result?.[0]?.meta || {};
-  const quote = Array.isArray(searchData?.quotes) ? searchData.quotes[0] : null;
-  const companyName = quote?.longname || quote?.shortname || meta.longName || meta.shortName || symbol.toUpperCase();
-  const exchange = meta.fullExchangeName || quote?.exchDisp || meta.exchangeName || "";
+  const assetProfile = summary?.assetProfile || {};
 
   return {
     symbol: symbol.toUpperCase(),
-    companyName,
-    description: quote?.sector || quote?.industry || exchange || "",
-    sector: quote?.sector || "",
-    industry: quote?.industry || "",
-    ceo: "",
-    website: "",
+    companyName: quote.longName || quote.shortName || symbol.toUpperCase(),
+    description: assetProfile.longBusinessSummary || assetProfile.industry || assetProfile.sector || "",
+    sector: assetProfile.sector || "",
+    industry: assetProfile.industry || "",
+    ceo: assetProfile.companyOfficers?.find((o: any) => o.title?.toLowerCase().includes("ceo"))?.name || "",
+    website: assetProfile.website || "",
     image: "",
-    exchange,
-    currency: meta.currency || "",
-    country: isIndianExchangeSymbol(symbol) ? "IN" : "",
+    exchange: quote.fullExchangeName || quote.exchange || "",
+    currency: quote.currency || "USD",
+    country: assetProfile.country || (isIndianExchangeSymbol(symbol) ? "IN" : ""),
     ipoDate: "",
-    fullTimeEmployees: "",
+    fullTimeEmployees: assetProfile.fullTimeEmployees || "",
   };
 }
 

@@ -11,6 +11,7 @@ import { StockProfileTab } from "@/components/stock/stock-profile-tab";
 import { StockEarningsTab } from "@/components/stock/stock-earnings-tab";
 import { StockInsiderTab } from "@/components/stock/stock-insider-tab";
 import { StockNewsTab } from "@/components/stock/stock-news-tab";
+import { getCurrencySymbol } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then((res) => {
   if (!res.ok) throw new Error("Failed to fetch");
@@ -63,6 +64,7 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
 
   const isUp = quote && quote.change >= 0;
   const currency = quote?.currency || profile?.currency || "USD";
+  const currencySymbol = getCurrencySymbol(currency);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto min-h-screen">
@@ -177,9 +179,9 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {activeTab === "Profile" && <StockProfileTab symbol={symbol} />}
-            {activeTab === "Earnings" && <StockEarningsTab symbol={symbol} />}
-            {activeTab === "Insider" && <StockInsiderTab symbol={symbol} />}
+            {activeTab === "Profile" && <StockProfileTab symbol={symbol} currencySymbol={currencySymbol} />}
+            {activeTab === "Earnings" && <StockEarningsTab symbol={symbol} currencySymbol={currencySymbol} />}
+            {activeTab === "Insider" && <StockInsiderTab symbol={symbol} currencySymbol={currencySymbol} />}
             {activeTab === "News" && <StockNewsTab symbol={symbol} />}
           </motion.div>
         </AnimatePresence>

@@ -5,22 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number) {
+export function formatCurrency(value: number, currencyCode: string = "USD") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currencyCode,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value);
 }
 
-export function formatLargeNumber(num: number): string {
+export function getCurrencySymbol(currencyCode: string = "USD"): string {
+  const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode });
+  const parts = formatter.formatToParts(0);
+  const symbol = parts.find(part => part.type === 'currency')?.value;
+  return symbol || currencyCode;
+}
+
+export function formatLargeNumber(num: number, currencySymbol: string = "$"): string {
   if (num === null || num === undefined) return "-";
-  if (num >= 1e12) return "$" + (num / 1e12).toFixed(2) + "T";
-  if (num >= 1e9) return "$" + (num / 1e9).toFixed(2) + "B";
-  if (num >= 1e6) return "$" + (num / 1e6).toFixed(2) + "M";
-  if (num >= 1e3) return "$" + (num / 1e3).toFixed(2) + "K";
-  return "$" + num.toFixed(2);
+  if (num >= 1e12) return currencySymbol + (num / 1e12).toFixed(2) + "T";
+  if (num >= 1e9) return currencySymbol + (num / 1e9).toFixed(2) + "B";
+  if (num >= 1e6) return currencySymbol + (num / 1e6).toFixed(2) + "M";
+  if (num >= 1e3) return currencySymbol + (num / 1e3).toFixed(2) + "K";
+  return currencySymbol + num.toFixed(2);
 }
 
 export function formatPercent(num: number): string {

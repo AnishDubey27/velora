@@ -8,29 +8,25 @@ function isIndianExchangeSymbol(symbol: string) {
   return /\.(NS|BO)$/i.test(symbol);
 }
 
+import yahooFinance from "yahoo-finance2";
+
 async function getYahooKeyStats(symbol: string) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1y`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  const quote = await yahooFinance.quote(symbol);
+  if (!quote) throw new Error("Yahoo key stats quote not found");
 
-  if (!res.ok) {
-    throw new Error(`Yahoo Finance key stats request failed with status ${res.status}`);
-  }
-
-  const data = await res.json();
-  const meta = data?.chart?.result?.[0]?.meta || {};
-  const weekLow = meta.fiftyTwoWeekLow || 0;
-  const weekHigh = meta.fiftyTwoWeekHigh || 0;
+  const weekLow = quote.fiftyTwoWeekLow || 0;
+  const weekHigh = quote.fiftyTwoWeekHigh || 0;
 
   return [{
-    avgVolume: meta.averageDailyVolume3Month || 0,
-    marketCap: meta.marketCap || 0,
-    peRatio: meta.trailingPE || 0,
+    avgVolume: quote.averageDailyVolume10Day || quote.averageDailyVolume3Month || 0,
+    marketCap: quote.marketCap || 0,
+    peRatio: quote.trailingPE || 0,
     weekRange52: weekLow || weekHigh ? `${weekLow.toFixed(2)} - ${weekHigh.toFixed(2)}` : "0 - 0",
-    eps: meta.epsTrailingTwelveMonths || 0,
+    eps: quote.epsTrailingTwelveMonths || 0,
     revenue: 0,
     netIncome: 0,
-    beta: meta.beta || 0,
-    dividendYield: meta.trailingAnnualDividendYield || 0,
+    beta: 0, // Not typically in basic quote, would need summary
+    dividendYield: quote.trailingAnnualDividendYield || 0,
     profitMargin: 0,
   }];
 }

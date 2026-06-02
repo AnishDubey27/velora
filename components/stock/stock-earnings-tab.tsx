@@ -8,19 +8,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, ReferenceLine, Cell,
 } from "recharts";
-import { cn } from "@/lib/utils";
+import { cn, formatLargeNumber } from "@/lib/utils";
 import type { EarningsEntry } from "@/lib/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
-function formatLargeNumber(num: number): string {
-  const abs = Math.abs(num);
-  if (abs >= 1e12) return `$${(num / 1e12).toFixed(1)}T`;
-  if (abs >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
-  return `$${num.toFixed(2)}`;
-}
 
 function getQuarterLabel(period: string, date: string): string {
   if (period) return period;
@@ -59,7 +50,7 @@ function statusColor(status: BeatStatus) {
 }
 
 /* ─── Custom Recharts Tooltip ─── */
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label, currencySymbol = "$" }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-vel-panel2 border border-white/10 rounded-xl px-4 py-3 shadow-card text-xs">
@@ -67,14 +58,14 @@ function ChartTooltip({ active, payload, label }: any) {
       {payload.map((p: any, i: number) => (
         <p key={i} className="text-white/70">
           <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: p.color }} />
-          {p.name}: {typeof p.value === "number" ? (Math.abs(p.value) >= 1e6 ? formatLargeNumber(p.value) : `$${p.value.toFixed(2)}`) : p.value}
+          {p.name}: {typeof p.value === "number" ? (Math.abs(p.value) >= 1e6 ? formatLargeNumber(p.value, currencySymbol) : `${currencySymbol}${p.value.toFixed(2)}`) : p.value}
         </p>
       ))}
     </div>
   );
 }
 
-export function StockEarningsTab({ symbol }: { symbol: string }) {
+export function StockEarningsTab({ symbol, currencySymbol = "$" }: { symbol: string, currencySymbol?: string }) {
   const [view, setView] = useState<"past" | "upcoming">("past");
 
   const { data, error, isLoading } = useSWR<EarningsEntry[]>(
@@ -220,12 +211,12 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                         <p className={cn("text-[11px] font-bold", statusColor(status))}>{status}</p>
                         {latest.revenueEstimated !== null && (
                           <p className="text-[9px] text-white/25 mt-1">
-                            Est {formatLargeNumber(latest.revenueEstimated)}
+                            Est {formatLargeNumber(latest.revenueEstimated, currencySymbol)}
                           </p>
                         )}
                         {latest.revenueActual !== null && (
                           <p className="text-[10px] text-white/50">
-                            Act {formatLargeNumber(latest.revenueActual)}
+                            Act {formatLargeNumber(latest.revenueActual, currencySymbol)}
                           </p>
                         )}
                       </div>
@@ -241,12 +232,12 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                         <p className={cn("text-[11px] font-bold", statusColor(status))}>{status}</p>
                         {latest.epsEstimated !== null && (
                           <p className="text-[9px] text-white/25 mt-1">
-                            Est ${latest.epsEstimated?.toFixed(2)}
+                            Est {currencySymbol}{latest.epsEstimated?.toFixed(2)}
                           </p>
                         )}
                         {latest.epsActual !== null && (
                           <p className="text-[10px] text-white/50">
-                            Act ${latest.epsActual?.toFixed(2)}
+                            Act {currencySymbol}{latest.epsActual?.toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -304,9 +295,9 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                         tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={(v) => `$${v}`}
+                        tickFormatter={(v) => `${currencySymbol}${v}`}
                       />
-                      <Tooltip content={<ChartTooltip />} />
+                      <Tooltip content={<ChartTooltip currencySymbol={currencySymbol} />} />
                       <Legend
                         wrapperStyle={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}
                         iconType="circle"
@@ -366,9 +357,9 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                         tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={(v) => formatLargeNumber(v).replace("$", "")}
+                        tickFormatter={(v) => formatLargeNumber(v, currencySymbol).replace(currencySymbol, "")}
                       />
-                      <Tooltip content={<ChartTooltip />} />
+                      <Tooltip content={<ChartTooltip currencySymbol={currencySymbol} />} />
                       <Legend
                         wrapperStyle={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}
                         iconType="circle"
@@ -430,7 +421,7 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                             EPS Estimate
                           </p>
                           <p className="text-lg font-bold text-white">
-                            {next.epsEstimated !== null ? `$${next.epsEstimated.toFixed(2)}` : "—"}
+                            {next.epsEstimated !== null ? `${currencySymbol}${next.epsEstimated.toFixed(2)}` : "—"}
                           </p>
                         </div>
                         <div className="rounded-xl bg-white/[0.03] p-3">
@@ -438,7 +429,7 @@ export function StockEarningsTab({ symbol }: { symbol: string }) {
                             Revenue Estimate
                           </p>
                           <p className="text-lg font-bold text-white">
-                            {next.revenueEstimated !== null ? formatLargeNumber(next.revenueEstimated) : "—"}
+                            {next.revenueEstimated !== null ? formatLargeNumber(next.revenueEstimated, currencySymbol) : "—"}
                           </p>
                         </div>
                       </div>

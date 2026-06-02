@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import yahooFinance from "yahoo-finance2";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
@@ -28,23 +29,44 @@ interface FinnhubInsiderTransaction {
   transactionPrice: number;
 }
 
-export async function GET(request: Request) {
-  if (!FINNHUB_KEY) {
-    return NextResponse.json(
-      { error: "FINNHUB_API_KEY not configured." },
-      { status: 500 }
-    );
-  }
+function isIndianExchangeSymbol(symbol: string) {
+  return /\.(NS|BO)$/i.test(symbol);
+}
 
+async function getYahooInsider(symbol: string) {
+  const summary = await yahooFinance.quoteSummary(symbol, { modules: ['insiderTransactions'] }).catch(() => null);
+  
+  if (!summary) throw new Error("Yahoo insider not found");
+  
+  const transactions = summary.insiderTransactions?.transactions || [];
+  
+  return transactions.map((t: any) => ({
+    symbol,
+    reportingName: t.filerName || "",
+    transactionType: t.transactionText || t.filerRelation || "Unknown",
+    securitiesTransacted: t.shares || 0,
+    price: t.value && t.shares ? (t.value / t.shares) : 0,
+    transactionDate: t.startDate?.toISOString() || "",
+    filingDate: t.startDate?.toISOString() || "",
+    typeOfOwner: t.filerRelation || "officer",
+    link: "",
+  }));
+}
+
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
+  if (!symbol) return NextResponse.json({ error: "Query parameter 'symbol' is required." }, { status: 400 });
 
-  if (!symbol) {
-    return NextResponse.json(
-      { error: "Query parameter 'symbol' is required." },
-      { status: 400 }
-    );
+  if (isIndianExchangeSymbol(symbol)) {
+    try {
+      return NextResponse.json(await getYahooInsider(symbol));
+    } catch {
+      // Fall through
+    }
   }
+
+  if (!FINNHUB_KEY) return NextResponse.json({ error: "FINNHUB_API_KEY not configured." }, { status: 500 });
 
   try {
     const url = `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(FINNHUB_KEY)}`;
@@ -58,23 +80,15 @@ export async function GET(request: Request) {
     }
 
     const json = await res.json();
-    const raw: FinnhubInsiderTransaction[] = Array.isArray(json?.data)
-      ? json.data
-      : [];
+    const raw: FinnhubInsiderTransaction[] = Array.isArray(json?.data) ? json.data : [];
 
     const mapped = raw
-      .filter(
-        (t) =>
-          !t.isDerivative &&
-          t.transactionPrice != null &&
-          t.transactionPrice > 0
-      )
+      .filter((t) => !t.isDerivative && t.transactionPrice != null && t.transactionPrice > 0)
       .slice(0, 30)
       .map((t) => ({
         symbol: t.symbol,
         reportingName: t.name,
-        transactionType:
-          TRANSACTION_CODE_MAP[t.transactionCode] ?? t.transactionCode,
+        transactionType: TRANSACTION_CODE_MAP[t.transactionCode] ?? t.transactionCode,
         securitiesTransacted: Math.abs(t.change),
         price: t.transactionPrice ?? 0,
         transactionDate: t.transactionDate,
@@ -85,14 +99,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mapped);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch insider trading data.",
-      },
-      { status: 502 }
-    );
+    try {
+      return NextResponse.json(await getYahooInsider(symbol));
+    } catch {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to fetch insider trading data." }, { status: 502 });
+    }
   }
 }
