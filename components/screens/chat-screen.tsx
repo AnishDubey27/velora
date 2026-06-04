@@ -117,11 +117,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       } else {
         throw new Error(data.error || "Failed to get response");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." }
+        { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
       ]);
     } finally {
       setIsLoading(false);
@@ -159,11 +159,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       } else {
         throw new Error(data.error || "Failed to get response");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." }
+        { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
       ]);
     } finally {
       setIsLoading(false);
