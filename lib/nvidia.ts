@@ -6,7 +6,7 @@ export const NVIDIA_ALLOWED_MODELS = [
   "mistralai/mistral-nemotron",
   "mistralai/mistral-large-3-675b-instruct-2512",
   "bytedance/seed-oss-36b-instruct",
-  "z-ai/glm-5.1"
+  "google/gemma-4-31b-it"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];
@@ -16,7 +16,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "z-ai/glm-5.1";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "google/gemma-4-31b-it";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;
