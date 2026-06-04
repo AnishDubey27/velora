@@ -132,38 +132,89 @@ IMPORTANT:
   }
 
   try {
-    const braveApiKey = getEnv('BRAVE_SEARCH_API_KEY');
-    const braveApiUrl = getEnv('BRAVE_SEARCH_API_URL') || "https://api.search.brave.com/res/v1/web/search";
-    
-    if (braveApiKey && messages.length > 0) {
+    let searchContextInjected = false;
+
+    // ── Primary: Tavily Search (finance-optimized) ──
+    const tavilyKey = getEnv('TAVILY_API_KEY');
+    if (tavilyKey && messages.length > 0) {
       const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
       if (lastUserMsg) {
         try {
-          const searchParams = new URLSearchParams({
-            q: lastUserMsg.content,
-            count: "5",
-            freshness: "pw", // past week for fresh financial news
-          });
-          const searchRes = await fetch(`${braveApiUrl}?${searchParams.toString()}`, {
+          const tavilyRes = await fetch("https://api.tavily.com/search", {
+            method: "POST",
             headers: {
-              "X-Subscription-Token": braveApiKey,
-              "Accept": "application/json"
-            }
+              Authorization: `Bearer ${tavilyKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: lastUserMsg.content,
+              search_depth: "basic",
+              topic: "finance",
+              max_results: 5,
+              include_answer: true,
+              time_range: "week",
+            }),
           });
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            const results = searchData?.web?.results || [];
+
+          if (tavilyRes.ok) {
+            const tavilyData = await tavilyRes.json();
+            const results = tavilyData?.results || [];
             if (results.length > 0) {
-              const snippets = results.map((r: any) => `- ${r.title}: ${r.description}`).join("\n");
+              const snippets = results
+                .map((r: any) => `- ${r.title}: ${r.content}`)
+                .join("\n");
+              const answerBlock = tavilyData.answer
+                ? `\n\nAI-Generated Summary:\n${tavilyData.answer}`
+                : "";
               const contextMessage: ChatMessage = {
                 role: "system",
-                content: `Here is some real-time context from the web to help answer the user's question. Do not hallucinate. If the context doesn't have the answer, just say so. \n\nContext:\n${snippets}`
+                content: `Here is some real-time financial context from the web to help answer the user's question. Do not hallucinate. If the context doesn't have the answer, just say so.\n\nContext:\n${snippets}${answerBlock}`,
               };
               messages.unshift(contextMessage);
+              searchContextInjected = true;
             }
           }
-        } catch (searchError) {
-          console.error("Brave search failed:", searchError);
+        } catch (tavilyError) {
+          console.error("Tavily search failed, falling back to Brave:", tavilyError);
+        }
+      }
+    }
+
+    // ── Fallback: Brave Search ──
+    if (!searchContextInjected) {
+      const braveApiKey = getEnv('BRAVE_SEARCH_API_KEY');
+      const braveApiUrl = getEnv('BRAVE_SEARCH_API_URL') || "https://api.search.brave.com/res/v1/web/search";
+      
+      if (braveApiKey && messages.length > 0) {
+        const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+        if (lastUserMsg) {
+          try {
+            const searchParams = new URLSearchParams({
+              q: lastUserMsg.content,
+              count: "5",
+              freshness: "pw", // past week for fresh financial news
+            });
+            const searchRes = await fetch(`${braveApiUrl}?${searchParams.toString()}`, {
+              headers: {
+                "X-Subscription-Token": braveApiKey,
+                "Accept": "application/json"
+              }
+            });
+            if (searchRes.ok) {
+              const searchData = await searchRes.json();
+              const results = searchData?.web?.results || [];
+              if (results.length > 0) {
+                const snippets = results.map((r: any) => `- ${r.title}: ${r.description}`).join("\n");
+                const contextMessage: ChatMessage = {
+                  role: "system",
+                  content: `Here is some real-time context from the web to help answer the user's question. Do not hallucinate. If the context doesn't have the answer, just say so. \n\nContext:\n${snippets}`
+                };
+                messages.unshift(contextMessage);
+              }
+            }
+          } catch (searchError) {
+            console.error("Brave search failed:", searchError);
+          }
         }
       }
     }

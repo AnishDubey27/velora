@@ -195,7 +195,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           </div>
           <div>
             <h2 className="text-[15px] font-semibold text-white">Velora AI</h2>
-            <p className="text-[11px] text-white/50">Powered by NVIDIA NIM & Brave</p>
+            <p className="text-[11px] text-white/50">Powered by NVIDIA NIM & Tavily</p>
           </div>
         </div>
         <div className="flex-1" />

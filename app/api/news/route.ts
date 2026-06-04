@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
 
 const MARKETAUX_KEY = getEnv('MARKETAUX_API_KEY');
 const FINNHUB_KEY = getEnv('FINNHUB_API_KEY');
@@ -81,6 +82,40 @@ export async function GET(request: Request) {
           summary: "Try again in a few minutes.",
         },
       ]);
+    }
+
+    // Prioritize Tavily for news search
+    if (isTavilyConfigured()) {
+      try {
+        const query = country === "India" 
+          ? "India stock market business news today" 
+          : country === "Crypto"
+            ? "cryptocurrency crypto market news today"
+            : "US stock market business financial news today";
+        
+        const tavilyData = await tavilySearch({
+          query,
+          topic: "news",
+          maxResults: 10,
+          timeRange: "day",
+        });
+
+        if (tavilyData.results.length > 0) {
+          const normalized = tavilyData.results.map((item) => ({
+            title: item.title,
+            summary: item.content || "",
+            description: item.content || "",
+            time: item.published_date ? formatTime(item.published_date) : null,
+            url: item.url || null,
+            source: null,
+            domain: item.url ? new URL(item.url).hostname.replace("www.", "") : null,
+            image_url: null,
+          }));
+          return NextResponse.json(normalized);
+        }
+      } catch (tavilyErr) {
+        console.error("Tavily news search failed, falling back...", tavilyErr);
+      }
     }
 
     // Prioritize Brave News Search for US and India to deliver 5+ articles

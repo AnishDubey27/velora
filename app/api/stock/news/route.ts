@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
 
 const FINNHUB_KEY = getEnv("FINNHUB_API_KEY");
 
@@ -60,6 +61,30 @@ async function getYahooNews(symbol: string): Promise<StockNewsItem[]> {
   }));
 }
 
+async function getTavilyNews(symbol: string): Promise<StockNewsItem[]> {
+  const tavilyData = await tavilySearch({
+    query: `${symbol} stock news analysis`,
+    topic: "finance",
+    maxResults: 10,
+    timeRange: "month",
+    includeDomains: [
+      "reuters.com", "bloomberg.com", "wsj.com",
+      "cnbc.com", "seekingalpha.com", "marketwatch.com",
+      "finance.yahoo.com", "fool.com", "barrons.com"
+    ],
+  });
+
+  return tavilyData.results.map((item) => ({
+    title: item.title,
+    url: item.url,
+    publishedDate: item.published_date || new Date().toISOString(),
+    site: item.url ? new URL(item.url).hostname.replace("www.", "") : "Tavily",
+    text: item.content || "",
+    image: "",
+    symbol,
+  }));
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
@@ -108,6 +133,14 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mapped);
   } catch (error) {
+    // Fallback: Tavily → Yahoo Finance
+    if (isTavilyConfigured()) {
+      try {
+        return NextResponse.json(await getTavilyNews(symbol));
+      } catch (tavilyErr) {
+        console.error("Tavily stock news fallback failed:", tavilyErr);
+      }
+    }
     try {
       return NextResponse.json(await getYahooNews(symbol));
     } catch {
