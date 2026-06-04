@@ -137,8 +137,14 @@ IMPORTANT:
     // ── Primary: Tavily Search (finance-optimized) ──
     const tavilyKey = getEnv('TAVILY_API_KEY');
     if (tavilyKey && messages.length > 0) {
-      const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+      const userMessages = messages.filter(m => m.role === "user");
+      const lastUserMsg = userMessages[userMessages.length - 1];
+      
       if (lastUserMsg) {
+        // Construct a context-aware query using up to the last 3 user messages
+        const recentUserContext = userMessages.slice(-3).map(m => m.content).join(" | ");
+        const searchQuery = recentUserContext || lastUserMsg.content;
+
         try {
           const tavilyRes = await fetch("https://api.tavily.com/search", {
             method: "POST",
@@ -147,7 +153,7 @@ IMPORTANT:
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              query: lastUserMsg.content,
+              query: searchQuery,
               search_depth: "basic",
               topic: "finance",
               max_results: 5,
@@ -186,11 +192,16 @@ IMPORTANT:
       const braveApiUrl = getEnv('BRAVE_SEARCH_API_URL') || "https://api.search.brave.com/res/v1/web/search";
       
       if (braveApiKey && messages.length > 0) {
-        const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+        const userMessages = messages.filter(m => m.role === "user");
+        const lastUserMsg = userMessages[userMessages.length - 1];
+        
         if (lastUserMsg) {
           try {
+            const recentUserContext = userMessages.slice(-3).map(m => m.content).join(" | ");
+            const searchQuery = recentUserContext || lastUserMsg.content;
+
             const searchParams = new URLSearchParams({
-              q: lastUserMsg.content,
+              q: searchQuery,
               count: "5",
               freshness: "pw", // past week for fresh financial news
             });
