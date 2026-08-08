@@ -1,0 +1,38 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every 3 days to prevent Supabase 7-day inactivity pause
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Allows manual run from GitHub Actions tab
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase REST API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST Endpoint
+        run: |
+          SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          SUPABASE_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}"
+
+          # Fallback to default project URL if secrets are not provided in GH Secrets
+          if [ -z "$SUPABASE_URL" ]; then
+            SUPABASE_URL="https://wgufujxqmdqugcyzetaa.supabase.co"
+          fi
+
+          echo "Pinging Supabase endpoint at: ${SUPABASE_URL}/rest/v1/"
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/")
+
+          echo "Response HTTP Status Code: ${HTTP_STATUS}"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
+            echo "Successfully sent request to Supabase. Database kept active!"
+          else
+            echo "Error: Unexpected HTTP response code ${HTTP_STATUS}"
+            exit 1
+          fi
