@@ -21,12 +21,12 @@ jobs:
             SUPABASE_URL="https://wgufujxqmdqugcyzetaa.supabase.co"
           fi
 
-          echo "Pinging Supabase endpoint at: ${SUPABASE_URL}/rest/v1/"
+          echo "Pinging Supabase REST endpoint at: ${SUPABASE_URL}/rest/v1/raw_journal?select=*&limit=1"
 
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            "${SUPABASE_URL}/rest/v1/")
+            "${SUPABASE_URL}/rest/v1/raw_journal?select=*&limit=1")
 
           echo "Response HTTP Status Code: ${HTTP_STATUS}"
 
