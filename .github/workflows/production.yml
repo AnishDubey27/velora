@@ -52,7 +52,7 @@ jobs:
         run: echo "REPO=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Execute remote SSH commands
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
