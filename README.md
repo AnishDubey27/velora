@@ -57,14 +57,14 @@ Velora is engineered for enterprise-grade stability, automated delivery, and low
 graph TD
     Developer[Developer] -->|git push| GitHub[GitHub Repository]
     
-    subgraph CI/CD (GitHub Actions)
+    subgraph CICD["CI/CD (GitHub Actions)"]
         GitHub --> Workflow[Production Pipeline]
         Workflow --> Scan[Trivy Security Scan]
         Scan -->|No Criticals| Build[Multi-Stage Build & Cache]
         Build --> Push[Push to GHCR]
     end
     
-    subgraph Target Host (Always-Free 1GB VM)
+    subgraph Host["Target Host (Always-Free 1GB VM)"]
         GHCR[GitHub Container Registry] -->|Polls & Pulls| Watchtower[Watchtower Container]
         Watchtower -->|Auto-Recreate| Velora[Velora Standalone App]
         Velora -->|700MB Hard Limit| VM[Docker Runtime]
