@@ -265,8 +265,17 @@ IMPORTANT:
 
     if (data?.choices?.[0]?.message?.content) {
       let content: string = data.choices[0].message.content;
-      // Strip reasoning tags if present e.g. <think>...</think>
+      // 1. Strip <think>...</think> tags if present
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+      // 2. Strip CoT internal monologue chatter (e.g., "Got it, let's tackle this...", "First, the user wants...")
+      if (/^(got it|okay|first, the user|let's see)[\s\S]{0,400}?(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i.test(content)) {
+        const matchIndex = content.search(/(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i);
+        if (matchIndex > 0) {
+          content = content.slice(matchIndex).trim();
+        }
+      }
+
       data.choices[0].message.content = content;
     }
 

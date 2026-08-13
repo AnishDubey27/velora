@@ -318,11 +318,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           onChange={(e) => setSelectedModel(e.target.value)}
           className="bg-white/5 border border-white/10 text-white/80 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-vel-teal/50 cursor-pointer max-w-[140px] md:max-w-[200px]"
         >
-          <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
+          <option value="stepfun-ai/step-3.7-flash" className="bg-[#05080F]">Step 3.7 Flash</option>
           <option value="meta/llama-3.3-70b-instruct" className="bg-[#05080F]">Llama 3.3 70B</option>
           <option value="meta/llama-3.1-8b-instruct" className="bg-[#05080F]">Llama 3.1 8B</option>
+          <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
           <option value="mistralai/mistral-large-2-instruct" className="bg-[#05080F]">Mistral Large 2</option>
-          <option value="stepfun-ai/step-3.7-flash" className="bg-[#05080F]">Step 3.7 Flash</option>
           <option value="google/gemma-2-27b-it" className="bg-[#05080F]">Gemma 2 27B</option>
         </select>
       </div>

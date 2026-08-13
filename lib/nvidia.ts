@@ -1,10 +1,10 @@
 import { getEnv } from "./env";
 export const NVIDIA_ALLOWED_MODELS = [
-  "mistralai/mistral-nemotron",
+  "stepfun-ai/step-3.7-flash",
   "meta/llama-3.3-70b-instruct",
   "meta/llama-3.1-8b-instruct",
+  "mistralai/mistral-nemotron",
   "mistralai/mistral-large-2-instruct",
-  "stepfun-ai/step-3.7-flash",
   "google/gemma-2-27b-it"
 ] as const;
 
@@ -15,7 +15,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "mistralai/mistral-nemotron";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "stepfun-ai/step-3.7-flash";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;
