@@ -110,7 +110,18 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         body: JSON.stringify(body)
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      let data: any;
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(
+          res.status >= 500
+            ? "AI model service timed out or experienced a temporary gateway issue. Please try again or switch model."
+            : `Unexpected server response (${res.status}).`
+        );
+      }
 
       if (res.ok && data?.choices?.[0]?.message) {
         setMessages((prev) => [...prev, data.choices[0].message]);
@@ -153,7 +164,18 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         body: JSON.stringify(body)
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      let data: any;
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(
+          res.status >= 500
+            ? "AI model service timed out or experienced a temporary gateway issue. Please try again or switch model."
+            : `Unexpected server response (${res.status}).`
+        );
+      }
 
       if (res.ok && data?.choices?.[0]?.message) {
         setMessages((prev) => [...prev, data.choices[0].message]);
@@ -206,12 +228,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           className="bg-white/5 border border-white/10 text-white/80 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-vel-teal/50 cursor-pointer max-w-[140px] md:max-w-[200px]"
         >
           <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
-          <option value="google/gemma-4-31b-it" className="bg-[#05080F]">Gemma 4 31B</option>
-          <option value="meta/llama-4-maverick-17b-128e-instruct" className="bg-[#05080F]">Llama 4 Maverick</option>
-          <option value="minimaxai/minimax-m2.7" className="bg-[#05080F]">MiniMax M2.7</option>
+          <option value="meta/llama-3.3-70b-instruct" className="bg-[#05080F]">Llama 3.3 70B</option>
+          <option value="meta/llama-3.1-8b-instruct" className="bg-[#05080F]">Llama 3.1 8B</option>
+          <option value="mistralai/mistral-large-2-instruct" className="bg-[#05080F]">Mistral Large 2</option>
           <option value="stepfun-ai/step-3.7-flash" className="bg-[#05080F]">Step 3.7 Flash</option>
-          <option value="mistralai/mistral-large-3-675b-instruct-2512" className="bg-[#05080F]">Mistral Large 3</option>
-          <option value="bytedance/seed-oss-36b-instruct" className="bg-[#05080F]">Seed OSS 36B</option>
+          <option value="google/gemma-2-27b-it" className="bg-[#05080F]">Gemma 2 27B</option>
         </select>
       </div>
 

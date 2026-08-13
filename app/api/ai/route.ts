@@ -160,6 +160,7 @@ IMPORTANT:
               include_answer: true,
               time_range: "week",
             }),
+            signal: AbortSignal.timeout(4000),
           });
 
           if (tavilyRes.ok) {
@@ -181,7 +182,7 @@ IMPORTANT:
             }
           }
         } catch (tavilyError) {
-          console.error("Tavily search failed, falling back to Brave:", tavilyError);
+          console.error("Tavily search failed or timed out, falling back to Brave:", tavilyError);
         }
       }
     }
@@ -209,7 +210,8 @@ IMPORTANT:
               headers: {
                 "X-Subscription-Token": braveApiKey,
                 "Accept": "application/json"
-              }
+              },
+              signal: AbortSignal.timeout(4000),
             });
             if (searchRes.ok) {
               const searchData = await searchRes.json();
@@ -224,7 +226,7 @@ IMPORTANT:
               }
             }
           } catch (searchError) {
-            console.error("Brave search failed:", searchError);
+            console.error("Brave search failed or timed out:", searchError);
           }
         }
       }
@@ -243,6 +245,7 @@ IMPORTANT:
         max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 2048,
         stream: false,
       }),
+      signal: AbortSignal.timeout(45000),
     });
 
     const text = await res.text();
@@ -258,6 +261,13 @@ IMPORTANT:
         { error: "NVIDIA request failed.", status: res.status, details: data ?? text },
         { status: 502 }
       );
+    }
+
+    if (data?.choices?.[0]?.message?.content) {
+      let content: string = data.choices[0].message.content;
+      // Strip reasoning tags if present e.g. <think>...</think>
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      data.choices[0].message.content = content;
     }
 
     return NextResponse.json(data ?? { raw: text });

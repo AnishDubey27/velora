@@ -1,12 +1,11 @@
 import { getEnv } from "./env";
 export const NVIDIA_ALLOWED_MODELS = [
   "mistralai/mistral-nemotron",
-  "google/gemma-4-31b-it",
-  "meta/llama-4-maverick-17b-128e-instruct",
-  "minimaxai/minimax-m2.7",
+  "meta/llama-3.3-70b-instruct",
+  "meta/llama-3.1-8b-instruct",
+  "mistralai/mistral-large-2-instruct",
   "stepfun-ai/step-3.7-flash",
-  "mistralai/mistral-large-3-675b-instruct-2512",
-  "bytedance/seed-oss-36b-instruct"
+  "google/gemma-2-27b-it"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];
