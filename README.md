@@ -114,7 +114,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # NVIDIA NIM (AI)
 NVIDIA_API_KEY=your_nvidia_api_key
-NVIDIA_DEFAULT_MODEL=google/gemma-3n-e4b-it  # optional, defaults to first allowed model
+NVIDIA_DEFAULT_MODEL=mistralai/mistral-nemotron  # optional, defaults to mistralai/mistral-nemotron
 
 # MarketAux (News)
 MARKETAUX_API_KEY=your_marketaux_api_key

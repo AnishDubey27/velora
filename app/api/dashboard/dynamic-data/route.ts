@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { resolveNvidiaModel } from "@/lib/nvidia";
 
 export const revalidate = 3600; // Cache for 1 hour
 
@@ -44,7 +45,7 @@ Make the data look like real, current financial market activity.
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "meta/llama-3.1-8b-instruct",
+        model: resolveNvidiaModel(undefined),
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 500,

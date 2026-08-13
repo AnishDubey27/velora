@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { resolveNvidiaModel } from "@/lib/nvidia";
 
 export const revalidate = 86400;
 export const dynamic = "force-dynamic";
@@ -168,7 +169,7 @@ Example: [{"company":"APPLE INC","cusip":"037833100","value":89234000000,"shares
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'meta/llama-3.1-8b-instruct',
+          model: resolveNvidiaModel(undefined),
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
           max_tokens: 2000,

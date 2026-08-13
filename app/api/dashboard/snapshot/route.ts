@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     // 3. Synthesize with NVIDIA NIM
     const prompt = `You are a professional financial analyst. Based on the following recent news headlines, synthesize a market snapshot. Return ONLY a valid JSON object with exactly two keys: "title" (a punchy, 5-7 word headline summarizing the overall sentiment) and "summary" (a 2-sentence paragraph summarizing the key takeaways). Do not use markdown formatting like \`\`\`json.\n\n${tavilyAnswer ? `AI Summary: ${tavilyAnswer}\n\n` : ""}News:\n${context}`;
 
-    const model = "meta/llama-3.1-8b-instruct";
+    const model = resolveNvidiaModel(undefined);
     
     const aiRes = await fetch(getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
