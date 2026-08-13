@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DEFAULT_MODEL } from "@/lib/nvidia";
 
 type Message = {
   role: "system" | "user" | "assistant";
@@ -41,7 +42,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestions, setActiveSuggestions] = useState<{ label: string; icon?: string }[]>([]);
   const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("mistralai/mistral-nemotron");
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
 
@@ -204,11 +205,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           onChange={(e) => setSelectedModel(e.target.value)}
           className="bg-white/5 border border-white/10 text-white/80 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-vel-teal/50 cursor-pointer max-w-[140px] md:max-w-[200px]"
         >
+          <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
           <option value="google/gemma-4-31b-it" className="bg-[#05080F]">Gemma 4 31B</option>
           <option value="meta/llama-4-maverick-17b-128e-instruct" className="bg-[#05080F]">Llama 4 Maverick</option>
           <option value="minimaxai/minimax-m2.7" className="bg-[#05080F]">MiniMax M2.7</option>
           <option value="stepfun-ai/step-3.7-flash" className="bg-[#05080F]">Step 3.7 Flash</option>
-          <option value="mistralai/mistral-nemotron" className="bg-[#05080F]">Mistral Nemotron</option>
           <option value="mistralai/mistral-large-3-675b-instruct-2512" className="bg-[#05080F]">Mistral Large 3</option>
           <option value="bytedance/seed-oss-36b-instruct" className="bg-[#05080F]">Seed OSS 36B</option>
         </select>
