@@ -16,7 +16,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "google/gemma-4-31b-it";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "mistralai/mistral-nemotron";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;

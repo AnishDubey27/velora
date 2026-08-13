@@ -41,7 +41,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestions, setActiveSuggestions] = useState<{ label: string; icon?: string }[]>([]);
   const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("google/gemma-4-31b-it");
+  const [selectedModel, setSelectedModel] = useState<string>("mistralai/mistral-nemotron");
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
 
