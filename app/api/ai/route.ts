@@ -269,7 +269,7 @@ IMPORTANT:
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
       // 2. Strip CoT internal monologue chatter (e.g., "Got it, let's tackle this...", "First, the user wants...")
-      if (/^(got it|okay|first, the user|let's see)[\s\S]{0,400}?(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i.test(content)) {
+      if (/^(got it|okay|first|let's see)[\s\S]{0,500}?(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i.test(content)) {
         const matchIndex = content.search(/(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i);
         if (matchIndex > 0) {
           content = content.slice(matchIndex).trim();
