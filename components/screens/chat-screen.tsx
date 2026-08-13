@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles, Copy, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -18,6 +18,96 @@ export type SkillContext = {
   displayMessage: string;
   hiddenPrompt: string;
   suggestions: string[];
+};
+
+const markdownComponents = {
+  h1: ({ children }: any) => (
+    <h1 className="text-base md:text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-cyan-200 to-white mt-5 mb-2 pb-1 border-b border-white/10 flex items-center gap-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 className="text-sm md:text-base font-bold text-teal-300 mt-4 mb-2 flex items-center gap-2">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className="text-[13px] md:text-[14px] font-semibold text-cyan-200/90 mt-3.5 mb-1.5 flex items-center gap-1.5">
+      {children}
+    </h3>
+  ),
+  p: ({ children }: any) => (
+    <p className="text-[14px] leading-relaxed text-white/90 my-2">
+      {children}
+    </p>
+  ),
+  blockquote: ({ children }: any) => (
+    <blockquote className="my-3.5 rounded-xl border-l-4 border-vel-teal bg-gradient-to-r from-vel-teal/20 via-vel-teal/5 to-transparent px-4 py-3 text-white/95 text-xs md:text-sm font-medium shadow-md shadow-black/40">
+      {children}
+    </blockquote>
+  ),
+  table: ({ children }: any) => (
+    <div className="my-4 overflow-hidden overflow-x-auto rounded-xl border border-white/15 bg-[#080D1A]/90 backdrop-blur-md shadow-xl">
+      <table className="w-full text-left text-xs md:text-sm text-white/90 border-collapse">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: any) => (
+    <thead className="bg-vel-teal/20 text-vel-teal border-b border-white/10 font-semibold uppercase tracking-wider text-[11px]">
+      {children}
+    </thead>
+  ),
+  tr: ({ children }: any) => (
+    <tr className="border-b border-white/5 last:border-0 hover:bg-white/[0.04] transition-colors">
+      {children}
+    </tr>
+  ),
+  th: ({ children }: any) => (
+    <th className="px-3.5 py-2.5 font-semibold text-teal-300">
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className="px-3.5 py-2.5 text-white/85">
+      {children}
+    </td>
+  ),
+  ul: ({ children }: any) => (
+    <ul className="my-2.5 space-y-2 pl-1">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="my-2.5 space-y-2 list-decimal pl-5 text-white/90">
+      {children}
+    </ol>
+  ),
+  li: ({ children }: any) => (
+    <li className="flex items-start gap-2.5 text-[14px] text-white/90 leading-relaxed">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-vel-teal mt-2 shrink-0 shadow-sm shadow-vel-teal" />
+      <span className="flex-1">{children}</span>
+    </li>
+  ),
+  code: ({ inline, className, children }: any) => {
+    if (inline) {
+      return (
+        <code className="rounded bg-white/10 px-1.5 py-0.5 text-[12px] font-mono text-cyan-300 border border-white/10">
+          {children}
+        </code>
+      );
+    }
+    return (
+      <div className="my-3 overflow-x-auto rounded-xl border border-white/10 bg-[#060A14] p-3 text-xs text-cyan-200 font-mono">
+        <code>{children}</code>
+      </div>
+    );
+  },
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-white bg-white/[0.06] px-1 py-0.5 rounded text-[13.5px]">
+      {children}
+    </strong>
+  ),
 };
 
 type ChatScreenProps = {
@@ -43,6 +133,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [activeSuggestions, setActiveSuggestions] = useState<{ label: string; icon?: string }[]>([]);
   const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
 
@@ -263,10 +354,21 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
               {msg.role === "user" ? (
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : (
-                <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10 text-white/90 marker:text-vel-teal">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div className="relative group">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </ReactMarkdown>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(msg.content);
+                      setCopiedIndex(i);
+                      setTimeout(() => setCopiedIndex(null), 2000);
+                    }}
+                    className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
+                    title="Copy response"
+                  >
+                    {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                  </button>
                 </div>
               )}
             </div>
