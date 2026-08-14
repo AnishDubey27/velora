@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cell, Pie, PieChart as RechartsPieChart, ResponsiveContainer } from "recharts";
 import { Bot, Edit2, Check, Plus, Trash2, TrendingUp, TrendingDown, LogIn, Sparkles, ShieldCheck, WalletCards } from "lucide-react";
+import { OrbLoader } from "@/components/ui/orb-loader";
 import { BuiPortfolioAnalytics } from "@/components/ui/bui-portfolio-analytics";
 import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
 import { cn, formatCurrency } from "@/lib/utils";
