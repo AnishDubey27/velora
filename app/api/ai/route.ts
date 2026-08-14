@@ -169,14 +169,19 @@ RISK SCORE: 7/10 (Volatile Growth)`;
       }
     }
 
-    // Models to try in order (requested model -> default fast model -> 8B backup)
-    const modelsToTry = [model];
-    if (model !== DEFAULT_MODEL) {
-      modelsToTry.push(DEFAULT_MODEL);
-    }
-    if (model !== "meta/llama-3.1-8b-instruct" && DEFAULT_MODEL !== "meta/llama-3.1-8b-instruct") {
-      modelsToTry.push("meta/llama-3.1-8b-instruct");
-    }
+    // Define explicit Fast and Deep hierarchy fallback chains
+    const isDeepMode = model.includes("70b") || model === "deep";
+    const modelsToTry = isDeepMode
+      ? [
+          "meta/llama-3.3-70b-instruct",       // Primary Deep 70B Wall Street Analyst
+          "stepfun-ai/step-3.7-flash",         // Fallback 1: Fast reasoning
+          "meta/llama-3.1-8b-instruct",       // Fallback 2: Ultra-fast 450ms
+        ]
+      : [
+          "stepfun-ai/step-3.7-flash",         // Primary Fast Reasoning
+          "meta/llama-3.1-8b-instruct",       // Fallback 1: Ultra-fast 450ms
+          "mistralai/mistral-nemotron",        // Fallback 2: Financial benchmark
+        ];
 
     let lastError: any = null;
     let data: any = null;

@@ -36,8 +36,11 @@ function StockSearchBar({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const isSelectingRef = useRef(false);
+
   /* debounced search */
   useEffect(() => {
+    if (isSelectingRef.current) return;
     if (query.length < 1) {
       setResults([]);
       setOpen(false);
@@ -45,13 +48,16 @@ function StockSearchBar({
     }
 
     const timer = setTimeout(async () => {
+      if (isSelectingRef.current) return;
       try {
         setLoading(true);
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         const searchResults: SearchResult[] = data.results || [];
-        setResults(searchResults);
-        setOpen(searchResults.length > 0);
+        if (!isSelectingRef.current) {
+          setResults(searchResults);
+          setOpen(searchResults.length > 0);
+        }
       } catch {
         setResults([]);
       } finally {
@@ -75,9 +81,14 @@ function StockSearchBar({
 
   const selectItem = useCallback(
     (item: SearchResult) => {
+      isSelectingRef.current = true;
       setQuery(item.symbol);
       onChange(item.symbol);
+      setResults([]);
       setOpen(false);
+      setTimeout(() => {
+        isSelectingRef.current = false;
+      }, 500);
     },
     [onChange],
   );
