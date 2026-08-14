@@ -24,12 +24,12 @@ export function StockQuickStats({
   const stats = keyStats?.[0];
 
   const currentPrice = quote?.price ?? 0;
-  const yearLow = quote?.yearLow ?? stats?.yearLow ?? (currentPrice * 0.75);
-  const yearHigh = quote?.yearHigh ?? stats?.yearHigh ?? (currentPrice * 1.25);
+  const yearLow = typeof quote?.yearLow === "number" ? quote.yearLow : (currentPrice * 0.75);
+  const yearHigh = typeof quote?.yearHigh === "number" ? quote.yearHigh : (currentPrice * 1.25);
   const range = yearHigh - yearLow || 1;
   const currentPosPercent = Math.min(100, Math.max(0, ((currentPrice - yearLow) / range) * 100));
 
-  const marketCap = profile?.mktCap ?? quote?.marketCap ?? stats?.marketCap;
+  const marketCap = profile?.marketCapitalization ?? quote?.marketCap ?? stats?.marketCap;
   const peRatio = stats?.peRatio ?? quote?.pe;
 
   return (
