@@ -268,19 +268,17 @@ IMPORTANT:
     }
 
     if (data?.choices?.[0]?.message?.content) {
-      let content: string = data.choices[0].message.content;
+      const rawContent: string = data.choices[0].message.content;
+      let content = rawContent;
+
       // 1. Strip <think>...</think> tags if present
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-      // 2. Strip CoT internal monologue chatter (e.g., "Got it, let's tackle this...", "First, the user wants...")
-      if (/^(got it|okay|first|let's see)[\s\S]{0,500}?(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i.test(content)) {
-        const matchIndex = content.search(/(>\s*\*\*key takeaway|\*\*key takeaway|###\s+|1\.\s+|\*\*1\.)/i);
-        if (matchIndex > 0) {
-          content = content.slice(matchIndex).trim();
-        }
-      }
+      // 2. Safely strip leading CoT monologue lines (e.g. "Got it, let's tackle this...")
+      content = content.replace(/^(got it,?\s+(let's|let us)[\s\S]*?\n\n|okay,?\s+(let's|let us)[\s\S]*?\n\n)/i, '').trim();
 
-      data.choices[0].message.content = content;
+      // Safety fallback: if cleaning accidentally erased everything, preserve original raw text!
+      data.choices[0].message.content = content.trim() || rawContent.trim();
     }
 
     return NextResponse.json(data ?? { raw: text });

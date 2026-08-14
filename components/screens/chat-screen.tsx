@@ -377,7 +377,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       }
 
       if (res.ok && data?.choices?.[0]?.message) {
-        setMessages((prev) => [...prev, data.choices[0].message]);
+        const msg = data.choices[0].message;
+        if (!msg.content || !msg.content.trim()) {
+          msg.content = "No output generated. Please try again or rephrase your request.";
+        }
+        setMessages((prev) => [...prev, msg]);
         setShowSuggestions(true);
       } else {
         throw new Error(data.error || "Failed to get response");
@@ -431,7 +435,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       }
 
       if (res.ok && data?.choices?.[0]?.message) {
-        setMessages((prev) => [...prev, data.choices[0].message]);
+        const msg = data.choices[0].message;
+        if (!msg.content || !msg.content.trim()) {
+          msg.content = "No output generated. Please try again or rephrase your request.";
+        }
+        setMessages((prev) => [...prev, msg]);
       } else {
         throw new Error(data.error || "Failed to get response");
       }
