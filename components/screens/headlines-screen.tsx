@@ -19,7 +19,9 @@ function cleanHtmlText(text?: string | null): string {
     .trim();
 }
 
-export function HeadlinesScreen() {
+import { BuiNewsBento, type BentoNewsItem } from "@/components/ui/bui-news-bento";
+
+export function HeadlinesScreen({ onStartChat }: { onStartChat?: (prompt: string) => void }) {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("United States");
   const [filter, setFilter] = useState<"All" | "Important" | "Critical">("All");
   const [showFilter, setShowFilter] = useState(false);
@@ -40,12 +42,26 @@ export function HeadlinesScreen() {
       .catch(() => setLoading(false));
   }, [activeTab]);
 
-  const filteredNews = news.filter(item => {
-    if (filter === "All") return true;
-    if (filter === "Important") return item.impact === "Positive" || item.impact === "Negative";
-    if (filter === "Critical") return item.impact === "Negative";
-    return true;
-  });
+  const filteredNews: BentoNewsItem[] = news
+    .filter(item => {
+      if (filter === "All") return true;
+      if (filter === "Important") return item.impact === "Positive" || item.impact === "Negative";
+      if (filter === "Critical") return item.impact === "Negative";
+      return true;
+    })
+    .map(item => ({
+      title: cleanHtmlText(item.title),
+      summary: cleanHtmlText(item.summary || item.description),
+      source: item.source || item.domain || item.publisher || "Financial Press",
+      time: item.time || "Recent",
+      sentiment: (item.impact === "Positive" ? "Bullish" : item.impact === "Negative" ? "Bearish" : "Neutral") as any,
+      sentimentScore: item.impact === "Positive" ? 84 : item.impact === "Negative" ? 68 : 50,
+      symbol: item.symbol,
+      price: item.price,
+      changePercent: item.change,
+      url: item.url || item.link || item.source_url || null,
+      impact: item.impact,
+    }));
 
   return (
     <section className="pb-5 pt-2">
@@ -69,7 +85,7 @@ export function HeadlinesScreen() {
 
       {/* Header + Filter Button */}
       <div className="flex items-center justify-between px-1 mb-4">
-        <p className="text-xl font-semibold text-white">Today</p>
+        <p className="text-xl font-semibold text-white">Market Catalysts & Headlines</p>
         <button
           onClick={() => setShowFilter(true)}
           className="grid h-9 w-9 place-items-center rounded-xl text-white/70 hover:bg-white/10"
@@ -78,84 +94,14 @@ export function HeadlinesScreen() {
         </button>
       </div>
 
-      {/* News List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="py-10 text-center text-white/50">Loading headlines...</div>
-        ) : filteredNews.length === 0 ? (
-          <div className="py-10 text-center text-white/50">No news found for this category</div>
-        ) : (
-          filteredNews.slice(0, 10).map((item, index) => {
-            const href = item.url || item.link || item.source_url || null;
-            const Card: any = href ? motion.a : motion.div;
-
-            return (
-              <Card
-                key={index}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.04 }}
-              href={href || undefined}
-              target={href ? "_blank" : undefined}
-              rel={href ? "noreferrer" : undefined}
-              className={cn(
-                "glassy block rounded-2xl p-4",
-                href && "cursor-pointer hover:bg-white/[0.04]"
-              )}
-            >
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-white/50">{item.time || "Recent"}</span>
-                {item.impact && (
-                  <span className={cn(
-                    "font-semibold",
-                    item.impact === "Positive" && "text-green-400",
-                    item.impact === "Negative" && "text-red-400"
-                  )}>
-                    {item.impact}
-                  </span>
-                )}
-              </div>
-
-              <h3 className="text-[16px] font-semibold leading-tight text-white">
-                {cleanHtmlText(item.title)}
-              </h3>
-
-              <p className="mt-2 text-[13px] leading-relaxed text-white/70 line-clamp-2">
-                {cleanHtmlText(item.summary || item.description)}
-              </p>
-
-              <div className="mt-4 flex items-center gap-3">
-                {item.symbol ? (
-                  <>
-                    <div className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold">
-                      {item.symbol.slice(0, 1)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-white">{item.symbol}</p>
-                      <p className="text-xs text-white/50">Company</p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1">
-                    <p className="text-xs text-white/50">
-                      {item.source || item.domain || item.publisher || "Source"}
-                    </p>
-                  </div>
-                )}
-                {item.price && (
-                  <div className="text-right">
-                    <p className="font-semibold text-white">${item.price}</p>
-                    <p className={cn("text-xs", (item.change || 0) > 0 ? "text-green-400" : "text-red-400")}>
-                      {(item.change || 0) > 0 ? "+" : ""}{item.change}%
-                    </p>
-                  </div>
-                )}
-              </div>
-              </Card>
-            );
-          })
-        )}
-      </div>
+      {/* Bento Grid News */}
+      {loading ? (
+        <div className="py-10 text-center text-white/50">Loading market intelligence...</div>
+      ) : filteredNews.length === 0 ? (
+        <div className="py-10 text-center text-white/50">No news found for this category</div>
+      ) : (
+        <BuiNewsBento items={filteredNews} onAskAI={onStartChat} />
+      )}
 
       {/* Filter Modal */}
       <AnimatePresence>

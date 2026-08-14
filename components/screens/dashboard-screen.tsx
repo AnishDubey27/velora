@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import useSWR from "swr";
 import { SectionTitle } from "@/components/ui/section-title";
+import { BuiMarketHeatmap } from "@/components/ui/bui-market-heatmap";
+import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
 
@@ -323,6 +325,9 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
           </div>
         </div>
       </div>
+
+      {/* Interactive Market Heatmap */}
+      <BuiMarketHeatmap />
 
       {/* Market Summary */}
       <div className="glassy rounded-2xl p-5">
