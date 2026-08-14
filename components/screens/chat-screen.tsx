@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles, Copy, Check } from "lucide-react";
+import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles, Copy, Check, TrendingUp, TrendingDown, Target, ShieldAlert, Zap, Pin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -19,6 +19,176 @@ export type SkillContext = {
   hiddenPrompt: string;
   suggestions: string[];
 };
+
+// Helper: Extract text from React children safely
+function extractText(children: any): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(extractText).join("");
+  if (children?.props?.children) return extractText(children.props.children);
+  return "";
+}
+
+// ── Smart Infographic Components ──
+
+function InfographicBlockquote({ children }: any) {
+  const rawText = extractText(children);
+
+  // 1. Trade Setup Infographic Card
+  if (rawText.toUpperCase().includes("TRADE SETUP")) {
+    const entryMatch = rawText.match(/Entry:\s*([^|]+)/i);
+    const targetMatch = rawText.match(/Target:\s*([^|]+)/i);
+    const stopMatch = rawText.match(/Stop\s*Loss:\s*([^|]+)/i);
+    const biasMatch = rawText.match(/Bias:\s*([^|]+)/i);
+
+    const entry = entryMatch ? entryMatch[1].trim() : null;
+    const target = targetMatch ? targetMatch[1].trim() : null;
+    const stop = stopMatch ? stopMatch[1].trim() : null;
+    const bias = biasMatch ? biasMatch[1].trim() : "Bullish";
+
+    const isBullish = bias.toLowerCase().includes("bull");
+    const isBearish = bias.toLowerCase().includes("bear");
+
+    return (
+      <div className="my-4 rounded-2xl border border-vel-teal/30 bg-gradient-to-br from-[#0B1528] via-[#091120] to-[#050914] p-4 shadow-2xl backdrop-blur-xl">
+        {/* Card Header */}
+        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-vel-teal/20 flex items-center justify-center border border-vel-teal/30">
+              <Target size={15} className="text-vel-teal animate-pulse" />
+            </div>
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-300">
+              Infographic Trade Setup
+            </span>
+          </div>
+          <span className={cn(
+            "px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border",
+            isBullish && "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm shadow-emerald-500/20",
+            isBearish && "bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-sm shadow-rose-500/20",
+            !isBullish && !isBearish && "bg-amber-500/20 text-amber-400 border-amber-500/40"
+          )}>
+            {isBullish ? "🚀 Bullish Bias" : isBearish ? "📉 Bearish Bias" : "⚖️ Neutral"}
+          </span>
+        </div>
+
+        {/* 3 Visual Pillar Stat Boxes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          {/* Entry Box */}
+          <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 flex flex-col">
+            <span className="text-[11px] font-medium uppercase text-white/50 mb-1 flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Entry Zone
+            </span>
+            <span className="text-sm md:text-base font-bold text-white font-mono">
+              {entry || "Current Market"}
+            </span>
+          </div>
+
+          {/* Target Box */}
+          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex flex-col">
+            <span className="text-[11px] font-medium uppercase text-emerald-400 mb-1 flex items-center gap-1">
+              <TrendingUp size={12} /> Price Target
+            </span>
+            <span className="text-sm md:text-base font-bold text-emerald-300 font-mono">
+              {target || "N/A"}
+            </span>
+          </div>
+
+          {/* Stop Loss Box */}
+          <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 flex flex-col">
+            <span className="text-[11px] font-medium uppercase text-rose-400 mb-1 flex items-center gap-1">
+              <TrendingDown size={12} /> Stop Loss
+            </span>
+            <span className="text-sm md:text-base font-bold text-rose-300 font-mono">
+              {stop || "N/A"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Risk Score Infographic Card
+  if (rawText.toUpperCase().includes("RISK SCORE")) {
+    const scoreMatch = rawText.match(/RISK SCORE.*?:?\s*(\d+)\/10/i);
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 5;
+
+    const scoreLabel = score <= 3 ? "Low Risk" : score <= 6 ? "Moderate Risk" : "High Risk";
+
+    return (
+      <div className="my-4 rounded-2xl border border-white/15 bg-gradient-to-br from-[#120B1D] via-[#0E0A1A] to-[#070512] p-4 shadow-xl">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-amber-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+              Risk Profile Radar
+            </span>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-white font-mono">
+            {score}/10 — {scoreLabel}
+          </span>
+        </div>
+
+        {/* Visual 10-Segment Progress Gauge */}
+        <div className="flex gap-1 my-2">
+          {Array.from({ length: 10 }).map((_, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "h-2.5 flex-1 rounded-full transition-all duration-300",
+                idx < score
+                  ? idx < 3
+                    ? "bg-emerald-400 shadow-sm shadow-emerald-400/50"
+                    : idx < 6
+                    ? "bg-amber-400 shadow-sm shadow-amber-400/50"
+                    : "bg-rose-500 shadow-sm shadow-rose-500/50"
+                  : "bg-white/10"
+              )}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-white/70">{rawText}</p>
+      </div>
+    );
+  }
+
+  // 3. Key Takeaway Glassmorphic Banner
+  return (
+    <blockquote className="my-3.5 rounded-2xl border-l-4 border-vel-teal bg-gradient-to-r from-vel-teal/20 via-cyan-500/10 to-transparent p-4 text-white/95 text-xs md:text-sm font-medium shadow-lg shadow-black/40 backdrop-blur-md">
+      <div className="flex items-center gap-2 mb-1 text-teal-300 font-bold uppercase text-[11px] tracking-wider">
+        <Pin size={13} className="text-vel-teal" />
+        <span>Executive Insight</span>
+      </div>
+      <div>{children}</div>
+    </blockquote>
+  );
+}
+
+// ── Smart Table Cell Badge Renderer ──
+function SmartTableCell({ children }: any) {
+  const text = extractText(children).trim();
+  const upper = text.toUpperCase();
+
+  const isBuy = ["BUY", "STRONG BUY", "BULLISH", "BEAT", "OUTPERFORM", "POSITIVE"].includes(upper);
+  const isSell = ["SELL", "STRONG SELL", "BEARISH", "MISS", "UNDERPERFORM", "NEGATIVE"].includes(upper);
+  const isHold = ["HOLD", "NEUTRAL"].includes(upper);
+
+  if (isBuy || isSell || isHold) {
+    return (
+      <td className="px-3.5 py-2.5 text-white/85">
+        <span className={cn(
+          "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border",
+          isBuy && "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/20",
+          isSell && "bg-rose-500/20 text-rose-400 border-rose-500/30 shadow-sm shadow-rose-500/20",
+          isHold && "bg-amber-500/20 text-amber-400 border-amber-500/30"
+        )}>
+          {isBuy ? "🟢 " : isSell ? "🔴 " : "🟡 "}{text}
+        </span>
+      </td>
+    );
+  }
+
+  return <td className="px-3.5 py-2.5 text-white/85">{children}</td>;
+}
 
 const markdownComponents = {
   h1: ({ children }: any) => (
@@ -41,13 +211,9 @@ const markdownComponents = {
       {children}
     </p>
   ),
-  blockquote: ({ children }: any) => (
-    <blockquote className="my-3.5 rounded-xl border-l-4 border-vel-teal bg-gradient-to-r from-vel-teal/20 via-vel-teal/5 to-transparent px-4 py-3 text-white/95 text-xs md:text-sm font-medium shadow-md shadow-black/40">
-      {children}
-    </blockquote>
-  ),
+  blockquote: InfographicBlockquote,
   table: ({ children }: any) => (
-    <div className="my-4 overflow-hidden overflow-x-auto rounded-xl border border-white/15 bg-[#080D1A]/90 backdrop-blur-md shadow-xl">
+    <div className="my-4 overflow-hidden overflow-x-auto rounded-2xl border border-white/15 bg-[#080D1A]/90 backdrop-blur-md shadow-2xl">
       <table className="w-full text-left text-xs md:text-sm text-white/90 border-collapse">
         {children}
       </table>
@@ -68,11 +234,7 @@ const markdownComponents = {
       {children}
     </th>
   ),
-  td: ({ children }: any) => (
-    <td className="px-3.5 py-2.5 text-white/85">
-      {children}
-    </td>
-  ),
+  td: SmartTableCell,
   ul: ({ children }: any) => (
     <ul className="my-2.5 space-y-2 pl-1">
       {children}
@@ -104,7 +266,7 @@ const markdownComponents = {
     );
   },
   strong: ({ children }: any) => (
-    <strong className="font-semibold text-white bg-white/[0.06] px-1 py-0.5 rounded text-[13.5px]">
+    <strong className="font-semibold text-white bg-white/[0.08] border border-white/10 px-1.5 py-0.5 rounded text-[13.5px] shadow-sm">
       {children}
     </strong>
   ),
