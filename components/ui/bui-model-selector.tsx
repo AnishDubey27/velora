@@ -63,12 +63,12 @@ export const MODEL_OPTIONS: ModelOption[] = [
     icon: Microchip,
   },
   {
-    id: "google/gemma-2-27b-it",
-    name: "Gemma 2 27B",
-    badge: "Google AI",
+    id: "nvidia/llama-3.1-nemotron-70b-instruct",
+    name: "Nemotron 70B",
+    badge: "NVIDIA Ultra",
     badgeColor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    latency: "💡 27B",
-    description: "Google's open-weights model suited for macroeconomic research.",
+    latency: "⚡ 70B",
+    description: "NVIDIA's flagship 70B Nemotron model trained for complex finance & reasoning.",
     icon: Lightbulb,
   },
 ];

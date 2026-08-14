@@ -1,11 +1,16 @@
 import { getEnv } from "./env";
+
+export const NVIDIA_API_URL =
+  getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions";
+
 export const NVIDIA_ALLOWED_MODELS = [
   "stepfun-ai/step-3.7-flash",
   "meta/llama-3.3-70b-instruct",
   "meta/llama-3.1-8b-instruct",
   "mistralai/mistral-nemotron",
   "mistralai/mistral-large-2-instruct",
-  "google/gemma-2-27b-it"
+  "google/gemma-2-27b-it",
+  "nvidia/llama-3.1-nemotron-70b-instruct"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];

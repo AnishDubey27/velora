@@ -1,232 +1,165 @@
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
+
 import { NextResponse } from "next/server";
-import { resolveNvidiaModel } from "@/lib/nvidia";
-import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
 import { getEnv } from "@/lib/env";
+import { DEFAULT_MODEL, NVIDIA_API_URL } from "@/lib/nvidia";
+import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
 
-const NVIDIA_API_URL =
-  getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions";
-
-function getApiKey() {
-  return getEnv('NVIDIA_API_KEY') ?? "";
-}
-
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
 
 export async function POST(request: Request) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing NVIDIA_API_KEY." },
-      { status: 500 }
-    );
-  }
-
-  let payload: any;
   try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+    const payload = await request.json();
+    const model = payload?.model || DEFAULT_MODEL;
 
-  const model = (() => {
-    try {
-      return resolveNvidiaModel(payload?.model);
-    } catch (error) {
+    if (!Array.isArray(payload?.messages) || payload.messages.length === 0) {
+      return NextResponse.json({ error: "Missing or invalid 'messages' array" }, { status: 400 });
+    }
+
+    const apiKey = getEnv('NVIDIA_API_KEY');
+    if (!apiKey) {
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Invalid model." },
-        { status: 400 }
+        { error: "NVIDIA API key not configured on server.", status: 500 },
+        { status: 500 }
       );
     }
-  })();
-  if (model instanceof NextResponse) return model;
 
-  const messages = Array.isArray(payload?.messages) ? (payload.messages as ChatMessage[]) : null;
-  if (!messages || messages.length === 0) {
-    return NextResponse.json({ error: "messages[] is required." }, { status: 400 });
-  }
+    const messages: ChatMessage[] = payload.messages.map((m: any) => ({
+      role: m.role === "user" ? "user" : m.role === "assistant" ? "assistant" : "system",
+      content: String(m.content || "")
+    }));
 
-  // ── Base Velora identity prompt (always first) ──
-  const baseSystemPrompt = `You are Velora AI — a premium, intelligent financial assistant built into the Velora investment platform.
+    // Base System Prompt
+    const baseSystemPrompt = `You are Velora AI — an elite Wall Street financial research assistant and market strategist.
+Your purpose is to deliver highly actionable, quantitative, and risk-calibrated financial insights.
+Be direct, professional, concise, and structured. Always use bullet points, bold text, and markdown tables where applicable.
 
-PERSONALITY & TONE:
-- Professional, analytical, and actionable. Think: an elite Wall Street strategist delivering high-conviction insights.
-- Concise and data-driven. Lead with the core conclusion or key takeaway, then break down the details.
-- Never say "As an AI language model" or similar meta-commentary. You are Velora AI.
+When asked for trade ideas or market analysis, format your output cleanly into sections:
+1. Executive Takeaway
+2. Catalyst & Fundamental Drivers
+3. Quantitative Ratios & Valuation
+4. Technical Setup & Trade Plan (Entry, Target Price, Stop Loss)
+5. Downside Risks & Portfolio Impact
 
-FORMATTING & VISUAL HIERARCHY RULES:
-- Start complex answers with a 1-2 sentence **Key Takeaway** block using a blockquote (\`> 📌 **Key Takeaway:** ...\`).
-- When giving trade suggestions or price levels, ALWAYS include an Infographic Trade Setup blockquote:
-  \`> 🎯 **TRADE SETUP** | Entry: $120 - $122 | Target: $145 (+18%) | Stop Loss: $115 (-5%) | Bias: Bullish\`
-- When analyzing risk or volatility, include an Infographic Risk Score blockquote:
-  \`> ⚡ **RISK SCORE**: 4/10 (Moderate) | Volatility: Medium | Beta: 1.2\`
-- Use clean, styled section headers (\`### 📊 Market Breakdown\`, \`### 🎯 Trade Strategy\`, \`### ⚠️ Key Risks\`).
-- When comparing tickers, showing financial ratios, or rating metrics, ALWAYS use Markdown tables (\`| Metric | Value | Rating |\`). Use status keywords like **BUY**, **SELL**, **HOLD**, **BEAT**, **MISS**, **BULLISH**, **BEARISH** in table cells so they render as visual badge pills!
-- Use **bolding** for tickers, key prices, and quantitative metrics (e.g. **NVDA**, **$125.50**, **P/E 32.4**).
-- Use concise bullet points for actionable takeaways.
-- Keep paragraphs short (2-3 sentences max) for clear readability.
+If the user mentions "TRADE SETUP" or "RISK SCORE", output clear parameters formatted like:
+TRADE SETUP: Entry $130, Target $145 (+11.5%), Stop $122 (-6.1%), Conviction HIGH
+RISK SCORE: 7/10 (Volatile Growth)`;
 
-FINANCIAL EXPERTISE:
-- Deep knowledge across equities, technical analysis, fundamentals, macroeconomics, options, and portfolio risk.
-- Always include risk context — balance potential rewards with drawdown risks.
-- Proactively reference user portfolio context if provided to deliver personalized guidance.
+    messages.unshift({ role: "system", content: baseSystemPrompt });
 
-IMPORTANT:
-- Never fabricate specific price targets or financial data you don't have.
-- If you don't know something, state it honestly rather than guessing.
-- Do not repeat the user's question back to them. Direct answers only.`;
-
-  messages.unshift({ role: "system", content: baseSystemPrompt });
-
-  // Inject skill-specific system prompt if provided (layered on top of base identity)
-  if (typeof payload?.systemPrompt === "string" && payload.systemPrompt.trim()) {
-    messages.splice(1, 0, { role: "system", content: payload.systemPrompt.trim() });
-  }
-
-  // Fetch Portfolio Context
-  try {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (user) {
-      const { data: holdings } = await supabase
-        .from('holdings')
-        .select('symbol, shares, purchase_price')
-        .eq('user_id', user.id);
-        
-      if (holdings && holdings.length > 0) {
-        // Fetch real-time prices for these holdings
-        const finnhubKey = getEnv('FINNHUB_API_KEY');
-        const holdingsTextPromises = holdings.map(async (h) => {
-          let currentPriceStr = "";
-          if (finnhubKey) {
-            try {
-              const quoteRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${h.symbol}&token=${finnhubKey}`, { cache: "no-store" });
-              if (quoteRes.ok) {
-                const quoteData = await quoteRes.json();
-                if (quoteData && quoteData.c) {
-                  const currentPrice = quoteData.c;
-                  const percentChange = (((currentPrice - h.purchase_price) / h.purchase_price) * 100).toFixed(2);
-                  const isUp = currentPrice >= h.purchase_price;
-                  currentPriceStr = ` (Current Price: $${currentPrice}, Return: ${isUp ? '+' : ''}${percentChange}%)`;
-                }
-              }
-            } catch (e) {
-              console.error(`Failed to fetch quote for ${h.symbol}`);
-            }
-          }
-          return `${h.shares} shares of ${h.symbol} purchased at $${h.purchase_price}${currentPriceStr}`;
-        });
-        
-        const holdingsTexts = await Promise.all(holdingsTextPromises);
-        const holdingsText = holdingsTexts.join(", ");
-        
-        const portfolioContext: ChatMessage = {
-          role: "system",
-          content: `You are Velora AI. The user currently has the following portfolio holdings: ${holdingsText}. Keep this in mind and provide personalized advice if they ask about their portfolio.`
-        };
-        messages.unshift(portfolioContext);
-      }
+    // Inject skill-specific system prompt if provided
+    if (typeof payload?.systemPrompt === "string" && payload.systemPrompt.trim()) {
+      messages.splice(1, 0, { role: "system", content: payload.systemPrompt.trim() });
     }
-  } catch (error) {
-    console.error("Failed to load portfolio context for AI", error);
-  }
 
-  try {
-    let searchContextInjected = false;
-
-    // ── Primary: Tavily Search (finance-optimized) ──
-    const tavilyKey = getEnv('TAVILY_API_KEY');
-    if (tavilyKey && messages.length > 0) {
-      const userMessages = messages.filter(m => m.role === "user");
-      const lastUserMsg = userMessages[userMessages.length - 1];
+    // Fetch Portfolio Context
+    try {
+      const cookieStore = await cookies();
+      const supabase = createClient(cookieStore);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (lastUserMsg) {
-        // Construct a context-aware query using up to the last 3 user messages
-        const recentUserContext = userMessages.slice(-3).map(m => m.content).join(" | ");
-        const searchQuery = recentUserContext || lastUserMsg.content;
-
-        try {
-          const tavilyRes = await fetch("https://api.tavily.com/search", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${tavilyKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query: searchQuery,
-              search_depth: "basic",
-              topic: "finance",
-              max_results: 5,
-              include_answer: true,
-              time_range: "week",
-            }),
-            signal: AbortSignal.timeout(4000),
-          });
-
-          if (tavilyRes.ok) {
-            const tavilyData = await tavilyRes.json();
-            const results = tavilyData?.results || [];
-            if (results.length > 0) {
-              const snippets = results
-                .map((r: any) => `- ${r.title}: ${r.content}`)
-                .join("\n");
-              const answerBlock = tavilyData.answer
-                ? `\n\nAI-Generated Summary:\n${tavilyData.answer}`
-                : "";
-              const contextMessage: ChatMessage = {
-                role: "system",
-                content: `Here is some real-time financial context from the web to help answer the user's question. Do not hallucinate. If the context doesn't have the answer, just say so.\n\nContext:\n${snippets}${answerBlock}`,
-              };
-              messages.unshift(contextMessage);
-              searchContextInjected = true;
+      if (user) {
+        const { data: holdings } = await supabase
+          .from('holdings')
+          .select('symbol, shares, purchase_price')
+          .eq('user_id', user.id);
+          
+        if (holdings && holdings.length > 0) {
+          const finnhubKey = getEnv('FINNHUB_API_KEY');
+          const holdingsTextPromises = holdings.map(async (h) => {
+            let currentPriceStr = "";
+            if (finnhubKey) {
+              try {
+                const quoteRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${h.symbol}&token=${finnhubKey}`, { cache: "no-store" });
+                if (quoteRes.ok) {
+                  const quoteData = await quoteRes.json();
+                  if (quoteData && quoteData.c) {
+                    const currentPrice = quoteData.c;
+                    const percentChange = (((currentPrice - h.purchase_price) / h.purchase_price) * 100).toFixed(2);
+                    const isUp = currentPrice >= h.purchase_price;
+                    currentPriceStr = ` (Current Price: $${currentPrice}, Return: ${isUp ? '+' : ''}${percentChange}%)`;
+                  }
+                }
+              } catch (e) {
+                console.error(`Failed to fetch quote for ${h.symbol}`);
+              }
             }
-          }
-        } catch (tavilyError) {
-          console.error("Tavily search failed or timed out, falling back to Brave:", tavilyError);
+            return `${h.shares} shares of ${h.symbol} purchased at $${h.purchase_price}${currentPriceStr}`;
+          });
+          
+          const holdingsTexts = await Promise.all(holdingsTextPromises);
+          const holdingsText = holdingsTexts.join(", ");
+          
+          const portfolioContext: ChatMessage = {
+            role: "system",
+            content: `You are Velora AI. The user currently has the following portfolio holdings: ${holdingsText}. Keep this in mind and provide personalized advice if they ask about their portfolio.`
+          };
+          messages.splice(1, 0, portfolioContext);
         }
       }
+    } catch (e) {
+      console.error("Failed to fetch user portfolio context:", e);
     }
 
-    // ── Fallback: Brave Search ──
-    if (!searchContextInjected) {
-      const braveApiKey = getEnv('BRAVE_SEARCH_API_KEY');
-      const braveApiUrl = getEnv('BRAVE_SEARCH_API_URL') || "https://api.search.brave.com/res/v1/web/search";
-      
-      if (braveApiKey && messages.length > 0) {
-        const userMessages = messages.filter(m => m.role === "user");
-        const lastUserMsg = userMessages[userMessages.length - 1];
-        
-        if (lastUserMsg) {
-          try {
-            const recentUserContext = userMessages.slice(-3).map(m => m.content).join(" | ");
-            const searchQuery = recentUserContext || lastUserMsg.content;
+    // Real-Time Grounding via Tavily / Brave Search
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const needsSearch = /stock|price|market|news|earnings|crypto|nvda|aapl|tsla|msft|report|today|ratio|fed|rate|inflation|war|cpi|gdp/i.test(lastUserMsg);
 
-            const searchParams = new URLSearchParams({
-              q: searchQuery,
-              count: "5",
-              freshness: "pw", // past week for fresh financial news
-            });
-            const searchRes = await fetch(`${braveApiUrl}?${searchParams.toString()}`, {
+    if (needsSearch) {
+      if (isTavilyConfigured()) {
+        try {
+          const searchResult = await tavilySearch({
+            query: lastUserMsg,
+            maxResults: 5,
+            topic: "general",
+          });
+
+          if (searchResult.results.length > 0) {
+            const contextText = searchResult.results
+              .map((r: any) => `[${r.title}] (${r.url}): ${r.content}`)
+              .join("\n\n");
+
+            const searchContextMsg: ChatMessage = {
+              role: "system",
+              content: `Real-time web search results from Tavily (as of today):\n\n${contextText}\n\nUse this real-time info to answer accurately with live price targets and metrics.`,
+            };
+            messages.splice(1, 0, searchContextMsg);
+          }
+        } catch (searchError) {
+          console.error("Tavily search failed or timed out:", searchError);
+        }
+      } else {
+        const braveKey = getEnv('BRAVE_SEARCH_API_KEY');
+        if (braveKey) {
+          try {
+            const searchUrl = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(lastUserMsg)}&count=4`;
+            const searchRes = await fetch(searchUrl, {
               headers: {
-                "X-Subscription-Token": braveApiKey,
-                "Accept": "application/json"
+                "X-Subscription-Token": braveKey,
+                "Accept": "application/json",
               },
-              signal: AbortSignal.timeout(4000),
+              cache: "no-store",
             });
+
             if (searchRes.ok) {
               const searchData = await searchRes.json();
               const results = searchData?.web?.results || [];
               if (results.length > 0) {
-                const snippets = results.map((r: any) => `- ${r.title}: ${r.description}`).join("\n");
-                const contextMessage: ChatMessage = {
+                const contextText = results
+                  .map((r: any) => `[${r.title}] (${r.url}): ${r.description}`)
+                  .join("\n\n");
+
+                const searchContextMsg: ChatMessage = {
                   role: "system",
-                  content: `Here is some real-time context from the web to help answer the user's question. Do not hallucinate. If the context doesn't have the answer, just say so. \n\nContext:\n${snippets}`
+                  content: `Real-time web search results from Brave Search:\n\n${contextText}\n\nUse this real-time info to ground your analysis.`,
                 };
-                messages.unshift(contextMessage);
+                messages.splice(1, 0, searchContextMsg);
               }
             }
           } catch (searchError) {
@@ -236,53 +169,66 @@ IMPORTANT:
       }
     }
 
-    const res = await fetch(NVIDIA_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
-        max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(45000),
-    });
+    // Models to try in order (requested model -> default fast model -> 8B backup)
+    const modelsToTry = [model];
+    if (model !== DEFAULT_MODEL) {
+      modelsToTry.push(DEFAULT_MODEL);
+    }
+    if (model !== "meta/llama-3.1-8b-instruct" && DEFAULT_MODEL !== "meta/llama-3.1-8b-instruct") {
+      modelsToTry.push("meta/llama-3.1-8b-instruct");
+    }
 
-    const text = await res.text();
+    let lastError: any = null;
     let data: any = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      // pass through raw text
+
+    for (const attemptModel of modelsToTry) {
+      try {
+        const res = await fetch(NVIDIA_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: attemptModel,
+            messages,
+            temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
+            max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
+            stream: false,
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+
+        if (res.ok && data?.choices?.[0]?.message) {
+          const msg = data.choices[0].message;
+          const rawContent: string = msg.content || msg.reasoning_content || msg.reasoning || "";
+          let content = rawContent;
+
+          content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+          content = content.replace(/^(got it,?\s+(let's|let us)[\s\S]*?\n\n|okay,?\s+(let's|let us)[\s\S]*?\n\n)/i, '').trim();
+
+          msg.content = content.trim() || rawContent.trim() || "No detailed output produced by model. Please try again.";
+          return NextResponse.json(data);
+        } else {
+          lastError = data?.error || `NVIDIA request failed with status ${res.status}`;
+        }
+      } catch (err: any) {
+        console.error(`Attempt with model ${attemptModel} failed:`, err);
+        lastError = err.message || "Model timeout";
+      }
     }
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "NVIDIA request failed.", status: res.status, details: data ?? text },
-        { status: 502 }
-      );
-    }
-
-    if (data?.choices?.[0]?.message) {
-      const msg = data.choices[0].message;
-      const rawContent: string = msg.content || msg.reasoning_content || msg.reasoning || "";
-      let content = rawContent;
-
-      // 1. Strip <think>...</think> tags if present
-      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-      // 2. Safely strip leading CoT monologue lines (e.g. "Got it, let's tackle this...")
-      content = content.replace(/^(got it,?\s+(let's|let us)[\s\S]*?\n\n|okay,?\s+(let's|let us)[\s\S]*?\n\n)/i, '').trim();
-
-      // Safety fallback: ensure content is always a valid populated string
-      msg.content = content.trim() || rawContent.trim() || "No detailed output produced by model. Please try again.";
-    }
-
-    return NextResponse.json(data ?? { raw: text });
+    return NextResponse.json(
+      { error: `AI request failed across available models (${lastError}). Please try again.` },
+      { status: 502 }
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Request failed." },

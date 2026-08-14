@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles, Copy, Check, TrendingUp, TrendingDown, Target, ShieldAlert, Zap, Pin, Activity } from "lucide-react";
+import { ArrowUp, Bot, User, ArrowLeft, Loader2, Sparkles, Copy, Check, TrendingUp, TrendingDown, Target, ShieldAlert, Zap, Pin, Activity, Square, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -304,6 +304,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-submit initial prompt or skill context (only once)
   useEffect(() => {
@@ -403,6 +404,27 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     }
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
+  const handleRerun = (index: number) => {
+    let userPrompt = "";
+    for (let j = index - 1; j >= 0; j--) {
+      if (messages[j].role === "user") {
+        userPrompt = messages[j].content;
+        break;
+      }
+    }
+    if (userPrompt) {
+      sendMessage(userPrompt);
+    }
+  };
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
@@ -415,6 +437,9 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     setMessages(newMessages);
     setIsLoading(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const body: any = { messages: newMessages, model: selectedModel };
       if (activeSystemPrompt) {
@@ -424,7 +449,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       const contentType = res.headers.get("content-type") || "";
@@ -446,17 +472,26 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           msg.content = "No output generated. Please try again or rephrase your request.";
         }
         setMessages((prev) => [...prev, msg]);
+        setShowSuggestions(true);
       } else {
         throw new Error(data.error || "Failed to get response");
       }
     } catch (err: any) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
-      ]);
+      if (err.name === "AbortError") {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: " Generation stopped by user." }
+        ]);
+      } else {
+        console.error(err);
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
+        ]);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -465,13 +500,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     sendMessage(input);
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion);
-  };
-
   return (
     <div className="flex h-[calc(100vh-80px)] md:h-[calc(100vh-140px)] flex-col bg-[#05080F]">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
         <button 
           onClick={onBack}
@@ -492,7 +522,6 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         <BuiModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto app-scroll px-4 py-6 space-y-6">
         {messages.filter(m => m.role !== "system").map((msg, i) => (
           <motion.div 
@@ -520,58 +549,37 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : (
                 <div className="relative group">
-                  {/* Beautiful UI Tool Chips & Thinking Trace for assistant */}
                   <BuiThinkingState isThinking={false} />
                   
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </ReactMarkdown>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(msg.content);
-                      setCopiedIndex(i);
-                      setTimeout(() => setCopiedIndex(null), 2000);
-                    }}
-                    className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
-                    title="Copy response"
-                  >
-                    {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                  </button>
+                  
+                  <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <button
+                      onClick={() => handleRerun(i)}
+                      className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
+                      title="Rerun response"
+                    >
+                      <RotateCcw size={12} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        setCopiedIndex(i);
+                        setTimeout(() => setCopiedIndex(null), 2000);
+                      }}
+                      className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
+                      title="Copy response"
+                    >
+                      {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </motion.div>
         ))}
-
-        {/* Suggestion Buttons */}
-        {showSuggestions && !isLoading && activeSuggestions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-            className="flex flex-col gap-2 pl-11"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={12} className="text-vel-teal" />
-              <span className="text-[11px] text-vel-muted font-medium uppercase tracking-wider">Quick Actions</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {activeSuggestions.map((s, i) => (
-                <motion.button
-                  key={s.label}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 + i * 0.08 }}
-                  onClick={() => handleSuggestionClick(s.label)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[13px] text-white/80 hover:bg-vel-teal/10 hover:border-vel-teal/30 hover:text-vel-teal transition-all duration-200"
-                >
-                  {s.icon && <span>{s.icon}</span>}
-                  <span>{s.label}</span>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        )}
         
         {isLoading && (
           <motion.div 
@@ -591,7 +599,6 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         <div ref={endOfMessagesRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 bg-gradient-to-t from-[#05080F] via-[#05080F] to-transparent">
         <form 
           onSubmit={handleSubmit}
@@ -610,17 +617,27 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
             className="flex-1 bg-transparent text-[15px] text-white placeholder:text-white/40 focus:outline-none resize-none py-2 px-3 max-h-32 app-scroll"
             rows={input.split("\n").length > 1 ? Math.min(input.split("\n").length, 5) : 1}
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="h-10 w-10 flex-none rounded-xl bg-white/10 flex items-center justify-center disabled:opacity-50 hover:bg-white/20 transition mb-0.5 mr-0.5"
-          >
-            <ArrowUp size={18} className="text-white" />
-          </button>
+          {isLoading ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="h-10 w-10 flex-none rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center hover:bg-rose-500/30 transition mb-0.5 mr-0.5 cursor-pointer shadow-lg shadow-rose-500/20"
+              title="Stop generating"
+            >
+              <Square size={16} className="fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="h-10 w-10 flex-none rounded-xl bg-white/10 flex items-center justify-center disabled:opacity-50 hover:bg-white/20 transition mb-0.5 mr-0.5"
+            >
+              <ArrowUp size={18} className="text-white" />
+            </button>
+          )}
         </form>
       </div>
 
-      {/* Floating Highlight-to-Ask Selection Actions Menu */}
       <BuiSelectionActions onAskAI={(selected) => sendMessage(`Analyze this excerpt: "${selected}"`)} />
     </div>
   );
