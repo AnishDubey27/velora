@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DEFAULT_MODEL } from "@/lib/nvidia";
+import { BuiLoadingState } from "@/components/ui/bui-loading-state";
+import { BuiThinkingState } from "@/components/ui/bui-thinking-state";
+import { BuiToolChips } from "@/components/ui/bui-tool-chips";
 
 type Message = {
   role: "system" | "user" | "assistant";
@@ -525,6 +528,9 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : (
                 <div className="relative group">
+                  {/* Beautiful UI Tool Chips & Thinking Trace for assistant */}
+                  <BuiThinkingState isThinking={false} />
+                  
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </ReactMarkdown>
@@ -577,16 +583,16 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         
         {isLoading && (
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             className="flex gap-3 max-w-[85%]"
           >
             <div className="flex-none h-8 w-8 rounded-full bg-vel-teal/20 flex items-center justify-center">
               <Bot size={14} className="text-vel-teal" />
             </div>
-            <div className="rounded-2xl px-4 py-3 bg-transparent border border-white/10 flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin text-vel-teal" />
-              <span className="text-sm text-white/50">Analyzing...</span>
+            <div className="flex flex-col gap-2">
+              <BuiLoadingState label="Velora is analyzing markets" />
+              <BuiThinkingState isThinking={true} />
             </div>
           </motion.div>
         )}
