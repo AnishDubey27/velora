@@ -196,7 +196,7 @@ RISK SCORE: 7/10 (Volatile Growth)`;
             max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
             stream: false,
           }),
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(15000),
         });
 
         const text = await res.text();

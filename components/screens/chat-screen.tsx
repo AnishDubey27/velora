@@ -376,11 +376,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? "AI model service timed out or experienced a temporary gateway issue. Please try again or switch model."
-            : `Unexpected server response (${res.status}).`
-        );
+        throw new Error(text || `Server returned HTTP ${res.status}`);
       }
 
       if (res.ok && data?.choices?.[0]?.message) {
@@ -459,11 +455,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? "AI model service timed out or experienced a temporary gateway issue. Please try again or switch model."
-            : `Unexpected server response (${res.status}).`
-        );
+        throw new Error(text || `Server returned HTTP ${res.status}`);
       }
 
       if (res.ok && data?.choices?.[0]?.message) {
