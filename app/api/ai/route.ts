@@ -246,7 +246,7 @@ IMPORTANT:
         model,
         messages,
         temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
-        max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 2048,
+        max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
         stream: false,
       }),
       signal: AbortSignal.timeout(45000),
@@ -267,8 +267,9 @@ IMPORTANT:
       );
     }
 
-    if (data?.choices?.[0]?.message?.content) {
-      const rawContent: string = data.choices[0].message.content;
+    if (data?.choices?.[0]?.message) {
+      const msg = data.choices[0].message;
+      const rawContent: string = msg.content || msg.reasoning_content || msg.reasoning || "";
       let content = rawContent;
 
       // 1. Strip <think>...</think> tags if present
@@ -277,8 +278,8 @@ IMPORTANT:
       // 2. Safely strip leading CoT monologue lines (e.g. "Got it, let's tackle this...")
       content = content.replace(/^(got it,?\s+(let's|let us)[\s\S]*?\n\n|okay,?\s+(let's|let us)[\s\S]*?\n\n)/i, '').trim();
 
-      // Safety fallback: if cleaning accidentally erased everything, preserve original raw text!
-      data.choices[0].message.content = content.trim() || rawContent.trim();
+      // Safety fallback: ensure content is always a valid populated string
+      msg.content = content.trim() || rawContent.trim() || "No detailed output produced by model. Please try again.";
     }
 
     return NextResponse.json(data ?? { raw: text });
