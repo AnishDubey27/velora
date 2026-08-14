@@ -11,6 +11,9 @@ import { StockProfileTab } from "@/components/stock/stock-profile-tab";
 import { StockEarningsTab } from "@/components/stock/stock-earnings-tab";
 import { StockInsiderTab } from "@/components/stock/stock-insider-tab";
 import { StockNewsTab } from "@/components/stock/stock-news-tab";
+import { StockQuickStats } from "@/components/stock/stock-quick-stats";
+import { StockAiSetupCard } from "@/components/stock/stock-ai-setup-card";
+import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
 import { getCurrencySymbol } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then((res) => {
@@ -127,7 +130,12 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
           <>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-bold tracking-tight text-vel-text">
-                {quote?.price?.toFixed(2) || "0.00"}
+                <BuiAnimatedTicker
+                  value={quote?.price ?? 0}
+                  prefix={currencySymbol}
+                  decimals={2}
+                  className="text-4xl font-bold text-white tracking-tight"
+                />
               </span>
               <span className="text-sm font-medium text-vel-muted mb-1 pb-1">{currency}</span>
             </div>
@@ -144,6 +152,16 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
       {/* Chart */}
       <div className="px-1 mb-2 mt-2">
         <StockChart symbol={symbol} />
+      </div>
+
+      {/* Institutional Quick-Stats Bar (52W Range, P/E, Market Cap) */}
+      <div className="px-1">
+        <StockQuickStats symbol={symbol} quote={quote} profile={profile} currencySymbol={currencySymbol} />
+      </div>
+
+      {/* Velora AI Strategic Setup Card */}
+      <div className="px-1">
+        <StockAiSetupCard symbol={symbol} quote={quote} profile={profile} onStartChat={onStartChat} />
       </div>
 
       {/* Tabs */}
