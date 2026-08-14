@@ -7,6 +7,18 @@ import { cn } from "@/lib/utils";
 
 const tabs = ["United States", "India", "Crypto"] as const;
 
+function cleanHtmlText(text?: string | null): string {
+  if (!text) return "";
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
 export function HeadlinesScreen() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("United States");
   const [filter, setFilter] = useState<"All" | "Important" | "Critical">("All");
@@ -73,7 +85,7 @@ export function HeadlinesScreen() {
         ) : filteredNews.length === 0 ? (
           <div className="py-10 text-center text-white/50">No news found for this category</div>
         ) : (
-          filteredNews.slice(0, 5).map((item, index) => {
+          filteredNews.slice(0, 10).map((item, index) => {
             const href = item.url || item.link || item.source_url || null;
             const Card: any = href ? motion.a : motion.div;
 
@@ -92,7 +104,7 @@ export function HeadlinesScreen() {
               )}
             >
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-white/50">{item.time || "12:25 pm"}</span>
+                <span className="text-white/50">{item.time || "Recent"}</span>
                 {item.impact && (
                   <span className={cn(
                     "font-semibold",
@@ -105,11 +117,11 @@ export function HeadlinesScreen() {
               </div>
 
               <h3 className="text-[16px] font-semibold leading-tight text-white">
-                {item.title}
+                {cleanHtmlText(item.title)}
               </h3>
 
               <p className="mt-2 text-[13px] leading-relaxed text-white/70 line-clamp-2">
-                {item.summary || item.description}
+                {cleanHtmlText(item.summary || item.description)}
               </p>
 
               <div className="mt-4 flex items-center gap-3">

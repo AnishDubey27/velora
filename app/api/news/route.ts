@@ -21,15 +21,49 @@ function isProbablyEnglish(text: string) {
   return latinLetters.length / letters.length >= 0.8;
 }
 
-function formatTime(publishedAt: unknown) {
+function stripHtml(html: unknown): string {
+  if (!html || typeof html !== "string") return "";
+  return html
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+function formatTime(publishedAt: unknown): string | null {
+  if (!publishedAt) return null;
+  let date: Date;
+
   if (typeof publishedAt === "number") {
-    publishedAt = new Date(publishedAt).toISOString();
+    const ms = publishedAt < 1e11 ? publishedAt * 1000 : publishedAt;
+    date = new Date(ms);
+  } else if (typeof publishedAt === "string") {
+    date = new Date(publishedAt);
+  } else {
+    return null;
   }
-  if (typeof publishedAt !== "string") return null;
-  const date = new Date(publishedAt);
+
   if (Number.isNaN(date.getTime())) return null;
+
   try {
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+
+    if (diffMins >= 0 && diffMins < 60) {
+      return `${Math.max(1, diffMins)}m ago`;
+    }
+    if (diffHours >= 0 && diffHours < 24) {
+      return `${diffHours}h ago`;
+    }
+
+    const timeStr = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
+    const monthDayStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return `${monthDayStr}, ${timeStr}`;
   } catch {
     return null;
   }
@@ -63,9 +97,9 @@ export async function GET(request: Request) {
         const normalized = englishOnly
           .filter((item: any) => !!item?.headline)
           .map((item: any) => ({
-            title: item.headline,
-            summary: item.summary || "",
-            description: item.summary || "",
+            title: stripHtml(item.headline),
+            summary: stripHtml(item.summary),
+            description: stripHtml(item.summary),
             time: formatTime(item.datetime * 1000) || null,
             url: item.url || null,
             source: item.source || null,
@@ -102,9 +136,9 @@ export async function GET(request: Request) {
 
         if (tavilyData.results.length > 0) {
           const normalized = tavilyData.results.map((item) => ({
-            title: item.title,
-            summary: item.content || "",
-            description: item.content || "",
+            title: stripHtml(item.title),
+            summary: stripHtml(item.content || ""),
+            description: stripHtml(item.content || ""),
             time: item.published_date ? formatTime(item.published_date) : null,
             url: item.url || null,
             source: null,
@@ -138,9 +172,9 @@ export async function GET(request: Request) {
           
           if (results.length > 0) {
             const normalized = results.map((item: any) => ({
-              title: item.title,
-              summary: item.description || "",
-              description: item.description || "",
+              title: stripHtml(item.title),
+              summary: stripHtml(item.description || ""),
+              description: stripHtml(item.description || ""),
               time: formatTime(item.page_age) || item.age || null,
               url: item.url || null,
               source: item.profile?.name || null,
@@ -216,9 +250,9 @@ export async function GET(request: Request) {
             item.entities.find((e: any) => typeof e?.symbol === "string" && e.symbol.length > 0)?.symbol;
 
           return {
-            title: item.title,
-            summary: item.description || item.snippet || item.summary || "",
-            description: item.description || item.snippet || "",
+            title: stripHtml(item.title),
+            summary: stripHtml(item.description || item.snippet || item.summary || ""),
+            description: stripHtml(item.description || item.snippet || ""),
             keywords: typeof item.keywords === "string" ? item.keywords : "",
             time: formatTime(item.published_at) || item.time || null,
             url: item.url || item.link || null,
