@@ -5,9 +5,9 @@ export const NVIDIA_API_URL =
 
 export const NVIDIA_ALLOWED_MODELS = [
   "stepfun-ai/step-3.7-flash",
+  "meta/llama-3.3-70b-instruct",
   "meta/llama-3.1-8b-instruct",
-  "mistralai/mistral-nemotron",
-  "nvidia/llama-3.1-nemotron-70b-instruct"
+  "mistralai/mistral-nemotron"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];

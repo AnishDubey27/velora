@@ -45,12 +45,12 @@ export const MODEL_OPTIONS: ModelOption[] = [
     icon: BarChart3,
   },
   {
-    id: "nvidia/llama-3.1-nemotron-70b-instruct",
-    name: "Nemotron 70B",
-    badge: "NVIDIA Ultra",
-    badgeColor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    id: "meta/llama-3.3-70b-instruct",
+    name: "Llama 3.3 70B",
+    badge: "70B Deep",
+    badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     latency: "🧠 70B",
-    description: "NVIDIA's flagship 70B Nemotron model trained for complex finance & reasoning.",
+    description: "Meta's flagship 70B parameter model. Best for deep Wall Street research.",
     icon: Lightbulb,
   },
 ];
