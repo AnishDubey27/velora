@@ -319,7 +319,7 @@ export function PortfolioScreen({
         <Bot size={48} className="mb-4 text-vel-teal/50" />
         <h2 className="mb-2 text-xl font-semibold text-white">Encrypted Vault</h2>
         <p className="mb-6 text-sm text-white/60">Initialize your session to track live holdings and AI metrics.</p>
-        <button onClick={() => router.push('/login')} className="flex items-center gap-2 rounded-full bg-vel-teal px-6 py-2.5 text-sm font-semibold text-vel-bg transition-opacity hover:opacity-90">
+        <button onClick={() => router.push('/login?next=portfolio')} className="flex items-center gap-2 rounded-full bg-vel-teal px-6 py-2.5 text-sm font-semibold text-vel-bg transition-opacity hover:opacity-90">
           <LogIn size={16} /> Authenticate
         </button>
       </section>

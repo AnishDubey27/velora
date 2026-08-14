@@ -41,6 +41,30 @@ export default function Home() {
     }
   }, []);
 
+  // Sync state from URL on initial load and popstate
+  useEffect(() => {
+    const parseUrlState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") as NavKey | null;
+      const stockParam = params.get("stock");
+      const cikParam = params.get("cik");
+
+      if (stockParam) {
+        setSelectedStockSymbol(stockParam.toUpperCase());
+        setActive("stock-detail");
+      } else if (cikParam && tabParam === "super-investor-profile") {
+        setSelectedInvestorCik(cikParam);
+        setActive("super-investor-profile");
+      } else if (tabParam) {
+        setActive(tabParam);
+      }
+    };
+
+    parseUrlState();
+    window.addEventListener("popstate", parseUrlState);
+    return () => window.removeEventListener("popstate", parseUrlState);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -59,15 +83,35 @@ export default function Home() {
     };
   }, []);
 
+  const updateUrl = (key: NavKey, extraParams?: Record<string, string>) => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tab");
+    url.searchParams.delete("stock");
+    url.searchParams.delete("cik");
+
+    if (key === "stock-detail" && extraParams?.stock) {
+      url.searchParams.set("stock", extraParams.stock);
+    } else if (key === "super-investor-profile" && extraParams?.cik) {
+      url.searchParams.set("tab", "super-investor-profile");
+      url.searchParams.set("cik", extraParams.cik);
+    } else if (key !== "research") {
+      url.searchParams.set("tab", key);
+    }
+
+    window.history.pushState(null, "", url.pathname + (url.search ? url.search : ""));
+  };
+
   const handleNavigate = (key: NavKey) => {
     setSkillLibraryOpen(false);
     setActive(key);
+    updateUrl(key);
   };
 
   const handleViewStock = (symbol: string) => {
     setPreviousScreen(active);
     setSelectedStockSymbol(symbol);
     setActive("stock-detail");
+    updateUrl("stock-detail", { stock: symbol });
   };
 
   const handleSelectSkill = (skill: Skill) => {
@@ -176,18 +220,19 @@ export default function Home() {
           />
         );
       case "reddit-trending":
-        return <RedditTrendingScreen onBack={() => setActive("dashboard")} />;
+        return <RedditTrendingScreen onBack={() => { setActive("dashboard"); updateUrl("dashboard"); }} />;
       case "insider-trading":
-        return <InsiderTradingScreen onBack={() => setActive("dashboard")} />;
+        return <InsiderTradingScreen onBack={() => { setActive("dashboard"); updateUrl("dashboard"); }} />;
       case "congress-trading":
-        return <CongressTradingScreen onBack={() => setActive("dashboard")} />;
+        return <CongressTradingScreen onBack={() => { setActive("dashboard"); updateUrl("dashboard"); }} />;
       case "super-investors":
         return (
           <SuperInvestorsScreen 
-            onBack={() => setActive("dashboard")} 
+            onBack={() => { setActive("dashboard"); updateUrl("dashboard"); }} 
             onViewProfile={(cik: string) => {
               setSelectedInvestorCik(cik);
               setActive("super-investor-profile");
+              updateUrl("super-investor-profile", { cik });
             }}
           />
         );
@@ -195,18 +240,19 @@ export default function Home() {
         return (
           <SuperInvestorProfileScreen 
             cik={selectedInvestorCik} 
-            onBack={() => setActive("super-investors")} 
+            onBack={() => { setActive("super-investors"); updateUrl("super-investors"); }} 
           />
         );
       case "stock-detail":
         return (
           <StockDetailScreen
             symbol={selectedStockSymbol}
-            onBack={() => setActive(previousScreen)}
+            onBack={() => { setActive(previousScreen); updateUrl(previousScreen); }}
             onStartChat={(prompt) => {
               setSkillContext(undefined);
               setChatPrompt(prompt);
               setActive("chat");
+              updateUrl("chat");
             }}
           />
         );
@@ -220,6 +266,7 @@ export default function Home() {
               setSkillContext(undefined);
               setChatPrompt(prompt);
               setActive("chat");
+              updateUrl("chat");
             }}
           />
         );
@@ -230,12 +277,13 @@ export default function Home() {
     <AppShell 
       active={active} 
       onNavigate={handleNavigate}
-      onDashboard={() => setActive("dashboard")}
+      onDashboard={() => { setActive("dashboard"); updateUrl("dashboard"); }}
       onViewStock={handleViewStock}
       onStartChat={(prompt) => {
         setSkillContext(undefined);
         setChatPrompt(prompt);
         setActive("chat");
+        updateUrl("chat");
       }}
     >
       <AnimatePresence mode="wait">

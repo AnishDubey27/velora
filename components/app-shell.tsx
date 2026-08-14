@@ -8,7 +8,7 @@ import { GlobalSearchModal } from "@/components/global-search";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { WatchlistDrawer } from "@/components/watchlist-drawer";
 import type { NavKey } from "@/lib/types";
-import { Atom, LayoutDashboard, FileText, PieChart, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Atom, LayoutDashboard, FileText, PieChart, HelpCircle, LogOut, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
@@ -56,23 +56,12 @@ export function AppShell({
     }
   }, []);
 
-  useEffect(() => {
-    const collapsed = localStorage.getItem("velora_sidebar_collapsed");
-    if (collapsed === "true") {
-      setSidebarCollapsed(true);
-    }
-  }, []);
-
-  const toggleSidebar = () => {
-    const nextVal = !sidebarCollapsed;
-    setSidebarCollapsed(nextVal);
-    localStorage.setItem("velora_sidebar_collapsed", String(nextVal));
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  const isExpanded = isSidebarHovered;
 
   return (
     <div className="h-dvh overflow-hidden bg-[#05070C] text-vel-text">
@@ -81,30 +70,34 @@ export function AppShell({
         {/* Background gradient */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.09),transparent_40%),linear-gradient(180deg,rgba(7,10,17,0.3),#070A11_75%)] z-0" />
         
-        {/* Persistent Desktop Sidebar */}
+        {/* Persistent Desktop Sidebar with Smooth Hover Expansion */}
         <div 
+          onMouseEnter={() => setIsSidebarHovered(true)}
+          onMouseLeave={() => setIsSidebarHovered(false)}
           className={cn(
-            "hidden md:flex flex-col border-r border-white/10 bg-[#0A0F1C]/95 backdrop-blur-xl transition-all duration-300 relative z-20 h-full flex-none",
-            sidebarCollapsed ? "w-[72px]" : "w-64"
+            "hidden md:flex flex-col border-r border-white/10 bg-[#0A0F1C]/95 backdrop-blur-2xl transition-all duration-300 ease-in-out relative z-20 h-full flex-none shadow-2xl",
+            isExpanded ? "w-64" : "w-[72px]"
           )}
         >
           {/* Sidebar Header */}
           <div className={cn(
-            "flex items-center border-b border-white/10 p-5 h-[64px] flex-none",
-            sidebarCollapsed ? "justify-center" : "justify-between"
+            "flex items-center border-b border-white/10 p-5 h-[64px] flex-none overflow-hidden transition-all duration-300",
+            isExpanded ? "justify-between px-6" : "justify-center px-0"
           )}>
-            {!sidebarCollapsed && (
-              <span className="text-[15px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
-                VELORA
-              </span>
+            {isExpanded ? (
+              <div className="flex items-center gap-2.5">
+                <div className="h-7 w-7 rounded-lg bg-vel-teal/20 flex items-center justify-center border border-vel-teal/30">
+                  <span className="font-extrabold text-sm text-vel-teal">V</span>
+                </div>
+                <span className="text-[15px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+                  VELORA
+                </span>
+              </div>
+            ) : (
+              <div className="h-9 w-9 rounded-xl bg-vel-teal/15 flex items-center justify-center border border-vel-teal/30 shadow-glow">
+                <span className="font-black text-base text-vel-teal">V</span>
+              </div>
             )}
-            <button 
-              onClick={toggleSidebar} 
-              className="text-white/60 hover:text-white transition rounded-lg p-1.5 hover:bg-white/5"
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
-            </button>
           </div>
 
           {/* Navigation Items */}
@@ -117,18 +110,18 @@ export function AppShell({
                   onClick={() => onNavigate(key)}
                   className={cn(
                     "flex items-center rounded-2xl transition-all relative group",
-                    sidebarCollapsed ? "h-12 w-12 justify-center" : "w-full gap-3.5 px-5 py-3.5 text-[15px] font-medium",
+                    !isExpanded ? "h-12 w-12 justify-center" : "w-full gap-3.5 px-5 py-3.5 text-[15px] font-medium",
                     isActive 
                       ? "bg-white/10 text-[#00D4FF]" 
                       : "text-white/70 hover:bg-white/5 hover:text-white"
                   )}
-                  title={sidebarCollapsed ? label : undefined}
+                  title={!isExpanded ? label : undefined}
                 >
                   <Icon size={21} strokeWidth={isActive ? 2.3 : 2} />
-                  {!sidebarCollapsed && <span>{label}</span>}
+                  {isExpanded && <span className="truncate">{label}</span>}
                   
                   {/* Tooltip for collapsed state */}
-                  {sidebarCollapsed && (
+                  {!isExpanded && (
                     <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
                       {label}
                     </div>
@@ -145,15 +138,15 @@ export function AppShell({
               onClick={() => setOnboardingOpen(true)}
               className={cn(
                 "flex items-center rounded-xl transition-all border group relative",
-                sidebarCollapsed 
+                !isExpanded 
                   ? "h-12 w-12 justify-center border-cyan-500/10 bg-cyan-500/[0.02] text-cyan-400/80 hover:text-cyan-400 hover:bg-cyan-500/10" 
                   : "w-full gap-3.5 px-5 py-3 text-[14px] font-medium text-cyan-400/80 border-cyan-500/10 bg-cyan-500/[0.02] hover:bg-white/5 hover:text-cyan-400",
               )}
-              title={sidebarCollapsed ? "App Walkthrough" : undefined}
+              title={!isExpanded ? "App Walkthrough" : undefined}
             >
               <HelpCircle size={18} strokeWidth={2} />
-              {!sidebarCollapsed && <span>App Walkthrough</span>}
-              {sidebarCollapsed && (
+              {isExpanded && <span>App Walkthrough</span>}
+              {!isExpanded && (
                 <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
                   App Walkthrough
                 </div>
@@ -165,15 +158,15 @@ export function AppShell({
               onClick={handleLogout}
               className={cn(
                 "flex items-center rounded-xl transition-all border group relative",
-                sidebarCollapsed 
+                !isExpanded 
                   ? "h-12 w-12 justify-center border-red-500/10 bg-red-500/[0.02] text-red-400/80 hover:text-red-400 hover:bg-red-500/10" 
                   : "w-full gap-3.5 px-5 py-3 text-[14px] font-medium text-red-400/80 border-red-500/10 bg-red-500/[0.02] hover:bg-white/5 hover:text-red-400",
               )}
-              title={sidebarCollapsed ? "Log Out" : undefined}
+              title={!isExpanded ? "Log Out" : undefined}
             >
               <LogOut size={18} strokeWidth={2} />
-              {!sidebarCollapsed && <span>Log Out</span>}
-              {sidebarCollapsed && (
+              {isExpanded && <span>Log Out</span>}
+              {!isExpanded && (
                 <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
                   Log Out
                 </div>

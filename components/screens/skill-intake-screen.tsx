@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, Sparkles, X, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/types";
@@ -35,13 +35,17 @@ function StockSearchBar({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
   const isSelectingRef = useRef(false);
+
+  /* Sync with value */
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
 
   /* debounced search */
   useEffect(() => {
     if (isSelectingRef.current) return;
-    if (query.length < 1) {
+    if (!query || query.trim().length < 1 || query === value) {
       setResults([]);
       setOpen(false);
       return;
@@ -51,7 +55,7 @@ function StockSearchBar({
       if (isSelectingRef.current) return;
       try {
         setLoading(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
         const data = await res.json();
         const searchResults: SearchResult[] = data.results || [];
         if (!isSelectingRef.current) {
@@ -66,7 +70,7 @@ function StockSearchBar({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, value]);
 
   /* close dropdown on outside click */
   useEffect(() => {
@@ -79,19 +83,23 @@ function StockSearchBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const selectItem = useCallback(
-    (item: SearchResult) => {
-      isSelectingRef.current = true;
-      setQuery(item.symbol);
-      onChange(item.symbol);
-      setResults([]);
-      setOpen(false);
-      setTimeout(() => {
-        isSelectingRef.current = false;
-      }, 500);
-    },
-    [onChange],
-  );
+  const selectItem = (item: SearchResult) => {
+    isSelectingRef.current = true;
+    setQuery(item.symbol);
+    onChange(item.symbol);
+    setResults([]);
+    setOpen(false);
+    setTimeout(() => {
+      isSelectingRef.current = false;
+    }, 400);
+  };
+
+  const clearSelection = () => {
+    setQuery("");
+    onChange("");
+    setResults([]);
+    setOpen(false);
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -104,28 +112,42 @@ function StockSearchBar({
       <label
         className={cn(
           "flex items-center gap-2.5 rounded-xl border px-4 py-3 transition-colors",
-          "border-white/[0.08] bg-white/[0.03] focus-within:border-vel-teal/50 focus-within:bg-white/[0.05]",
+          value
+            ? "border-vel-teal/50 bg-vel-teal/[0.05]"
+            : "border-white/[0.08] bg-white/[0.03] focus-within:border-vel-teal/50 focus-within:bg-white/[0.05]"
         )}
       >
-        <Search size={16} className="flex-none text-vel-muted" />
+        <Search size={16} className={cn("flex-none", value ? "text-vel-teal" : "text-vel-muted")} />
         <input
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             if (e.target.value !== value) onChange("");
           }}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onFocus={() => {
+            if (!value && results.length > 0) setOpen(true);
+          }}
           placeholder="Search ticker or company…"
           className="w-full bg-transparent text-[14px] text-white/90 outline-none placeholder:text-vel-faint"
         />
         {loading && (
           <span className="h-4 w-4 flex-none animate-spin rounded-full border-2 border-vel-teal/30 border-t-vel-teal" />
         )}
+        {value && (
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="flex-none p-1 rounded-md bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition"
+            title="Clear selection"
+          >
+            <X size={13} />
+          </button>
+        )}
       </label>
 
       {/* ─── Dropdown ─── */}
       <AnimatePresence>
-        {open && (
+        {open && !value && (
           <motion.ul
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -137,15 +159,20 @@ function StockSearchBar({
               <li key={item.symbol}>
                 <button
                   type="button"
-                  onClick={() => selectItem(item)}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-white/[0.06]"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectItem(item);
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-2.5 text-left transition hover:bg-white/[0.06]"
                 >
-                  <span className="text-[14px] font-semibold text-white/90">
-                    {item.symbol}
-                  </span>
-                  <span className="truncate text-[13px] text-vel-faint">
-                    {item.description}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[14px] font-semibold text-white/90">
+                      {item.symbol}
+                    </span>
+                    <span className="truncate text-[13px] text-vel-faint max-w-[220px]">
+                      {item.description}
+                    </span>
+                  </div>
                 </button>
               </li>
             ))}

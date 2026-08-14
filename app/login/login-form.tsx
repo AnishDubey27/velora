@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Github, ArrowRight, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
 import { login, signup, forgotPassword } from "./actions";
@@ -32,6 +33,9 @@ function SubmitButton({ mode }: { mode: "signin" | "signup" | "forgot" }) {
 }
 
 export function LoginForm({ initialMessage }: { initialMessage?: string }) {
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next") || "";
+
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -81,6 +85,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
           </div>
 
           <form action={formAction} className="space-y-4">
+            <input type="hidden" name="next" value={nextParam} />
             <div className="space-y-4">
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-vel-muted" />

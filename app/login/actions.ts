@@ -11,35 +11,39 @@ export async function login(formData: FormData) {
     email: formData.get("email") as string,
     password: formData.get("password") as string,
   };
+  const next = (formData.get("next") as string) || "";
+  const destination = next ? `/?tab=${encodeURIComponent(next)}` : "/";
 
   const { error } = await supabase.auth.signInWithPassword(data);
-  if (error) redirect("/login?message=" + encodeURIComponent(error.message));
+  if (error) redirect(`/login?message=${encodeURIComponent(error.message)}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination);
 }
 
 export async function signup(formData: FormData) {
   const supabase = createClient(await cookies());
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const next = (formData.get("next") as string) || "";
+  const destination = next ? `/?tab=${encodeURIComponent(next)}` : "/";
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9999';
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
+      emailRedirectTo: `${siteUrl}/auth/callback${next ? `?next=${encodeURIComponent(`/?tab=${next}`)}` : ""}`,
     },
   });
-  if (error) redirect("/login?message=" + encodeURIComponent(error.message));
+  if (error) redirect(`/login?message=${encodeURIComponent(error.message)}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
 
   if (!data.session) {
     redirect("/login?message=" + encodeURIComponent("Check your email to confirm your account, then sign in."));
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination);
 }
 
 export async function forgotPassword(formData: FormData) {
