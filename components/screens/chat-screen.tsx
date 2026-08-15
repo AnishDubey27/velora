@@ -344,15 +344,78 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  const readSSEStream = async (
+    res: Response,
+    onChunk: (chunk: string) => void,
+    onDone: () => void,
+    onError: (err: any) => void
+  ) => {
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("text/event-stream") && contentType.includes("application/json")) {
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data?.choices?.[0]?.message?.content) {
+        onChunk(data.choices[0].message.content);
+      }
+      onDone();
+      return;
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No readable stream response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(":")) continue;
+          if (trimmed === "data: [DONE]") {
+            onDone();
+            return;
+          }
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(6));
+              if (parsed.text) {
+                onChunk(parsed.text);
+              }
+            } catch {
+              // Ignore partial JSON chunks
+            }
+          }
+        }
+      }
+      onDone();
+    } catch (err) {
+      onError(err);
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
   const sendMessageWithHiddenContext = async (displayContent: string, hiddenPrompt: string, systemPrompt: string) => {
     if (isLoading) return;
 
     setInput("");
     const displayMessages: Message[] = [
-      { role: "user", content: displayContent }
+      { role: "user", content: displayContent },
+      { role: "assistant", content: "" }
     ];
     setMessages(displayMessages);
     setIsLoading(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const apiMessages: Message[] = [
@@ -367,36 +430,55 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
-      const contentType = res.headers.get("content-type") || "";
-      let data: any;
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(text || `Server returned HTTP ${res.status}`);
+      if (!res.ok && res.headers.get("content-type")?.includes("application/json")) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned HTTP ${res.status}`);
       }
 
-      if (res.ok && data?.choices?.[0]?.message) {
-        const msg = data.choices[0].message;
-        if (!msg.content || !msg.content.trim()) {
-          msg.content = "No output generated. Please try again or rephrase your request.";
+      await readSSEStream(
+        res,
+        (chunk) => {
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, content: last.content + chunk };
+              return next;
+            }
+            return [...prev, { role: "assistant", content: chunk }];
+          });
+        },
+        () => {
+          setShowSuggestions(true);
+          setIsLoading(false);
+        },
+        (err) => {
+          if (err.name !== "AbortError") {
+            console.error("Stream error:", err);
+          }
+          setIsLoading(false);
         }
-        setMessages((prev) => [...prev, msg]);
-        setShowSuggestions(true);
-      } else {
-        throw new Error(data.error || "Failed to get response");
-      }
+      );
     } catch (err: any) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
-      ]);
+      if (err.name !== "AbortError") {
+        console.error(err);
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant" && !last.content) {
+            next[next.length - 1] = { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` };
+            return next;
+          }
+          return [...prev, { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }];
+        });
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -428,7 +510,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     setShowSuggestions(false);
     const newMessages: Message[] = [
       ...messages,
-      { role: "user", content: content.trim() }
+      { role: "user", content: content.trim() },
+      { role: "assistant", content: "" }
     ];
     setMessages(newMessages);
     setIsLoading(true);
@@ -437,7 +520,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     abortControllerRef.current = controller;
 
     try {
-      const body: any = { messages: newMessages, model: selectedModel };
+      const apiMessages = newMessages.filter(m => m.content.trim() !== "");
+      const body: any = { messages: apiMessages, model: selectedModel };
       if (activeSystemPrompt) {
         body.systemPrompt = activeSystemPrompt;
       }
@@ -449,37 +533,47 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         signal: controller.signal,
       });
 
-      const contentType = res.headers.get("content-type") || "";
-      let data: any;
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(text || `Server returned HTTP ${res.status}`);
+      if (!res.ok && res.headers.get("content-type")?.includes("application/json")) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned HTTP ${res.status}`);
       }
 
-      if (res.ok && data?.choices?.[0]?.message) {
-        const msg = data.choices[0].message;
-        if (!msg.content || !msg.content.trim()) {
-          msg.content = "No output generated. Please try again or rephrase your request.";
+      await readSSEStream(
+        res,
+        (chunk) => {
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, content: last.content + chunk };
+              return next;
+            }
+            return [...prev, { role: "assistant", content: chunk }];
+          });
+        },
+        () => {
+          setShowSuggestions(true);
+          setIsLoading(false);
+        },
+        (err) => {
+          if (err.name !== "AbortError") {
+            console.error("Stream error:", err);
+          }
+          setIsLoading(false);
         }
-        setMessages((prev) => [...prev, msg]);
-        setShowSuggestions(true);
-      } else {
-        throw new Error(data.error || "Failed to get response");
-      }
+      );
     } catch (err: any) {
-      if (err.name === "AbortError") {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: " Generation stopped by user." }
-        ]);
-      } else {
+      if (err.name !== "AbortError") {
         console.error(err);
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }
-        ]);
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant" && !last.content) {
+            next[next.length - 1] = { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` };
+            return next;
+          }
+          return [...prev, { role: "assistant", content: `Error: ${err.message || "I encountered an error. Please try again."}` }];
+        });
       }
     } finally {
       setIsLoading(false);
@@ -539,55 +633,48 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
             )}>
               {msg.role === "user" ? (
                 <div className="whitespace-pre-wrap">{msg.content}</div>
+              ) : !msg.content && isLoading && i === messages.length - 1 ? (
+                <div className="flex flex-col gap-2 py-1">
+                  <BuiLoadingState label="Velora is streaming analysis" />
+                  <BuiThinkingState isThinking={true} />
+                </div>
               ) : (
                 <div className="relative group">
-                  <BuiThinkingState isThinking={false} />
-                  
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </ReactMarkdown>
                   
-                  <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <button
-                      onClick={() => handleRerun(i)}
-                      className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
-                      title="Rerun response"
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.content);
-                        setCopiedIndex(i);
-                        setTimeout(() => setCopiedIndex(null), 2000);
-                      }}
-                      className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
-                      title="Copy response"
-                    >
-                      {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                    </button>
-                  </div>
+                  {isLoading && i === messages.length - 1 && (
+                    <span className="inline-block w-1.5 h-4 bg-teal-400 animate-pulse ml-1 align-middle rounded-sm shadow-[0_0_8px_rgba(0,206,209,0.9)]" />
+                  )}
+                  
+                  {!isLoading && msg.content && (
+                    <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      <button
+                        onClick={() => handleRerun(i)}
+                        className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
+                        title="Rerun response"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                          setCopiedIndex(i);
+                          setTimeout(() => setCopiedIndex(null), 2000);
+                        }}
+                        className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
+                        title="Copy response"
+                      >
+                        {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </motion.div>
         ))}
-        
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3 max-w-[85%]"
-          >
-            <div className="flex-none h-8 w-8 rounded-full bg-vel-teal/20 flex items-center justify-center">
-              <Bot size={14} className="text-vel-teal" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <BuiLoadingState label="Velora is analyzing markets" />
-              <BuiThinkingState isThinking={true} />
-            </div>
-          </motion.div>
-        )}
         <div ref={endOfMessagesRef} />
       </div>
 

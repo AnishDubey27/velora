@@ -184,7 +184,6 @@ Always include highlighted trade parameters and risk score formatted as blockquo
         ];
 
     let lastError: any = null;
-    let data: any = null;
 
     for (const attemptModel of modelsToTry) {
       try {
@@ -199,31 +198,90 @@ Always include highlighted trade parameters and risk score formatted as blockquo
             messages,
             temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
             max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
-            stream: false,
+            stream: true,
           }),
           signal: AbortSignal.timeout(15000),
         });
 
-        const text = await res.text();
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = null;
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => "");
+          lastError = errText || `Status ${res.status}`;
+          continue;
         }
 
-        if (res.ok && data?.choices?.[0]?.message) {
-          const msg = data.choices[0].message;
-          const rawContent: string = msg.content || msg.reasoning_content || msg.reasoning || "";
-          let content = rawContent;
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
 
-          content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-          content = content.replace(/^(got it,?\s+(let's|let us)[\s\S]*?\n\n|okay,?\s+(let's|let us)[\s\S]*?\n\n)/i, '').trim();
+        const stream = new ReadableStream({
+          async start(controller) {
+            const reader = res.body!.getReader();
+            let buffer = "";
+            let inThinkingBlock = false;
 
-          msg.content = content.trim() || rawContent.trim() || "No detailed output produced by model. Please try again.";
-          return NextResponse.json(data);
-        } else {
-          lastError = data?.error || `NVIDIA request failed with status ${res.status}`;
-        }
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed || trimmed.startsWith(":")) continue;
+                  if (trimmed === "data: [DONE]") {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                    continue;
+                  }
+
+                  if (trimmed.startsWith("data: ")) {
+                    try {
+                      const json = JSON.parse(trimmed.slice(6));
+                      const delta = json.choices?.[0]?.delta;
+                      let token = delta?.content || delta?.reasoning_content || "";
+
+                      if (token) {
+                        // Filter out <think> tags if present
+                        if (token.includes("<think>")) {
+                          inThinkingBlock = true;
+                          token = token.replace(/<think>[\s\S]*/gi, "");
+                        }
+                        if (token.includes("</think>")) {
+                          inThinkingBlock = false;
+                          token = token.replace(/[\s\S]*<\/think>/gi, "");
+                        }
+
+                        if (!inThinkingBlock && token) {
+                          controller.enqueue(
+                            encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`)
+                          );
+                        }
+                      }
+                    } catch {
+                      // ignore parse errors on partial lines
+                    }
+                  }
+                }
+              }
+
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            } catch (streamErr) {
+              controller.error(streamErr);
+            } finally {
+              reader.releaseLock();
+            }
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
       } catch (err: any) {
         console.error(`Attempt with model ${attemptModel} failed:`, err);
         lastError = err.message || "Model timeout";
