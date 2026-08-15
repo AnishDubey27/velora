@@ -7,6 +7,7 @@ import { SidebarDrawer } from "@/components/sidebar-drawer";
 import { GlobalSearchModal } from "@/components/global-search";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { WatchlistDrawer } from "@/components/watchlist-drawer";
+import { VeloraVideoLogo } from "@/components/ui/velora-video-logo";
 import type { NavKey } from "@/lib/types";
 import { Atom, LayoutDashboard, FileText, PieChart, HelpCircle, LogOut, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -74,9 +75,7 @@ export function AppShell({
             {/* Sidebar Header */}
             <div className="flex items-center border-b border-white/10 px-4 h-[64px] flex-none overflow-hidden">
               <div className="flex items-center gap-3 min-w-max">
-                <div className="h-9 w-9 rounded-xl bg-vel-teal/15 flex items-center justify-center border border-vel-teal/30 shadow-glow shrink-0">
-                  <span className="font-black text-base text-vel-teal">V</span>
-                </div>
+                <VeloraVideoLogo size="sm" glow={false} />
                 <span className="text-[15px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-all duration-150 translate-x-[-6px] group-hover/sidebar:translate-x-0">
                   VELORA
                 </span>

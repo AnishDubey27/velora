@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, Search, Star } from "lucide-react";
+import { VeloraVideoLogo } from "@/components/ui/velora-video-logo";
 
 export function TopBar({ 
   onDashboard, 
@@ -22,7 +23,10 @@ export function TopBar({
         <Menu size={20} strokeWidth={2.4} />
       </button>
 
-      <span className="text-[15px] md:text-[18px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">VELORA</span>
+      <div className="flex items-center gap-2">
+        <VeloraVideoLogo size="xs" glow={false} />
+        <span className="text-[15px] md:text-[18px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">VELORA</span>
+      </div>
 
       <div className="flex items-center gap-2">
         <button 

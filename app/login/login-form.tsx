@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Github, ArrowRight, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
+import { VeloraVideoLogo } from "@/components/ui/velora-video-logo";
 import { login, signup, forgotPassword } from "./actions";
 
 function SubmitButton({ mode }: { mode: "signin" | "signup" | "forgot" }) {
@@ -65,14 +66,14 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
           {/* Subtle top border glow */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-vel-teal/50 to-transparent" />
 
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 flex flex-col items-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-vel-teal/10 mb-4"
+              className="mb-4"
             >
-              <Sparkles className="h-6 w-6 text-vel-teal" />
+              <VeloraVideoLogo size="md" />
             </motion.div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
               {mode === "forgot" ? "Reset Password" : "Welcome to Velora"}

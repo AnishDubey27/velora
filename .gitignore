@@ -6,3 +6,6 @@ dist
 *.log
 !.gitkeep
 barebone reference images/
+*.tar.gz
+velora looping logo1.mp4
+velora logo.png

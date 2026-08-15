@@ -4,6 +4,7 @@ import { Atom, LayoutDashboard, FileText, PieChart, X, HelpCircle, LogOut } from
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { VeloraVideoLogo } from "@/components/ui/velora-video-logo";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
 
@@ -54,8 +55,9 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose, onOpenTour 
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 p-5 flex-none">
-              <div className="flex items-center gap-2">
-                <div className="text-xl font-bold tracking-[0.12em]">VELORA</div>
+              <div className="flex items-center gap-3">
+                <VeloraVideoLogo size="sm" />
+                <div className="text-xl font-bold tracking-[0.12em] text-white">VELORA</div>
               </div>
               <button onClick={onClose} className="text-white/60 hover:text-white">
                 <X size={24} />
