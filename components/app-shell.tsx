@@ -41,7 +41,6 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
@@ -61,8 +60,6 @@ export function AppShell({
     router.push("/login");
   };
 
-  const isExpanded = isSidebarHovered;
-
   return (
     <div className="h-dvh overflow-hidden bg-[#05070C] text-vel-text">
       <section className="relative mx-auto h-dvh w-full max-w-[1480px] overflow-hidden bg-[#070A11] md:rounded-3xl md:border md:border-white/10 md:shadow-2xl flex">
@@ -70,41 +67,24 @@ export function AppShell({
         {/* Background gradient */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.09),transparent_40%),linear-gradient(180deg,rgba(7,10,17,0.3),#070A11_75%)] z-0" />
         
-        {/* Persistent Desktop Sidebar with Zero-Shift Overlay Expansion */}
-        <div 
-          onMouseEnter={() => setIsSidebarHovered(true)}
-          onMouseLeave={() => setIsSidebarHovered(false)}
-          className="hidden md:block relative z-30 flex-none w-[72px] h-full"
-        >
-          <div 
-            className={cn(
-              "absolute top-0 left-0 bottom-0 flex flex-col border-r border-white/10 bg-[#0A0F1C]/98 backdrop-blur-2xl transition-[width,box-shadow] duration-200 ease-out h-full overflow-hidden",
-              isExpanded ? "w-64 shadow-[16px_0_40px_rgba(0,0,0,0.75)] border-r-white/15" : "w-[72px] shadow-none"
-            )}
-          >
+        {/* Persistent Desktop Sidebar with Hardware-Accelerated 120fps CSS Hover Overlay */}
+        <div className="group/sidebar hidden md:block relative z-30 flex-none w-[72px] h-full">
+          <div className="absolute top-0 left-0 bottom-0 flex flex-col border-r border-white/10 bg-[#0A0F1C] transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] w-[72px] group-hover/sidebar:w-64 group-hover/sidebar:shadow-[20px_0_50px_rgba(0,0,0,0.85)] group-hover/sidebar:border-r-white/20 h-full overflow-hidden will-change-[width]">
+            
             {/* Sidebar Header */}
-            <div className={cn(
-              "flex items-center border-b border-white/10 p-5 h-[64px] flex-none overflow-hidden transition-all duration-200",
-              isExpanded ? "justify-between px-6" : "justify-center px-0"
-            )}>
-              {isExpanded ? (
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-vel-teal/20 flex items-center justify-center border border-vel-teal/30">
-                    <span className="font-extrabold text-sm text-vel-teal">V</span>
-                  </div>
-                  <span className="text-[15px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent whitespace-nowrap">
-                    VELORA
-                  </span>
-                </div>
-              ) : (
-                <div className="h-9 w-9 rounded-xl bg-vel-teal/15 flex items-center justify-center border border-vel-teal/30 shadow-glow">
+            <div className="flex items-center border-b border-white/10 px-4 h-[64px] flex-none overflow-hidden">
+              <div className="flex items-center gap-3 min-w-max">
+                <div className="h-9 w-9 rounded-xl bg-vel-teal/15 flex items-center justify-center border border-vel-teal/30 shadow-glow shrink-0">
                   <span className="font-black text-base text-vel-teal">V</span>
                 </div>
-              )}
+                <span className="text-[15px] font-extrabold tracking-[0.2em] text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-all duration-150 translate-x-[-6px] group-hover/sidebar:translate-x-0">
+                  VELORA
+                </span>
+              </div>
             </div>
 
             {/* Navigation Items */}
-            <nav className="p-3 pt-6 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1.5">
+            <nav className="p-2.5 pt-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1.5">
               {navItems.map(({ key, label, icon: Icon }) => {
                 const isActive = active === key;
                 return (
@@ -112,68 +92,49 @@ export function AppShell({
                     key={key}
                     onClick={() => onNavigate(key)}
                     className={cn(
-                      "flex items-center rounded-2xl transition-all relative group",
-                      !isExpanded ? "h-12 w-12 justify-center" : "w-full gap-3.5 px-5 py-3.5 text-[15px] font-medium",
+                      "flex items-center h-12 w-full rounded-2xl transition-all relative px-3 gap-3.5 min-w-max text-left",
                       isActive 
                         ? "bg-white/10 text-[#00D4FF]" 
                         : "text-white/70 hover:bg-white/5 hover:text-white"
                     )}
-                    title={!isExpanded ? label : undefined}
                   >
-                    <Icon size={21} strokeWidth={isActive ? 2.3 : 2} />
-                    {isExpanded && <span className="truncate whitespace-nowrap">{label}</span>}
-                    
-                    {/* Tooltip for collapsed state */}
-                    {!isExpanded && (
-                      <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
-                        {label}
-                      </div>
-                    )}
+                    <div className="h-6 w-6 flex items-center justify-center shrink-0">
+                      <Icon size={21} strokeWidth={isActive ? 2.3 : 2} />
+                    </div>
+                    <span className="text-[15px] font-medium whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-all duration-150 translate-x-[-6px] group-hover/sidebar:translate-x-0 pointer-events-none group-hover/sidebar:pointer-events-auto">
+                      {label}
+                    </span>
                   </button>
                 );
               })}
             </nav>
 
             {/* Sidebar Footer */}
-            <div className="p-3 border-t border-white/10 bg-[#0A0F1C]/50 flex flex-col gap-1.5 flex-none">
+            <div className="p-2.5 border-t border-white/10 bg-[#0A0F1C]/80 flex flex-col gap-1.5 flex-none">
               {/* Walkthrough */}
               <button
                 onClick={() => setOnboardingOpen(true)}
-                className={cn(
-                  "flex items-center rounded-xl transition-all border group relative",
-                  !isExpanded 
-                    ? "h-12 w-12 justify-center border-cyan-500/10 bg-cyan-500/[0.02] text-cyan-400/80 hover:text-cyan-400 hover:bg-cyan-500/10" 
-                    : "w-full gap-3.5 px-5 py-3 text-[14px] font-medium text-cyan-400/80 border-cyan-500/10 bg-cyan-500/[0.02] hover:bg-white/5 hover:text-cyan-400",
-                )}
-                title={!isExpanded ? "App Walkthrough" : undefined}
+                className="flex items-center h-11 w-full rounded-xl transition-all border border-cyan-500/10 bg-cyan-500/[0.02] text-cyan-400/80 hover:text-cyan-400 hover:bg-cyan-500/10 px-3 gap-3.5 min-w-max text-left"
               >
-                <HelpCircle size={18} strokeWidth={2} />
-                {isExpanded && <span className="whitespace-nowrap">App Walkthrough</span>}
-                {!isExpanded && (
-                  <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
-                    App Walkthrough
-                  </div>
-                )}
+                <div className="h-5 w-5 flex items-center justify-center shrink-0">
+                  <HelpCircle size={18} strokeWidth={2} />
+                </div>
+                <span className="text-[13.5px] font-medium whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-all duration-150 translate-x-[-6px] group-hover/sidebar:translate-x-0 pointer-events-none group-hover/sidebar:pointer-events-auto">
+                  App Walkthrough
+                </span>
               </button>
 
               {/* Logout */}
               <button
                 onClick={handleLogout}
-                className={cn(
-                  "flex items-center rounded-xl transition-all border group relative",
-                  !isExpanded 
-                    ? "h-12 w-12 justify-center border-red-500/10 bg-red-500/[0.02] text-red-400/80 hover:text-red-400 hover:bg-red-500/10" 
-                    : "w-full gap-3.5 px-5 py-3 text-[14px] font-medium text-red-400/80 border-red-500/10 bg-red-500/[0.02] hover:bg-white/5 hover:text-red-400",
-                )}
-                title={!isExpanded ? "Log Out" : undefined}
+                className="flex items-center h-11 w-full rounded-xl transition-all border border-red-500/10 bg-red-500/[0.02] text-red-400/80 hover:text-red-400 hover:bg-red-500/10 px-3 gap-3.5 min-w-max text-left"
               >
-                <LogOut size={18} strokeWidth={2} />
-                {isExpanded && <span className="whitespace-nowrap">Log Out</span>}
-                {!isExpanded && (
-                  <div className="absolute left-16 scale-0 rounded-lg bg-zinc-900 border border-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl transition-all group-hover:scale-100 whitespace-nowrap z-50 pointer-events-none">
-                    Log Out
-                  </div>
-                )}
+                <div className="h-5 w-5 flex items-center justify-center shrink-0">
+                  <LogOut size={18} strokeWidth={2} />
+                </div>
+                <span className="text-[13.5px] font-medium whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-all duration-150 translate-x-[-6px] group-hover/sidebar:translate-x-0 pointer-events-none group-hover/sidebar:pointer-events-auto">
+                  Log Out
+                </span>
               </button>
             </div>
           </div>
