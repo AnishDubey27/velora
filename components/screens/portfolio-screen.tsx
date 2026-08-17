@@ -47,7 +47,6 @@ export function PortfolioScreen({
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [loadedValue, setLoadedValue] = useState(0);
-  const [page, setPage] = useState(0);
   
   // Edit Mode & Autocomplete State
   const [isEditing, setIsEditing] = useState(false);
@@ -385,155 +384,108 @@ export function PortfolioScreen({
         )}
       </div>
 
-      <div className="relative overflow-hidden touch-pan-y">
-        <motion.div
-          className="flex"
-          drag={!isEditing ? "x" : false}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragDirectionLock
-          dragElastic={0.14}
-          dragMomentum={false}
-          animate={{ x: `-${page * 100}%` }}
-          onDragEnd={(_, info) => {
-            const absX = Math.abs(info.offset.x);
-            const absY = Math.abs(info.offset.y);
-            if (absX < 72 || absX < absY * 1.25) return;
-            if (info.offset.x < 0) setPage((current) => Math.min(current + 1, 1));
-            if (info.offset.x > 0) setPage((current) => Math.max(current - 1, 0));
-          }}
-        >
-          <div className="w-full flex-none px-1">
-            <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-teal/60 to-transparent" />
-              {!isEditing && (
-                <div className="relative h-64 mb-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={portfolioStats.enrichedHoldings} dataKey="value"
-                        innerRadius={78} outerRadius={110} paddingAngle={3} cornerRadius={8} stroke="none"
-                      >
-                        {portfolioStats.enrichedHoldings.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-                      </Pie>
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-xs uppercase tracking-widest text-white/50">AI Risk Score</p>
-                    <p className="text-4xl font-semibold text-white">{pulseMetrics.riskScore}</p>
-                  </div>
-                </div>
-              )}
+      {/* Portfolio Holdings & Allocation Breakdown */}
+      <div className="px-1">
+        <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-teal/60 to-transparent" />
+          {!isEditing && (
+            <div className="relative h-64 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={portfolioStats.enrichedHoldings} dataKey="value"
+                    innerRadius={78} outerRadius={110} paddingAngle={3} cornerRadius={8} stroke="none"
+                  >
+                    {portfolioStats.enrichedHoldings.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+                  </Pie>
+                </RechartsPieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <p className="text-xs uppercase tracking-widest text-white/50">AI Risk Score</p>
+                <p className="text-4xl font-semibold text-white">{pulseMetrics.riskScore}</p>
+              </div>
+            </div>
+          )}
 
-              <div className={cn("grid gap-3", isEditing ? "grid-cols-1" : "grid-cols-2 mt-4")}>
-                <AnimatePresence>
-                  {portfolioStats.enrichedHoldings.map((holding, i) => (
-                    <motion.div 
-                      key={holding.symbol} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                      className={cn("rounded-2xl bg-white/5 p-4 flex justify-between items-center transition", !isEditing && "cursor-pointer hover:bg-white/10 active:scale-[0.98]")}
-                      onClick={() => !isEditing && onViewStock?.(holding.symbol)}
-                    >
-                      <div className="flex-1 pointer-events-none">
-                        <div className="flex items-center gap-2">
-                          {!isEditing && <div className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i % colors.length] }} />}
-                          <span className="font-semibold text-white">{holding.symbol}</span>
-                          {!isEditing && (
-                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-sm flex items-center gap-0.5", holding.totalReturnPercent >= 0 ? "bg-green-400/20 text-green-400" : "bg-red-400/20 text-red-400")}>
-                              {holding.totalReturnPercent >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                              {Math.abs(holding.totalReturnPercent).toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                        
-                        {isEditing ? (
-                          <div className="mt-2 text-sm text-white/60">
-                            {holding.shares} shrs @ ${holding.purchasePrice?.toFixed(2)}
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-xs text-white/60 mt-1">{holding.shares} shrs • Avg ${holding.purchasePrice?.toFixed(2)}</p>
-                            <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(holding.value)}</p>
-                          </>
-                        )}
-                      </div>
-                      {isEditing && <button onClick={() => removeHolding(holding.symbol, holding.id)} className="p-2 text-red-400/70 hover:text-red-400"><Trash2 size={18} /></button>}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-
-                {isEditing && (
-                  <div className="rounded-2xl border border-dashed border-white/20 p-4 relative" ref={searchRef}>
+          <div className={cn("grid gap-3", isEditing ? "grid-cols-1" : "grid-cols-2 mt-4")}>
+            <AnimatePresence>
+              {portfolioStats.enrichedHoldings.map((holding, i) => (
+                <motion.div 
+                  key={holding.symbol} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                  className={cn("rounded-2xl bg-white/5 p-4 flex justify-between items-center transition", !isEditing && "cursor-pointer hover:bg-white/10 active:scale-[0.98]")}
+                  onClick={() => !isEditing && onViewStock?.(holding.symbol)}
+                >
+                  <div className="flex-1 pointer-events-none">
                     <div className="flex items-center gap-2">
-                      <div className="relative w-24">
-                        <input 
-                          placeholder="TICKER" value={newSymbol} onChange={handleSymbolChange}
-                          className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal uppercase"
-                        />
-                        <AnimatePresence>
-                          {showDropdown && searchResults.length > 0 && (
-                            <motion.ul 
-                              initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
-                              className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-vel-panel2 border border-white/10 shadow-card overflow-hidden z-50"
-                            >
-                              {searchResults.slice(0, 5).map(res => (
-                                <li 
-                                  key={res.symbol} onClick={() => selectTicker(res)}
-                                  className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer flex justify-between group transition-colors"
-                                >
-                                  <span className="text-white font-semibold">{res.symbol}</span>
-                                  <span className="text-white/50 text-xs truncate ml-2 group-hover:text-white/70">{res.name}</span>
-                                </li>
-                              ))}
-                            </motion.ul>
-                          )}
-                        </AnimatePresence>
+                      {!isEditing && <div className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i % colors.length] }} />}
+                      <span className="font-semibold text-white">{holding.symbol}</span>
+                      {!isEditing && (
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-sm flex items-center gap-0.5", holding.totalReturnPercent >= 0 ? "bg-green-400/20 text-green-400" : "bg-red-400/20 text-red-400")}>
+                          {holding.totalReturnPercent >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          {Math.abs(holding.totalReturnPercent).toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    
+                    {isEditing ? (
+                      <div className="mt-2 text-sm text-white/60">
+                        {holding.shares} shrs @ ${holding.purchasePrice?.toFixed(2)}
                       </div>
-                      <input 
-                        type="number" placeholder="Shares" value={newShares} onChange={(e) => setNewShares(e.target.value)}
-                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
-                      />
-                      <input 
-                        type="number" placeholder="Avg $" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
-                        className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
-                      />
-                      <button onClick={addHolding} className="ml-auto p-1.5 bg-vel-teal/20 text-vel-teal rounded-lg hover:bg-vel-teal/30 transition-colors">
-                        <Plus size={18} />
-                      </button>
-                    </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-white/60 mt-1">{holding.shares} shrs • Avg ${holding.purchasePrice?.toFixed(2)}</p>
+                        <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(holding.value)}</p>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
+                  {isEditing && <button onClick={() => removeHolding(holding.symbol, holding.id)} className="p-2 text-red-400/70 hover:text-red-400"><Trash2 size={18} /></button>}
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
-          <div className="w-full flex-none px-1">
-             <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-green/60 to-transparent" />
-              <div className="mb-6 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-white/40">Portfolio Pulse</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-white">Risk rhythm</h2>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                  <p className="text-[10px] uppercase tracking-wider text-white/40">Score</p>
-                  <p className="text-xl font-semibold text-white">{pulseMetrics.riskScore}</p>
-                </div>
-              </div>
-              <div className="space-y-6">
-                {pulseMetrics.rows.map((metric, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between mb-1.5">
-                      <p className="text-white/80">{metric.label}</p>
-                      <p className="text-white">{metric.value}</p>
-                    </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${metric.percent}%` }} transition={{ duration: 1, delay: 0.2 }} className="h-full bg-gradient-to-r from-vel-teal to-red-500" />
-                    </div>
+            {isEditing && (
+              <div className="rounded-2xl border border-dashed border-white/20 p-4 relative" ref={searchRef}>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-24">
+                    <input 
+                      placeholder="TICKER" value={newSymbol} onChange={handleSymbolChange}
+                      className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal uppercase"
+                    />
+                    <AnimatePresence>
+                      {showDropdown && searchResults.length > 0 && (
+                        <motion.ul 
+                          initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
+                          className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-vel-panel2 border border-white/10 shadow-card overflow-hidden z-50"
+                        >
+                          {searchResults.slice(0, 5).map(res => (
+                            <li 
+                              key={res.symbol} onClick={() => selectTicker(res)}
+                              className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer flex justify-between group transition-colors"
+                            >
+                              <span className="text-white font-semibold">{res.symbol}</span>
+                              <span className="text-white/50 text-xs truncate ml-2 group-hover:text-white/70">{res.name}</span>
+                            </li>
+                          ))}
+                        </motion.ul>
+                      )}
+                    </AnimatePresence>
                   </div>
-                ))}
+                  <input 
+                    type="number" placeholder="Shares" value={newShares} onChange={(e) => setNewShares(e.target.value)}
+                    className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
+                  />
+                  <input 
+                    type="number" placeholder="Avg $" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
+                    className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
+                  />
+                  <button onClick={addHolding} className="ml-auto p-1.5 bg-vel-teal/20 text-vel-teal rounded-lg hover:bg-vel-teal/30 transition-colors">
+                    <Plus size={18} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Institutional Risk Analytics & Monte Carlo Simulation Deep Dive */}
@@ -550,14 +502,6 @@ export function PortfolioScreen({
             <Sparkles size={17} />
             Analyze using Velora
           </button>
-        </div>
-      )}
-
-      {!isEditing && (
-        <div className="mt-4 flex justify-center gap-2">
-          {[0, 1].map((i) => (
-            <button key={i} onClick={() => setPage(i)} className={cn("h-1.5 rounded-full transition-all", page === i ? "w-8 bg-vel-teal" : "w-1.5 bg-white/30")} />
-          ))}
         </div>
       )}
     </section>
