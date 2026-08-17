@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import { ArrowUp, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -20,32 +21,42 @@ const iconMap: any = {
 };
 
 export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkill }: ResearchScreenProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const popular = skills.filter((skill) => skill.popular).slice(0, 3);
   const shouldCenterPopular = popular.length <= 3;
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.defaultMuted = true;
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => undefined);
+    }
+  }, []);
 
   return (
     <div className="relative overflow-hidden bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
       {/* Layer 2: Seamless Atmospheric Financial Intelligence Network Video */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
           preload="auto"
           poster="/financial-network-poster.webp"
-          className="h-full w-full object-cover object-center opacity-20 sm:opacity-25 md:opacity-35 transition-opacity duration-1000 motion-reduce:hidden"
+          className="h-full w-full object-cover object-center opacity-55 sm:opacity-65 md:opacity-80 transition-opacity duration-1000 motion-reduce:hidden"
         >
           <source src="/financial_intelligent-network.mp4" type="video/mp4" />
         </video>
 
         {/* Static Fallback for prefers-reduced-motion */}
-        <div className="pointer-events-none absolute inset-0 hidden motion-reduce:block bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.08),transparent_50%)]" />
+        <div className="pointer-events-none absolute inset-0 hidden motion-reduce:block bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.12),transparent_50%)]" />
       </div>
 
       {/* Layer 3: Dark Vignette & Edge Fading Mask for High Readability */}
-      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_top,_rgba(0,212,255,0.05)_0%,_transparent_65%),linear-gradient(180deg,rgba(5,8,15,0.15)_0%,rgba(5,8,15,0.6)_55%,#05080F_100%)]" />
-      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_35%,rgba(5,8,15,0.3)_0%,rgba(5,8,15,0.85)_85%)]" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_top,_rgba(0,212,255,0.08)_0%,_transparent_65%),linear-gradient(180deg,rgba(5,8,15,0.2)_0%,rgba(5,8,15,0.6)_60%,#05080F_100%)]" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_35%,rgba(5,8,15,0.35)_0%,rgba(5,8,15,0.85)_85%)]" />
 
       {/* Layer 4: Existing Velora UI Content */}
       <div className="relative z-10 flex-1 flex flex-col justify-center">
