@@ -2,7 +2,6 @@
 
 import { ArrowUp, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { VeloraVideoLogo } from "@/components/ui/velora-video-logo";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/types";
 
@@ -27,10 +26,8 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   return (
     <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
       <div className="flex-1 flex flex-col justify-center">
-        {/* Logo + Title */}
+        {/* Title */}
         <div className="flex flex-col items-center justify-center pt-0 pb-3 md:pt-0 md:pb-4">
-          <VeloraVideoLogo size="lg" className="mb-3 md:mb-4" />
-
           <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white">
             Where should<br />we start?
           </h1>

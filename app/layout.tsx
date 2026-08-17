@@ -5,6 +5,16 @@ export const metadata: Metadata = {
   title: "Velora",
   description: "AI finance research app",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.gif", type: "image/gif" },
+      { url: "/icons/velora-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/velora-192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
