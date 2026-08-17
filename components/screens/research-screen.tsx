@@ -24,19 +24,40 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   const shouldCenterPopular = popular.length <= 3;
 
   return (
-    <div className="bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
-      <div className="flex-1 flex flex-col justify-center">
+    <div className="relative overflow-hidden bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
+      {/* Layer 2: Seamless Atmospheric Financial Intelligence Network Video */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          poster="/financial-network-poster.webp"
+          className="h-full w-full object-cover object-center opacity-20 sm:opacity-25 md:opacity-35 transition-opacity duration-1000 motion-reduce:hidden"
+        >
+          <source src="/financial_intelligent-network.mp4" type="video/mp4" />
+        </video>
+
+        {/* Static Fallback for prefers-reduced-motion */}
+        <div className="pointer-events-none absolute inset-0 hidden motion-reduce:block bg-[radial-gradient(circle_at_50%_20%,rgba(0,212,255,0.08),transparent_50%)]" />
+      </div>
+
+      {/* Layer 3: Dark Vignette & Edge Fading Mask for High Readability */}
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_top,_rgba(0,212,255,0.05)_0%,_transparent_65%),linear-gradient(180deg,rgba(5,8,15,0.15)_0%,rgba(5,8,15,0.6)_55%,#05080F_100%)]" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_35%,rgba(5,8,15,0.3)_0%,rgba(5,8,15,0.85)_85%)]" />
+
+      {/* Layer 4: Existing Velora UI Content */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center">
         {/* Title */}
         <div className="flex flex-col items-center justify-center pt-0 pb-3 md:pt-0 md:pb-4">
-          <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white">
+          <h1 className="text-center text-2xl md:text-[31px] font-medium leading-snug md:leading-[1.16] tracking-[0.01em] text-white drop-shadow-md">
             Where should<br />we start?
           </h1>
         </div>
 
         {/* Popular Skills */}
         <div className="px-4 pb-4 md:pb-6">
-
-
           <div
             className={cn(
               "pb-3 md:pb-6 no-scrollbar touch-pan-x snap-x snap-mandatory flex gap-3 overflow-x-auto",
@@ -57,7 +78,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.08 }}
-                  className="snap-start w-[158px] flex-none rounded-2xl bg-zinc-900/70 border border-white/5 p-3.5 md:p-4 text-left backdrop-blur-xl transition hover:border-teal-500/30 active:scale-[0.985]"
+                  className="snap-start w-[158px] flex-none rounded-2xl bg-zinc-900/80 border border-white/10 p-3.5 md:p-4 text-left backdrop-blur-xl transition hover:border-teal-500/40 hover:bg-zinc-900/90 active:scale-[0.985] shadow-lg shadow-black/40"
                 >
                   <div className="mb-3 md:mb-5 h-9 w-9 rounded-full bg-white/5 flex items-center justify-center">
                     <Icon className="text-white/70" size={20} strokeWidth={1.8} />
@@ -79,7 +100,7 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="w-full px-4 pb-2 mx-auto max-w-md md:max-w-lg md:pb-4"
+        className="relative z-10 w-full px-4 pb-2 mx-auto max-w-md md:max-w-lg md:pb-4"
       >
         <div className="rounded-2xl border border-[#00D4FF]/30 bg-[#0A0F1C]/95 p-4 shadow-2xl shadow-black/80 backdrop-blur-2xl">
           <form
