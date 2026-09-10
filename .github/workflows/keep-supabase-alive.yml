@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Supabase REST Endpoint
+        id: ping
         run: |
           SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
           SUPABASE_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}"
@@ -24,22 +25,33 @@ jobs:
           ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal?select=id&limit=1"
           echo "Pinging Supabase endpoint: ${ENDPOINT}"
 
+          # Capture both HTTP status and curl exit code
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             "${ENDPOINT}")
+          CURL_EXIT=$?
 
-          echo "Response HTTP Status Code: ${HTTP_STATUS}"
+          echo "HTTP Status: ${HTTP_STATUS} | curl exit code: ${CURL_EXIT}"
 
-          # 540 = Supabase-specific "Project Paused" status - treat as hard failure
-          if [ "$HTTP_STATUS" = "540" ]; then
-            echo "CRITICAL: Supabase project is PAUSED (HTTP 540). Manual restore required at https://supabase.com/dashboard"
+          # curl exit code 6 = DNS resolution failure (project offline/paused)
+          if [ "$CURL_EXIT" = "6" ] || [ "$CURL_EXIT" = "7" ]; then
+            echo "CRITICAL: Cannot reach Supabase host (curl exit ${CURL_EXIT}). Project may be PAUSED."
+            echo "Restore at: https://supabase.com/dashboard"
             exit 1
           fi
 
-          # 000 = curl could not connect at all (network error / project offline)
+          # 540 = Supabase-specific "Project Paused" status
+          if [ "$HTTP_STATUS" = "540" ]; then
+            echo "CRITICAL: Supabase project is PAUSED (HTTP 540)."
+            echo "Restore at: https://supabase.com/dashboard"
+            exit 1
+          fi
+
+          # 000 = curl returned no HTTP status (connection failed)
           if [ "$HTTP_STATUS" = "000" ]; then
-            echo "CRITICAL: Could not connect to Supabase (HTTP 000). Project may be offline."
+            echo "CRITICAL: No HTTP response from Supabase (HTTP 000). Project may be offline."
             exit 1
           fi
 
@@ -50,3 +62,53 @@ jobs:
             echo "ERROR: Unexpected HTTP response code ${HTTP_STATUS}"
             exit 1
           fi
+
+  # This job only runs if ping-supabase fails — sends a notification issue on GitHub
+  alert-on-failure:
+    name: Alert on Supabase Failure
+    runs-on: ubuntu-latest
+    needs: ping-supabase
+    if: failure()
+    permissions:
+      issues: write
+    steps:
+      - name: Create GitHub Issue Alert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Supabase project PAUSED — ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Supabase Project is Paused or Unreachable
+
+            The daily keep-alive ping **failed**. Your Supabase free-tier project (\`barebone\`) has likely been auto-paused.
+
+            ### Action Required
+            1. Go to [Supabase Dashboard](https://supabase.com/dashboard/project/wgufujxqmdqugcyzetaa)
+            2. Click **Restore project**
+            3. Wait ~2 minutes for it to come back online
+
+            ### Workflow Run
+            [View failing run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ---
+            *This issue was auto-created by the Keep Supabase Alive workflow.*`;
+
+            // Check if a similar open issue already exists to avoid spam
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'supabase-alert'
+            });
+
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['supabase-alert', 'urgent']
+              });
+              console.log('Created alert issue.');
+            } else {
+              console.log('Alert issue already open — skipping duplicate.');
+            }
