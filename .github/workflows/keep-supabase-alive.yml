@@ -21,18 +21,32 @@ jobs:
             SUPABASE_URL="https://wgufujxqmdqugcyzetaa.supabase.co"
           fi
 
-          echo "Pinging Supabase REST endpoint at: ${SUPABASE_URL}/rest/v1/raw_journal?select=*&limit=1"
+          ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal?select=id&limit=1"
+          echo "Pinging Supabase endpoint: ${ENDPOINT}"
 
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            "${SUPABASE_URL}/rest/v1/raw_journal?select=*&limit=1")
+            "${ENDPOINT}")
 
           echo "Response HTTP Status Code: ${HTTP_STATUS}"
 
+          # 540 = Supabase-specific "Project Paused" status - treat as hard failure
+          if [ "$HTTP_STATUS" = "540" ]; then
+            echo "CRITICAL: Supabase project is PAUSED (HTTP 540). Manual restore required at https://supabase.com/dashboard"
+            exit 1
+          fi
+
+          # 000 = curl could not connect at all (network error / project offline)
+          if [ "$HTTP_STATUS" = "000" ]; then
+            echo "CRITICAL: Could not connect to Supabase (HTTP 000). Project may be offline."
+            exit 1
+          fi
+
+          # 2xx or 4xx = project is alive (401 Unauthorized is fine - project is active)
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
-            echo "Successfully pinged Supabase. Database kept active!"
+            echo "SUCCESS: Supabase is active (HTTP ${HTTP_STATUS}). Database kept alive!"
           else
-            echo "Error: Unexpected HTTP response code ${HTTP_STATUS}"
+            echo "ERROR: Unexpected HTTP response code ${HTTP_STATUS}"
             exit 1
           fi
