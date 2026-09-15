@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Github, ArrowRight, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
-import { Mascot } from "@/components/ui/mascot";
+import { Mail, Lock, Github, ArrowRight, Sparkles, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { RobotMascot } from "@/components/ui/robot-mascot";
 import { login, signup, forgotPassword } from "./actions";
 
 function SubmitButton({ mode }: { mode: "signin" | "signup" | "forgot" }) {
@@ -40,6 +40,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
 
@@ -74,7 +75,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
               transition={{ delay: 0.2 }}
               className="mb-1"
             >
-              <Mascot passwordFocused={passwordFocused} size={135} />
+              <RobotMascot passwordFocused={passwordFocused} showPassword={showPassword} size={130} />
             </motion.div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
               {mode === "forgot" ? "Reset Password" : "Welcome to Velora"}
@@ -114,7 +115,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-vel-muted" />
                     <input
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
                       autoComplete={mode === "signin" ? "current-password" : "new-password"}
                       required
@@ -122,8 +123,21 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                       onChange={(e) => setPassword(e.target.value)}
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
-                      className="w-full rounded-xl border border-white/10 bg-black/40 pl-11 pr-4 py-3.5 text-white placeholder:text-vel-faint focus:border-vel-teal focus:ring-1 focus:ring-vel-teal focus:outline-none transition-all"
+                      className="w-full rounded-xl border border-white/10 bg-black/40 pl-11 pr-12 py-3.5 text-white placeholder:text-vel-faint focus:border-vel-teal focus:ring-1 focus:ring-vel-teal focus:outline-none transition-all"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-vel-muted hover:text-vel-teal transition-colors p-1 rounded-lg focus:outline-none"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
