@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Github, ArrowRight, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
-import { BullMascot } from "@/components/ui/bull-mascot";
+import { Mascot } from "@/components/ui/mascot";
 import { login, signup, forgotPassword } from "./actions";
 
 function SubmitButton({ mode }: { mode: "signin" | "signup" | "forgot" }) {
@@ -74,7 +74,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
               transition={{ delay: 0.2 }}
               className="mb-1"
             >
-              <BullMascot passwordFocused={passwordFocused} />
+              <Mascot passwordFocused={passwordFocused} size={135} />
             </motion.div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
               {mode === "forgot" ? "Reset Password" : "Welcome to Velora"}

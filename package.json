@@ -15,6 +15,7 @@
     "framer-motion": "^12.4.2",
     "lucide-react": "^0.475.0",
     "next": "15.5.15",
+    "page-mascot": "^0.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
