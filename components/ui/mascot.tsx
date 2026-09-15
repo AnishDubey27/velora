@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 const DIRECTIONS = [
   "up-left",
@@ -252,39 +251,7 @@ export function Mascot({
             }}
           />
 
-          {/* Floating paws covering eyes when password field is focused (MetaMask style) */}
-          <AnimatePresence>
-            {passwordFocused && (
-              <motion.div
-                initial={{ opacity: 0, y: 18, scale: 0.85 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 12, scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 380, damping: 24 }}
-                className="absolute inset-0 pointer-events-none flex items-center justify-center"
-                style={{ top: "14%" }}
-              >
-                <div className="flex items-center justify-center gap-6 w-full px-5">
-                  {/* Left Paw */}
-                  <div className="w-8 h-8 rounded-full bg-[#E06D37] border-2 border-[#B84E1E] shadow-lg shadow-black/40 flex items-center justify-center transform -rotate-12">
-                    <div className="flex gap-0.5 mb-1">
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                    </div>
-                  </div>
 
-                  {/* Right Paw */}
-                  <div className="w-8 h-8 rounded-full bg-[#E06D37] border-2 border-[#B84E1E] shadow-lg shadow-black/40 flex items-center justify-center transform rotate-12">
-                    <div className="flex gap-0.5 mb-1">
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                      <span className="w-1 h-2 bg-[#B84E1E] rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </span>
       </button>
     </div>
