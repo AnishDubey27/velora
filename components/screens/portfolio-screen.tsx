@@ -128,13 +128,23 @@ export function PortfolioScreen({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Ticker Auto-complete logic
+  // Dynamic Ticker Auto-complete logic from live search API
   const handleSymbolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
     setNewSymbol(val);
     if (val.length > 0) {
-      const matches = TICKER_INDEX.filter(t => t.symbol.includes(val) || t.name.toUpperCase().includes(val));
-      setSearchResults(matches);
+      fetch(`/api/search?q=${encodeURIComponent(val)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          const list = data?.results || [];
+          setSearchResults(
+            list.slice(0, 6).map((item: any) => ({
+              symbol: item.symbol || item.displaySymbol,
+              name: item.description || item.symbol,
+            }))
+          );
+        })
+        .catch(() => undefined);
       setShowDropdown(true);
     } else {
       setShowDropdown(false);
@@ -226,7 +236,70 @@ export function PortfolioScreen({
         },
       ],
     };
-  }, [portfolioStats, sp500ChangePercent]);
+  }, [holdings, portfolioStats, sp500ChangePercent]);
+
+  const institutionalRiskMetrics = useMemo(() => {
+    const total = portfolioStats.totalValue;
+    if (total <= 0 || holdings.length === 0) return null;
+
+    const colors = ["#00CED1", "#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#EC4899"];
+    const topHoldings = portfolioStats.enrichedHoldings.slice(0, 5);
+    const otherHoldings = portfolioStats.enrichedHoldings.slice(5);
+    const otherValue = otherHoldings.reduce((sum, h) => sum + h.value, 0);
+
+    const sectorAllocation = topHoldings.map((h, i) => ({
+      sector: h.symbol,
+      percentage: Math.round((h.value / total) * 100),
+      color: colors[i % colors.length],
+    }));
+
+    if (otherValue > 0) {
+      sectorAllocation.push({
+        sector: "Other",
+        percentage: Math.max(1, Math.round((otherValue / total) * 100)),
+        color: "#6B7280",
+      });
+    }
+
+    const sharpeStr = pulseMetrics.rows.find(r => r.label === "Sharpe Ratio")?.value;
+    const sharpeRatio = sharpeStr && sharpeStr !== "N/A" ? parseFloat(sharpeStr) : 1.2;
+    const volStr = pulseMetrics.rows.find(r => r.label === "Volatility")?.value;
+    const vol = volStr ? parseFloat(volStr) / 100 : 0.18;
+    const betaStr = pulseMetrics.rows.find(r => r.label === "Beta")?.value;
+    const betaVsSP500 = betaStr && betaStr !== "N/A" ? parseFloat(betaStr) : 1.0;
+
+    const monteCarloProjections = [
+      {
+        year: "Year 1",
+        pessimistic: Math.round(total * Math.max(0.3, 1 - vol * 0.9)),
+        expected: Math.round(total * 1.09),
+        optimistic: Math.round(total * (1 + vol * 1.2 + 0.05)),
+      },
+      {
+        year: "Year 2",
+        pessimistic: Math.round(total * Math.max(0.15, Math.pow(1 - vol * 0.9, 2))),
+        expected: Math.round(total * Math.pow(1.09, 2)),
+        optimistic: Math.round(total * Math.pow(1 + vol * 1.2 + 0.05, 2)),
+      },
+      {
+        year: "Year 3",
+        pessimistic: Math.round(total * Math.max(0.1, Math.pow(1 - vol * 0.9, 3))),
+        expected: Math.round(total * Math.pow(1.09, 3)),
+        optimistic: Math.round(total * Math.pow(1 + vol * 1.2 + 0.05, 3)),
+      },
+    ];
+
+    return {
+      totalValue: total,
+      dailyReturnPercent: portfolioStats.dayChangePercent,
+      sharpeRatio: Number.isFinite(sharpeRatio) ? Number(sharpeRatio.toFixed(2)) : 1.0,
+      valueAtRisk95: Number((1.65 * (vol / Math.sqrt(252)) * 100).toFixed(2)),
+      maxHistoricalDrawdown: Math.abs(Number(portfolioStats.allTimePercent.toFixed(1))),
+      betaVsSP500: Number.isFinite(betaVsSP500) ? Number(betaVsSP500.toFixed(2)) : 1.0,
+      sectorAllocation,
+      monteCarloProjections,
+    };
+  }, [portfolioStats, pulseMetrics, holdings]);
 
   // Animated value reveal
   useEffect(() => {
@@ -490,7 +563,7 @@ export function PortfolioScreen({
 
       {/* Institutional Risk Analytics & Monte Carlo Simulation Deep Dive */}
       <div className="mt-6 px-1">
-        <BuiPortfolioAnalytics />
+        <BuiPortfolioAnalytics metrics={institutionalRiskMetrics} />
       </div>
 
       {!isEditing && (

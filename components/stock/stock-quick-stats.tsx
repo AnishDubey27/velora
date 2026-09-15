@@ -24,10 +24,19 @@ export function StockQuickStats({
   const stats = keyStats?.[0];
 
   const currentPrice = quote?.price ?? 0;
-  const yearLow = typeof quote?.yearLow === "number" ? quote.yearLow : (currentPrice * 0.75);
-  const yearHigh = typeof quote?.yearHigh === "number" ? quote.yearHigh : (currentPrice * 1.25);
-  const range = yearHigh - yearLow || 1;
-  const currentPosPercent = Math.min(100, Math.max(0, ((currentPrice - yearLow) / range) * 100));
+  const parsedRange = stats?.weekRange52?.split(" - ");
+  const rawLow = typeof quote?.yearLow === "number" && quote.yearLow > 0
+    ? quote.yearLow
+    : parsedRange?.[0] ? parseFloat(parsedRange[0]) : null;
+  const rawHigh = typeof quote?.yearHigh === "number" && quote.yearHigh > 0
+    ? quote.yearHigh
+    : parsedRange?.[1] ? parseFloat(parsedRange[1]) : null;
+
+  const hasRange = typeof rawLow === "number" && typeof rawHigh === "number" && rawHigh > rawLow;
+  const yearLow = hasRange ? rawLow : 0;
+  const yearHigh = hasRange ? rawHigh : 0;
+  const range = hasRange ? yearHigh - yearLow : 1;
+  const currentPosPercent = hasRange ? Math.min(100, Math.max(0, ((currentPrice - yearLow) / range) * 100)) : 50;
 
   const marketCap = profile?.marketCapitalization ?? quote?.marketCap ?? stats?.marketCap;
   const peRatio = stats?.peRatio ?? quote?.pe;
@@ -53,9 +62,9 @@ export function StockQuickStats({
       {/* 3. 52-Week Range Slider (Spans 2 cols on mobile) */}
       <div className="col-span-2 p-3 rounded-xl border border-white/10 bg-[#0A0F1C]/90 backdrop-blur-md flex flex-col justify-between">
         <div className="flex items-center justify-between text-[11px] text-white/50 mb-1">
-          <span>52W Low: {currencySymbol}{yearLow.toFixed(2)}</span>
+          <span>52W Low: {hasRange ? `${currencySymbol}${yearLow.toFixed(2)}` : "—"}</span>
           <span className="text-white/80 font-medium">52-Week Range</span>
-          <span>52W High: {currencySymbol}{yearHigh.toFixed(2)}</span>
+          <span>52W High: {hasRange ? `${currencySymbol}${yearHigh.toFixed(2)}` : "—"}</span>
         </div>
 
         {/* Visual Range Bar with Current Price Marker */}

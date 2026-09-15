@@ -1,9 +1,12 @@
 "use client";
 
+import useSWR from "swr";
 import { motion } from "framer-motion";
 import { Zap, TrendingUp, TrendingDown, Target, ShieldAlert, Sparkles, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StockQuote, StockProfile } from "@/lib/types";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function StockAiSetupCard({
   symbol,
@@ -16,15 +19,60 @@ export function StockAiSetupCard({
   profile?: StockProfile;
   onStartChat?: (prompt: string) => void;
 }) {
-  const currentPrice = quote?.price ?? 100;
-  const isUp = (quote?.change ?? 0) >= 0;
+  const currentPrice = quote?.price ?? 0;
 
-  // Quantitative trade plan heuristics
-  const targetPrice = currentPrice * 1.145;
-  const stopLoss = currentPrice * 0.942;
-  const upsidePercent = "+14.5%";
-  const downsidePercent = "-5.8%";
-  const convictionScore = 8.6;
+  const { data: signalData } = useSWR(
+    symbol ? `/api/dashboard/signals?symbol=${encodeURIComponent(symbol)}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const priceTarget = signalData?.priceTarget;
+  const recs = signalData?.recommendations;
+
+  // Real targets from Wall Street consensus
+  const targetPrice = typeof priceTarget?.mean === "number" && priceTarget.mean > 0
+    ? priceTarget.mean
+    : typeof priceTarget?.median === "number" && priceTarget.median > 0
+    ? priceTarget.median
+    : null;
+
+  const upsidePercent = priceTarget?.upsidePercent != null
+    ? `${priceTarget.upsidePercent >= 0 ? "+" : ""}${priceTarget.upsidePercent.toFixed(1)}%`
+    : null;
+
+  // Support / stop-loss based on analyst low target or 52W support
+  const stopLoss = typeof priceTarget?.low === "number" && priceTarget.low > 0 && priceTarget.low < currentPrice
+    ? priceTarget.low
+    : currentPrice > 0
+    ? currentPrice * 0.92
+    : null;
+
+  const downsidePercent = stopLoss && currentPrice > 0
+    ? `${(((stopLoss - currentPrice) / currentPrice) * 100).toFixed(1)}%`
+    : null;
+
+  // Real conviction calculation from analyst recommendation breakdown
+  const strongBuy = recs?.strongBuy || 0;
+  const buy = recs?.buy || 0;
+  const hold = recs?.hold || 0;
+  const sell = recs?.sell || 0;
+  const strongSell = recs?.strongSell || 0;
+  const totalRecs = strongBuy + buy + hold + sell + strongSell;
+
+  const convictionScore = totalRecs > 0
+    ? Number((((strongBuy * 5 + buy * 4 + hold * 3 + sell * 2 + strongSell * 1) / (totalRecs * 5)) * 10).toFixed(1))
+    : 7.0;
+
+  const convictionLabel = totalRecs > 0
+    ? convictionScore >= 8.0
+      ? "Strong Buy Consensus"
+      : convictionScore >= 6.5
+      ? "Buy Consensus"
+      : convictionScore >= 4.5
+      ? "Hold Consensus"
+      : "Underperform Consensus"
+    : "Live Strategic Setup";
 
   return (
     <motion.div
@@ -49,7 +97,7 @@ export function StockAiSetupCard({
         </div>
 
         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
-          {convictionScore}/10 High Conviction
+          {convictionScore}/10 {convictionLabel}
         </span>
       </div>
 
@@ -58,7 +106,7 @@ export function StockAiSetupCard({
         <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
           <span className="text-[10px] text-white/50 block font-medium">Accumulation Zone</span>
           <span className="text-xs md:text-sm font-bold text-white font-mono block mt-0.5">
-            ${currentPrice.toFixed(2)}
+            {currentPrice > 0 ? `$${currentPrice.toFixed(2)}` : "—"}
           </span>
         </div>
 
@@ -67,7 +115,7 @@ export function StockAiSetupCard({
             Target <TrendingUp size={10} />
           </span>
           <span className="text-xs md:text-sm font-bold text-emerald-400 font-mono block mt-0.5">
-            ${targetPrice.toFixed(2)} <span className="text-[10px] opacity-80">({upsidePercent})</span>
+            {targetPrice ? `$${targetPrice.toFixed(2)}` : "—"} {upsidePercent && <span className="text-[10px] opacity-80">({upsidePercent})</span>}
           </span>
         </div>
 
@@ -76,7 +124,7 @@ export function StockAiSetupCard({
             Stop Loss <TrendingDown size={10} />
           </span>
           <span className="text-xs md:text-sm font-bold text-rose-400 font-mono block mt-0.5">
-            ${stopLoss.toFixed(2)} <span className="text-[10px] opacity-80">({downsidePercent})</span>
+            {stopLoss ? `$${stopLoss.toFixed(2)}` : "—"} {downsidePercent && <span className="text-[10px] opacity-80">({downsidePercent})</span>}
           </span>
         </div>
       </div>

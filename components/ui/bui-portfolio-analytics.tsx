@@ -16,32 +16,26 @@ export type PortfolioRiskMetrics = {
   monteCarloProjections?: { year: string; pessimistic: number; expected: number; optimistic: number }[];
 };
 
-const DEFAULT_PORTFOLIO_RISK: PortfolioRiskMetrics = {
-  totalValue: 48250,
-  dailyReturnPercent: 1.84,
-  sharpeRatio: 2.14,
-  valueAtRisk95: 2.85,
-  maxHistoricalDrawdown: 12.4,
-  betaVsSP500: 1.12,
-  sectorAllocation: [
-    { sector: "Semiconductors & AI", percentage: 42, color: "#00CED1" },
-    { sector: "Mega-Cap Tech", percentage: 28, color: "#3B82F6" },
-    { sector: "Digital Assets / Crypto", percentage: 18, color: "#8B5CF6" },
-    { sector: "Cash & Defensives", percentage: 12, color: "#10B981" },
-  ],
-  monteCarloProjections: [
-    { year: "Year 1", pessimistic: 44000, expected: 56500, optimistic: 68000 },
-    { year: "Year 2", pessimistic: 49000, expected: 67800, optimistic: 89000 },
-    { year: "Year 3", pessimistic: 55000, expected: 82000, optimistic: 118000 },
-  ],
-};
-
 export function BuiPortfolioAnalytics({
-  metrics = DEFAULT_PORTFOLIO_RISK,
+  metrics,
 }: {
-  metrics?: PortfolioRiskMetrics;
+  metrics?: PortfolioRiskMetrics | null;
 }) {
   const [activeTab, setActiveTab] = useState<"risk" | "monteCarlo">("risk");
+
+  if (!metrics || metrics.totalValue <= 0 || !metrics.sectorAllocation || metrics.sectorAllocation.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-[#091122]/90 p-6 backdrop-blur-xl shadow-2xl text-center">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-vel-teal/15 flex items-center justify-center mb-3 border border-vel-teal/30">
+          <Activity size={22} className="text-vel-teal" />
+        </div>
+        <h3 className="text-sm font-bold text-white">Portfolio Institutional Analytics</h3>
+        <p className="text-xs text-white/50 max-w-sm mx-auto mt-1.5 leading-relaxed">
+          Add your stock holdings above to calculate real-time Sharpe Ratio, Value at Risk (VaR), Beta vs S&P 500, and 3-Year Monte Carlo Projections.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[#091122]/90 p-5 backdrop-blur-xl shadow-2xl space-y-5">

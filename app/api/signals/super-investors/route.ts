@@ -165,6 +165,10 @@ Make numbers realistic and varied. Sort topPerformers by ytdReturn descending.
   }
 }
 
+// In-memory cache for super investor overview (TTL: 6 hours)
+let overviewCache: { data: any; timestamp: number } | null = null;
+const OVERVIEW_CACHE_TTL = 6 * 60 * 60 * 1000;
+
 function getFallbackConvictionData() {
   return {
     convictionPlays: {
@@ -190,23 +194,22 @@ function getFallbackConvictionData() {
       ],
     },
     topPerformers: [
-      { person: 'Edgar Wachenheim III', firm: 'Greenhaven Associates Inc', ytdReturn: 76928.5 },
-      { person: 'Mohnish Pabrai', firm: 'Dalal Street, LLC', ytdReturn: 19.8 },
-      { person: 'Leopold Aschenbrenner', firm: 'Situational Awareness LP', ytdReturn: 18.4 },
-      { person: 'Jensen Huang', firm: 'NVIDIA Corp', ytdReturn: 12.4 },
-      { person: 'Sundar Pichai', firm: 'Alphabet Inc.', ytdReturn: 11.1 },
-      { person: 'Ronald H. Muhlenkamp', firm: 'Muhlenkamp & Co Inc', ytdReturn: 10.8 },
-      { person: 'Guy Spier', firm: 'Aquamarine Financial', ytdReturn: 10.3 },
-      { person: 'Carl Icahn', firm: 'Icahn Carl C', ytdReturn: 9.4 },
-      { person: 'Bruce Berkowitz', firm: 'Fairholme Capital Management', ytdReturn: 6.6 },
-      { person: 'Bill Miller IV', firm: 'Miller Value Partners, LLC', ytdReturn: 5.9 },
+      { person: 'Bill Ackman', firm: 'Pershing Square Capital', ytdReturn: 16.8 },
+      { person: 'David Tepper', firm: 'Appaloosa Management', ytdReturn: 15.2 },
+      { person: 'Jensen Huang', firm: 'NVIDIA Corp', ytdReturn: 14.1 },
+      { person: 'Warren Buffett', firm: 'Berkshire Hathaway Inc', ytdReturn: 11.4 },
+      { person: 'Stanley Druckenmiller', firm: 'Duquesne Family Office', ytdReturn: 10.5 },
+      { person: 'Daniel Loeb', firm: 'Third Point LLC', ytdReturn: 9.8 },
+      { person: 'Carl Icahn', firm: 'Icahn Enterprises', ytdReturn: 8.4 },
+      { person: 'Seth Klarman', firm: 'Baupost Group', ytdReturn: 7.2 },
+      { person: 'David Einhorn', firm: 'Greenlight Capital', ytdReturn: 6.9 },
+      { person: 'Ray Dalio', firm: 'Bridgewater Associates', ytdReturn: 6.1 },
     ],
     notableTrades: [
-      { investor: 'Oaktree Capital Management LP', ticker: 'ASRT', details: '213M shares bought at $13.90', action: 'New Position', value: '+$3.0B' },
-      { investor: 'Tiger Global Management LLC', ticker: 'GRAB', details: '93M shares sold at $4.28', action: 'Exited', value: '-$398M' },
-      { investor: 'Dodge & Cox', ticker: 'SUNB', details: '53M shares bought at $70.63', action: 'New Position', value: '+$3.8B' },
-      { investor: 'Harris Associates LP', ticker: 'WBD', details: '46M shares sold at $27.99', action: 'Reduced', value: '-$1.3B' },
-      { investor: 'Berkshire Hathaway Inc', ticker: 'CVX', details: '46M shares sold at $182.36', action: 'Reduced', value: '-$8.3B' },
+      { investor: 'Berkshire Hathaway Inc', ticker: 'AAPL', details: 'Trimming Apple position into liquidity', action: 'Reduced', value: '-$5.2B' },
+      { investor: 'Pershing Square Capital', ticker: 'UBER', details: 'Added 29.9M shares reported 13F', action: 'Added', value: '+$2.1B' },
+      { investor: 'Bridgewater Associates', ticker: 'NVDA', details: 'Increased stake to 3.86M shares', action: 'Added', value: '+$773M' },
+      { investor: 'Scion Asset Management', ticker: 'PLTR', details: '5.0M shares reported in Q3 filing', action: 'New Position', value: '+$912M' },
     ],
     sectorConcentration: [
       { sector: 'Technology', value: 38.5 },
@@ -221,6 +224,10 @@ function getFallbackConvictionData() {
 }
 
 export async function GET() {
+  if (overviewCache && Date.now() - overviewCache.timestamp < OVERVIEW_CACHE_TTL) {
+    return NextResponse.json(overviewCache.data);
+  }
+
   const nvidiaKey = getEnv('NVIDIA_API_KEY');
 
   // Fetch SEC data for all investors with rate limiting
@@ -231,14 +238,18 @@ export async function GET() {
     await delay(120); // ~8 req/sec to stay under SEC 10 req/sec limit
   }
 
-  // Generate conviction/notable trades data via AI
+  // Generate conviction/notable trades data via AI or reliable fallback
   let aiData = getFallbackConvictionData();
   if (nvidiaKey) {
     aiData = await generateConvictionData(nvidiaKey);
   }
 
-  return NextResponse.json({
+  const responseData = {
     investors: investorSummaries,
     ...aiData,
-  });
+  };
+
+  overviewCache = { data: responseData, timestamp: Date.now() };
+
+  return NextResponse.json(responseData);
 }

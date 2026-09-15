@@ -55,7 +55,6 @@ export function HeadlinesScreen({ onStartChat }: { onStartChat?: (prompt: string
       source: item.source || item.domain || item.publisher || "Financial Press",
       time: item.time || "Recent",
       sentiment: (item.impact === "Positive" ? "Bullish" : item.impact === "Negative" ? "Bearish" : "Neutral") as any,
-      sentimentScore: item.impact === "Positive" ? 84 : item.impact === "Negative" ? 68 : 50,
       symbol: item.symbol,
       price: item.price,
       changePercent: item.change,

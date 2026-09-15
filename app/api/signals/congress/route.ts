@@ -29,82 +29,15 @@ function normalizeParty(party: string): string {
   return party.trim().charAt(0).toUpperCase();
 }
 
-const FALLBACK_DATA: CongressTrade[] = [
-  {
-    politician: "Nancy Pelosi",
-    party: "D",
-    chamber: "House",
-    ticker: "NVDA",
-    action: "BUY",
-    amount: "$1,000,001 - $5,000,000",
-    date: "2025-05-15",
-  },
-  {
-    politician: "Dan Crenshaw",
-    party: "R",
-    chamber: "House",
-    ticker: "MSFT",
-    action: "BUY",
-    amount: "$15,001 - $50,000",
-    date: "2025-05-14",
-  },
-  {
-    politician: "Tommy Tuberville",
-    party: "R",
-    chamber: "Senate",
-    ticker: "AAPL",
-    action: "SELL",
-    amount: "$100,001 - $250,000",
-    date: "2025-05-12",
-  },
-  {
-    politician: "Mark Kelly",
-    party: "D",
-    chamber: "Senate",
-    ticker: "TSLA",
-    action: "BUY",
-    amount: "$1,001 - $15,000",
-    date: "2025-05-10",
-  },
-  {
-    politician: "Marjorie Taylor Greene",
-    party: "R",
-    chamber: "House",
-    ticker: "AMZN",
-    action: "BUY",
-    amount: "$15,001 - $50,000",
-    date: "2025-05-08",
-  },
-  {
-    politician: "Josh Gottheimer",
-    party: "D",
-    chamber: "House",
-    ticker: "META",
-    action: "SELL",
-    amount: "$50,001 - $100,000",
-    date: "2025-05-06",
-  },
-  {
-    politician: "John Hickenlooper",
-    party: "D",
-    chamber: "Senate",
-    ticker: "GOOGL",
-    action: "BUY",
-    amount: "$1,001 - $15,000",
-    date: "2025-05-04",
-  },
-  {
-    politician: "Markwayne Mullin",
-    party: "R",
-    chamber: "Senate",
-    ticker: "JPM",
-    action: "SELL",
-    amount: "$250,001 - $500,000",
-    date: "2025-05-02",
-  },
-];
+// In-memory cache for congress trades (TTL: 12 hours)
+let congressCache: { data: CongressTrade[]; timestamp: number } | null = null;
+const CACHE_TTL = 12 * 60 * 60 * 1000;
 
 export async function GET() {
+  if (congressCache && Date.now() - congressCache.timestamp < CACHE_TTL) {
+    return NextResponse.json(congressCache.data);
+  }
+
   try {
     const results: CongressTrade[] = [];
 
@@ -112,33 +45,34 @@ export async function GET() {
     const [houseRes, senateRes] = await Promise.allSettled([
       fetch(
         "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
-        { cache: "no-store" }
+        { cache: "no-store", headers: { 'User-Agent': 'Mozilla/5.0' } }
       ),
       fetch(
         "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
-        { cache: "no-store" }
+        { cache: "no-store", headers: { 'User-Agent': 'Mozilla/5.0' } }
       ),
     ]);
 
     // Process House data
     if (houseRes.status === "fulfilled" && houseRes.value.ok) {
       try {
-        const houseData = await houseRes.value.json();
-        const houseTxs = Array.isArray(houseData) ? houseData : [];
+        const text = await houseRes.value.text();
+        if (text.startsWith("[")) {
+          const houseTxs = JSON.parse(text);
+          for (const tx of houseTxs) {
+            if (!tx.representative || !tx.ticker || tx.ticker === "--" || tx.ticker === "N/A")
+              continue;
 
-        for (const tx of houseTxs) {
-          if (!tx.representative || !tx.ticker || tx.ticker === "--" || tx.ticker === "N/A")
-            continue;
-
-          results.push({
-            politician: tx.representative || "Unknown",
-            party: normalizeParty(tx.party || ""),
-            chamber: "House",
-            ticker: tx.ticker.replace(/\s+/g, ""),
-            action: normalizeAction(tx.transaction_type || tx.type || ""),
-            amount: tx.amount || "N/A",
-            date: tx.transaction_date || "",
-          });
+            results.push({
+              politician: tx.representative || "Unknown",
+              party: normalizeParty(tx.party || ""),
+              chamber: "House",
+              ticker: tx.ticker.replace(/\s+/g, ""),
+              action: normalizeAction(tx.transaction_type || tx.type || ""),
+              amount: tx.amount || "N/A",
+              date: tx.transaction_date || "",
+            });
+          }
         }
       } catch (err) {
         console.warn("Error parsing House data:", err);
@@ -148,21 +82,22 @@ export async function GET() {
     // Process Senate data
     if (senateRes.status === "fulfilled" && senateRes.value.ok) {
       try {
-        const senateData = await senateRes.value.json();
-        const senateTxs = Array.isArray(senateData) ? senateData : [];
+        const text = await senateRes.value.text();
+        if (text.startsWith("[")) {
+          const senateTxs = JSON.parse(text);
+          for (const tx of senateTxs) {
+            if (!tx.senator || !tx.ticker || tx.ticker === "--" || tx.ticker === "N/A") continue;
 
-        for (const tx of senateTxs) {
-          if (!tx.senator || !tx.ticker || tx.ticker === "--" || tx.ticker === "N/A") continue;
-
-          results.push({
-            politician: tx.senator || "Unknown",
-            party: normalizeParty(tx.party || ""),
-            chamber: "Senate",
-            ticker: tx.ticker.replace(/\s+/g, ""),
-            action: normalizeAction(tx.transaction_type || tx.type || ""),
-            amount: tx.amount || "N/A",
-            date: tx.transaction_date || "",
-          });
+            results.push({
+              politician: tx.senator || "Unknown",
+              party: normalizeParty(tx.party || ""),
+              chamber: "Senate",
+              ticker: tx.ticker.replace(/\s+/g, ""),
+              action: normalizeAction(tx.transaction_type || tx.type || ""),
+              amount: tx.amount || "N/A",
+              date: tx.transaction_date || "",
+            });
+          }
         }
       } catch (err) {
         console.warn("Error parsing Senate data:", err);
@@ -170,16 +105,27 @@ export async function GET() {
     }
 
     if (results.length === 0) {
-      return NextResponse.json(FALLBACK_DATA);
+      if (congressCache) {
+        return NextResponse.json(congressCache.data);
+      }
+      return NextResponse.json([], { status: 200 });
     }
 
     // Sort by date (most recent first)
     results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Return top 30
-    return NextResponse.json(results.slice(0, 30));
+    const top30 = results.slice(0, 30);
+    congressCache = { data: top30, timestamp: Date.now() };
+
+    return NextResponse.json(top30);
   } catch (error) {
     console.error("Congress trading API error:", error);
-    return NextResponse.json(FALLBACK_DATA);
+    if (congressCache) {
+      return NextResponse.json(congressCache.data);
+    }
+    return NextResponse.json(
+      { error: "Congressional trading data temporarily unavailable", trades: [] },
+      { status: 503 }
+    );
   }
 }

@@ -190,7 +190,7 @@ export default function Home() {
 
     switch (active) {
       case "dashboard":
-        return <DashboardScreen onNavigate={handleNavigate} />;
+        return <DashboardScreen onNavigate={handleNavigate} onViewStock={handleViewStock} />;
       case "headlines":
         return <HeadlinesScreen />;
       case "portfolio":

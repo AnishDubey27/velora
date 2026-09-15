@@ -267,26 +267,9 @@ export async function GET(request: Request) {
       return NextResponse.json(normalized);
     }
 
-    return NextResponse.json([
-      {
-        title: "No English articles available right now.",
-        summary: "Try again in a few minutes.",
-      },
-    ]);
+    return NextResponse.json([]);
   } catch (error) {
     console.error("News API error:", error);
-    // Fallback mock data
-    return NextResponse.json([
-      {
-        title: "Wise on Track for Nasdaq Listing Next Month as Income Jumps 24%",
-        summary: "The company's income rose 24% as it prepares for Nasdaq listing.",
-        time: "12:25 pm",
-        symbol: "WIZEY",
-        price: "13.21",
-        change: 0.61,
-        url: "https://example.com",
-        source: "Example",
-      }
-    ]);
+    return NextResponse.json([], { status: 200 });
   }
 }

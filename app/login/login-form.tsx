@@ -68,7 +68,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
           {/* Subtle top border glow */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-vel-teal/50 to-transparent" />
 
-          <div className="text-center mb-8 flex flex-col items-center">
+          <div className="text-center mb-6 flex flex-col items-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -77,7 +77,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
             >
               <VeloMascot emailFocused={emailFocused} passwordFocused={passwordFocused} />
             </motion.div>
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
+            <h1 className="text-2xl font-bold tracking-tight text-white mb-1.5">
               {mode === "forgot" ? "Reset Password" : "Welcome to Velora"}
             </h1>
             <p className="text-vel-muted text-sm">
@@ -89,7 +89,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
 
           <form action={formAction} className="space-y-4">
             <input type="hidden" name="next" value={nextParam} />
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-vel-muted" />
                 <input
@@ -102,7 +102,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 pl-11 pr-4 py-3.5 text-white placeholder:text-vel-faint focus:border-vel-teal focus:ring-1 focus:ring-vel-teal focus:outline-none transition-all"
+                  className="w-full min-w-0 rounded-xl border border-white/5 bg-black/40 pl-11 pr-4 py-3 text-white placeholder:text-vel-muted/60 focus:border-vel-teal/40 focus:ring-1 focus:ring-vel-teal/20 focus:shadow-[0_0_15px_rgba(0,212,255,0.07)] focus:outline-none transition-all"
                 />
               </div>
               
@@ -112,7 +112,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="relative"
+                    className="relative overflow-hidden"
                   >
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-vel-muted" />
                     <input
@@ -125,7 +125,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                       onChange={(e) => setPassword(e.target.value)}
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
-                      className="w-full rounded-xl border border-white/10 bg-black/40 pl-11 pr-4 py-3.5 text-white placeholder:text-vel-faint focus:border-vel-teal focus:ring-1 focus:ring-vel-teal focus:outline-none transition-all"
+                      className="w-full min-w-0 rounded-xl border border-white/5 bg-black/40 pl-11 pr-4 py-3 text-white placeholder:text-vel-muted/60 focus:border-vel-teal/40 focus:ring-1 focus:ring-vel-teal/20 focus:shadow-[0_0_15px_rgba(0,212,255,0.07)] focus:outline-none transition-all"
                     />
                   </motion.div>
                 )}
@@ -133,11 +133,11 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
             </div>
 
             {mode === "signin" && (
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-0.5">
                 <button
                   type="button"
                   onClick={() => setMode("forgot")}
-                  className="text-xs text-vel-teal hover:text-vel-teal/80 transition-colors"
+                  className="text-[13px] text-vel-muted hover:text-white transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -163,19 +163,19 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
 
           {mode !== "forgot" && (
             <>
-              <div className="my-6 flex items-center">
-                <div className="flex-1 border-t border-white/10"></div>
-                <span className="px-4 text-xs font-medium text-vel-muted uppercase tracking-wider">
+              <div className="my-5 flex items-center">
+                <div className="flex-1 border-t border-white/5"></div>
+                <span className="px-3 text-[10px] font-semibold text-vel-faint/60 uppercase tracking-widest">
                   or continue with
                 </span>
-                <div className="flex-1 border-t border-white/10"></div>
+                <div className="flex-1 border-t border-white/5"></div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={handleSocialLogin}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] py-2.5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white"
                 >
                   <Github className="h-4 w-4" />
                   GitHub
@@ -183,7 +183,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
                 <button
                   type="button"
                   onClick={handleSocialLogin}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] py-2.5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white"
                 >
                   <svg className="h-4 w-4" viewBox="0 0 24 24">
                     <path
@@ -209,7 +209,7 @@ export function LoginForm({ initialMessage }: { initialMessage?: string }) {
             </>
           )}
 
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             {mode === "forgot" ? (
               <button
                 onClick={() => setMode("signin")}

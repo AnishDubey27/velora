@@ -81,16 +81,7 @@ const SECTOR_COLORS = [
 const RANK_ICONS = ['🥇', '🥈', '🥉'];
 
 const TOP_PERFORMER_FILTERS = [
-  { id: 'YTD', label: 'YTD', desc: 'Year-to-date return', mult: 1, icon: Calendar },
-  { id: '2025', label: '2025', desc: '2025 full year return', mult: 0.8, icon: Calendar },
-  { id: 'Last 4Q', label: 'Last 4Q', desc: 'Trailing four quarters', mult: 1.4, icon: Clock },
-  { id: 'Last 3 Year', label: 'Last 3 Year', desc: 'Last 3 full years (2023-2025)', mult: 2.5, icon: Clock },
-  { id: 'Last 5 Year', label: 'Last 5 Year', desc: 'Last 5 full years (2021-2025)', mult: 3.8, icon: Clock },
-  { id: 'YTD vs S&P 500', label: 'YTD vs S&P 500', desc: 'Year-to-date alpha over S&P 500', mult: 0.4, icon: Calendar },
-  { id: '2025 vs S&P 500', label: '2025 vs S&P 500', desc: '2025 full year alpha over S&P 500', mult: 0.45, icon: Calendar },
-  { id: 'Last 4Q vs S&P 500', label: 'Last 4Q vs S&P 500', desc: 'Trailing 4Q alpha over S&P 500', mult: 0.6, icon: Clock },
-  { id: 'Last 3Y vs S&P 500', label: 'Last 3Y vs S&P 500', desc: 'Last 3-year alpha vs S&P 500', mult: 1.2, icon: Clock },
-  { id: 'Last 5Y vs S&P 500', label: 'Last 5Y vs S&P 500', desc: 'Last 5-year alpha vs S&P 500', mult: 1.8, icon: Clock },
+  { id: 'YTD', label: 'YTD', desc: 'Year-to-date return', icon: Calendar },
 ] as const;
 
 /* ─────────────────── Helpers ─────────────────── */
@@ -418,9 +409,7 @@ export function SuperInvestorsScreen({
           </div>
           <div className="space-y-2.5">
             {data.topPerformers.map((perf, i) => {
-              const filterDef = TOP_PERFORMER_FILTERS.find(f => f.id === activeFilter);
-              const mult = filterDef?.mult || 1;
-              const val = perf.ytdReturn * mult;
+              const val = perf.ytdReturn;
               const isClickable = !!data?.investors.find(inv => inv.person.includes(perf.person) || perf.person.includes(inv.person));
               return (
                 <button

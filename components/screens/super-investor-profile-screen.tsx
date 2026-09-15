@@ -131,11 +131,6 @@ function getTickerFromName(company: string): string {
     .slice(0, 4);
 }
 
-function generateQuarterTrend(): number[] {
-  // Generate 4 quarters of trend data
-  return Array.from({ length: 4 }, () => Math.random() * 100 - 30);
-}
-
 /* ─────────────────── Stagger Animations ─────────────────── */
 
 const container = {
@@ -147,33 +142,9 @@ const container = {
 };
 
 const item = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
-
-/* ─────────────────── Quarter Trend Mini Chart ─────────────────── */
-
-function QuarterTrendBars({ values }: { values: number[] }) {
-  const maxAbs = Math.max(...values.map(Math.abs), 1);
-
-  return (
-    <div className="flex items-end gap-[3px] h-5">
-      {values.map((val, i) => {
-        const height = Math.max(Math.abs(val) / maxAbs * 16, 3);
-        return (
-          <div
-            key={i}
-            className={cn(
-              "w-[5px] rounded-sm transition-all",
-              val >= 0 ? "bg-emerald-400" : "bg-red-400"
-            )}
-            style={{ height: `${height}px` }}
-          />
-        );
-      })}
-    </div>
-  );
-}
 
 /* ─────────────────── Component ─────────────────── */
 
@@ -208,13 +179,12 @@ export function SuperInvestorProfileScreen({
       .catch(() => setLoading(false));
   }, [cik]);
 
-  // Pre-compute ticker and trend for each holding
+  // Pre-compute ticker and metrics for each holding
   const enrichedHoldings = useMemo(() => {
     if (!profile?.holdings) return [];
     return profile.holdings.map(h => ({
       ...h,
       ticker: getTickerFromName(h.company),
-      trend: generateQuarterTrend(),
       percentOfTotal: profile.totalValue > 0 ? (h.value / profile.totalValue) * 100 : 0,
       avgPrice: h.shares > 0 ? h.value / h.shares : 0,
     }));
@@ -231,27 +201,24 @@ export function SuperInvestorProfileScreen({
     return result;
   }, [enrichedHoldings]);
 
-  // Simulated stats
+  // Real 13F filing statistics computed directly from reported holdings
   const stats = useMemo(() => {
-    if (!profile) return null;
-    // Generate consistent pseudo-random returns based on CIK
-    const seed = parseInt(cik.replace(/\D/g, '').slice(-4), 10) || 1234;
-    const ytd = ((seed % 30) + 2) * (seed % 3 === 0 ? -1 : 1) * 0.7;
-    const trailing4q = ytd * 1.4;
-    const ret2025 = ytd * 0.8;
-    const ret3y = ytd * 2.5;
-    const ret5y = ytd * 3.8;
+    if (!profile || !enrichedHoldings.length) return null;
+    const top5Percent = enrichedHoldings.slice(0, 5).reduce((s, h) => s + h.percentOfTotal, 0);
+    const avgPosition = profile.totalValue > 0 ? profile.totalValue / enrichedHoldings.length : 0;
+    const topHolding = enrichedHoldings[0];
 
     return {
       totalValue: profile.totalValue,
-      ytdReturn: ytd,
-      trailing4qReturn: trailing4q,
-      return2025: ret2025,
-      return3y: ret3y,
-      return5y: ret5y,
-      holdingsCount: profile.holdings.length,
+      holdingsCount: enrichedHoldings.length,
+      topHoldingTicker: topHolding?.ticker || '—',
+      topHoldingPercent: topHolding?.percentOfTotal || 0,
+      top5Concentration: top5Percent,
+      avgPositionValue: avgPosition,
+      filingDate: profile.filingDate || 'Recent',
+      reportDate: profile.reportDate || 'Latest Qtr',
     };
-  }, [profile, cik]);
+  }, [profile, enrichedHoldings]);
 
   if (loading) {
     return (
@@ -363,40 +330,40 @@ export function SuperInvestorProfileScreen({
               <p className="text-lg font-bold text-white">{formatCompactValue(stats.totalValue)}</p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 mb-1">YTD Return</p>
-              <p className={cn("text-lg font-bold", stats.ytdReturn >= 0 ? "text-emerald-400" : "text-red-400")}>
-                {stats.ytdReturn >= 0 ? '+' : ''}{stats.ytdReturn.toFixed(1)}%
+              <p className="text-[10px] text-white/40 mb-1">Reported Period</p>
+              <p className="text-lg font-bold text-[#00D4FF]">
+                {stats.reportDate}
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 mb-1">Trailing 4Q Return</p>
-              <p className={cn("text-lg font-bold", stats.trailing4qReturn >= 0 ? "text-emerald-400" : "text-red-400")}>
-                {stats.trailing4qReturn >= 0 ? '+' : ''}{stats.trailing4qReturn.toFixed(1)}%
+              <p className="text-[10px] text-white/40 mb-1">Filing Date</p>
+              <p className="text-lg font-bold text-white/80">
+                {stats.filingDate}
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 mb-1">2025 Return</p>
-              <p className={cn("text-[15px] font-bold", stats.return2025 >= 0 ? "text-emerald-400" : "text-red-400")}>
-                {stats.return2025 >= 0 ? '+' : ''}{stats.return2025.toFixed(1)}%
+              <p className="text-[10px] text-white/40 mb-1">Top Holding</p>
+              <p className="text-[15px] font-bold text-white">
+                {stats.topHoldingTicker} <span className="text-xs text-white/50">({stats.topHoldingPercent.toFixed(1)}%)</span>
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 mb-1">3Y Return</p>
-              <p className={cn("text-[15px] font-bold", stats.return3y >= 0 ? "text-emerald-400" : "text-red-400")}>
-                {stats.return3y >= 0 ? '+' : ''}{stats.return3y.toFixed(1)}%
+              <p className="text-[10px] text-white/40 mb-1">Top 5 Concentration</p>
+              <p className="text-[15px] font-bold text-emerald-400">
+                {stats.top5Concentration.toFixed(1)}%
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 mb-1">5Y Return</p>
-              <p className={cn("text-[15px] font-bold", stats.return5y >= 0 ? "text-emerald-400" : "text-red-400")}>
-                {stats.return5y >= 0 ? '+' : ''}{stats.return5y.toFixed(1)}%
+              <p className="text-[10px] text-white/40 mb-1">Reported Holdings</p>
+              <p className="text-[15px] font-bold text-white">
+                {stats.holdingsCount} stocks
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 mt-5 text-[10px] text-white/30 hover:text-white/50 cursor-help transition-colors">
             <Info size={12} />
-            <p>How are returns calculated?</p>
+            <p>Sourced directly from official SEC Form 13F quarterly filings</p>
           </div>
         </motion.div>
       )}
@@ -483,7 +450,7 @@ export function SuperInvestorProfileScreen({
               {/* Table Header */}
               <div className="grid grid-cols-[1fr_60px_55px_70px_80px] gap-2 px-4 py-3 border-b border-white/[0.06]">
                 <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35">Ticker</span>
-                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35 text-center">4Q Trend</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35 text-right">Shares</span>
                 <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35 text-right">% Total</span>
                 <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35 text-right">Avg Price</span>
                 <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/35 text-right">Value</span>
@@ -507,10 +474,10 @@ export function SuperInvestorProfileScreen({
                     <p className="text-[10px] text-white/35 truncate">{holding.company}</p>
                   </div>
 
-                  {/* 4Q Trend Bars */}
-                  <div className="flex justify-center">
-                    <QuarterTrendBars values={holding.trend} />
-                  </div>
+                  {/* Shares */}
+                  <p className="text-[12px] font-medium text-white/60 text-right">
+                    {formatShares(holding.shares)}
+                  </p>
 
                   {/* % of Total */}
                   <p className="text-[12px] font-semibold text-white/70 text-right">
@@ -536,7 +503,9 @@ export function SuperInvestorProfileScreen({
                 <p className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
                   {enrichedHoldings.length} Holdings
                 </p>
-                <span />
+                <p className="text-[11px] font-bold text-white/50 text-right">
+                  {formatShares(profile.holdings.reduce((s, h) => s + (h.shares || 0), 0))}
+                </p>
                 <p className="text-[11px] font-bold text-white/50 text-right">100%</p>
                 <span />
                 <p className="text-[12px] font-bold text-white text-right">
@@ -557,50 +526,33 @@ export function SuperInvestorProfileScreen({
           {activeTab === 'Activity' && (
             <div className="glassy rounded-2xl p-5">
               <h3 className="text-[11px] font-black uppercase tracking-[0.1em] text-white/60 mb-4">
-                Recent Filing Activity
+                Top Reported Positions (SEC Form 13F)
               </h3>
               <div className="space-y-3">
-                {enrichedHoldings.slice(0, 8).map((holding, i) => {
-                  const isPositive = holding.trend[3] > holding.trend[2];
-                  const change = Math.abs(holding.trend[3] - holding.trend[2]);
-                  const action = isPositive
-                    ? change > 50 ? 'New Position' : 'Increased'
-                    : change > 50 ? 'Sold' : 'Reduced';
-
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center",
-                          isPositive ? "bg-emerald-500/15" : "bg-red-500/15"
-                        )}>
-                          {isPositive
-                            ? <TrendingUp size={14} className="text-emerald-400" />
-                            : <TrendingDown size={14} className="text-red-400" />
-                          }
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-white">{holding.ticker}</p>
-                          <p className="text-[10px] text-white/35">{holding.company}</p>
-                        </div>
+                {enrichedHoldings.slice(0, 8).map((holding, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#00D4FF]/10">
+                        <TrendingUp size={14} className="text-[#00D4FF]" />
                       </div>
-                      <div className="text-right">
-                        <span className={cn(
-                          "text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
-                          isPositive ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                        )}>
-                          {action}
-                        </span>
-                        <p className="text-[10px] text-white/30 mt-1">
-                          {formatShares(holding.shares)} shares
-                        </p>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{holding.ticker}</p>
+                        <p className="text-[10px] text-white/35">{holding.company}</p>
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-white/80">
+                        {holding.percentOfTotal.toFixed(1)}% of fund
+                      </span>
+                      <p className="text-[10px] text-white/40 mt-1">
+                        {formatShares(holding.shares)} shares ({formatCompactValue(holding.value)})
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

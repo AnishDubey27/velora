@@ -10,7 +10,6 @@ interface VeloMascotProps {
 
 export function VeloMascot({ emailFocused, passwordFocused }: VeloMascotProps) {
   const [blinking, setBlinking] = useState(false);
-  const [peeking, setPeeking] = useState(false);
 
   // Autonomous random blink loop
   useEffect(() => {
@@ -31,37 +30,9 @@ export function VeloMascot({ emailFocused, passwordFocused }: VeloMascotProps) {
     return () => clearTimeout(handle);
   }, []);
 
-  // Occasional peek through wings while password is focused
-  useEffect(() => {
-    if (!passwordFocused) {
-      setPeeking(false);
-      return;
-    }
-    let handle: ReturnType<typeof setTimeout>;
-    const loop = () => {
-      handle = setTimeout(
-        () => {
-          if (!passwordFocused) return;
-          setPeeking(true);
-          setTimeout(() => {
-            setPeeking(false);
-            if (passwordFocused) loop();
-          }, 650);
-        },
-        3200 + Math.random() * 2400,
-      );
-    };
-    loop();
-    return () => {
-      clearTimeout(handle);
-      setPeeking(false);
-    };
-  }, [passwordFocused]);
-
-  const fullyCovered = passwordFocused && !peeking;
-  const coverY = fullyCovered ? -58 : peeking ? -20 : 0;
-  const coverXL = fullyCovered ? 5 : 0;
-  const coverXR = fullyCovered ? -5 : 0;
+  const coverY = passwordFocused ? -58 : 0;
+  const coverXL = passwordFocused ? 5 : 0;
+  const coverXR = passwordFocused ? -5 : 0;
 
   // Pupil gaze shift
   const px = emailFocused ? -1.8 : 0;
@@ -110,21 +81,21 @@ export function VeloMascot({ emailFocused, passwordFocused }: VeloMascotProps) {
             <stop offset="100%" stopColor="#160838" />
           </radialGradient>
           <radialGradient id="velo-head" cx="38%" cy="26%">
-            <stop offset="0%" stopColor="#1E1B3C" />
-            <stop offset="58%" stopColor="#0D0B1E" />
-            <stop offset="100%" stopColor="#060510" />
+            <stop offset="0%" stopColor="#2A264D" />
+            <stop offset="58%" stopColor="#151230" />
+            <stop offset="100%" stopColor="#0B091A" />
           </radialGradient>
           <radialGradient id="velo-body" cx="42%" cy="18%">
-            <stop offset="0%" stopColor="#1A1638" />
-            <stop offset="100%" stopColor="#070614" />
+            <stop offset="0%" stopColor="#221D44" />
+            <stop offset="100%" stopColor="#0E0C22" />
           </radialGradient>
           <linearGradient id="velo-wl" x1="0%" y1="0%" x2="100%" y2="72%">
-            <stop offset="0%" stopColor="#161240" stopOpacity="0.97" />
-            <stop offset="100%" stopColor="#07061A" stopOpacity="0.92" />
+            <stop offset="0%" stopColor="#221C54" stopOpacity="0.97" />
+            <stop offset="100%" stopColor="#100D2A" stopOpacity="0.92" />
           </linearGradient>
           <linearGradient id="velo-wr" x1="100%" y1="0%" x2="0%" y2="72%">
-            <stop offset="0%" stopColor="#161240" stopOpacity="0.97" />
-            <stop offset="100%" stopColor="#07061A" stopOpacity="0.92" />
+            <stop offset="0%" stopColor="#221C54" stopOpacity="0.97" />
+            <stop offset="100%" stopColor="#100D2A" stopOpacity="0.92" />
           </linearGradient>
         </defs>
 
@@ -161,9 +132,9 @@ export function VeloMascot({ emailFocused, passwordFocused }: VeloMascotProps) {
         <ellipse cx="80" cy="112" rx="1.6" ry="18" fill="#7C3AED" opacity="0.08" filter="url(#velo-gv)" />
 
         {/* ── HEAD ── */}
-        <circle cx="80" cy="72" r="40" fill="#5B21B6" opacity="0.04" filter="url(#velo-ge)" />
+        <circle cx="80" cy="72" r="40" fill="#5B21B6" opacity="0.1" filter="url(#velo-ge)" />
         <circle cx="80" cy="72" r="28" fill="url(#velo-head)" />
-        <circle cx="80" cy="72" r="28" fill="none" stroke="#1E1A3E" strokeWidth="0.7" />
+        <circle cx="80" cy="72" r="28" fill="none" stroke="#3B346B" strokeWidth="0.7" />
         <ellipse cx="70" cy="58" rx="12" ry="7" fill="white" opacity="0.025" transform="rotate(-15 70 58)" />
 
         {/* ── ANTENNAE ── */}

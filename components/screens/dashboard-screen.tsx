@@ -108,11 +108,12 @@ function titleCase(value: string) {
 
 type DashboardScreenProps = {
   onNavigate?: (key: NavKey) => void;
+  onViewStock?: (symbol: string) => void;
 };
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
+export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProps) {
   // Use SWR for standard API calls to enable client-side caching
   const { data: fearGreedRaw } = useSWR("/api/fear-greed", fetcher, { revalidateOnFocus: false });
   const { data: vixRaw } = useSWR("/api/vix", fetcher, { revalidateOnFocus: false });
@@ -120,7 +121,6 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const { data: indicators } = useSWR<IndicatorsResponse>("/api/dashboard/indicators", fetcher, { revalidateOnFocus: false });
   const { data: events } = useSWR<EventsResponse>("/api/dashboard/events", fetcher, { revalidateOnFocus: false });
   const { data: snapshot } = useSWR<{ title: string; summary: string; updatedAt?: string }>("/api/dashboard/snapshot", fetcher, { revalidateOnFocus: false });
-  const { data: dynamicData } = useSWR<any>("/api/dashboard/dynamic-data", fetcher, { revalidateOnFocus: false });
 
   // Pre-process SWR data where necessary
   const fearGreed = {
@@ -212,35 +212,34 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const snapshotUpdated = indicators?.asOf ? formatDateTime(indicators.asOf) : null;
   const snapshotTime = snapshot?.updatedAt ? formatDateTime(snapshot.updatedAt) : snapshotUpdated;
 
-  // Build signal card data — prefer real data, fall back to AI-generated
+  // Build signal card data from authentic sources
   const congressData = congressPreview || {
-    symbol: dynamicData?.signals?.congress?.symbol || "—",
-    action: dynamicData?.signals?.congress?.action || "—",
-    amount: dynamicData?.signals?.congress?.amount || "—",
-    person: dynamicData?.signals?.congress?.person || "—",
+    symbol: "—",
+    action: "—",
+    amount: "—",
+    person: "Loading...",
   };
 
   const redditData = redditPreview || {
-    symbol: dynamicData?.signals?.reddit?.symbol || "—",
-    rankChange: dynamicData?.signals?.reddit?.rankChange || "—",
-    mentions: dynamicData?.signals?.reddit?.mentions || "—",
+    symbol: "—",
+    rankChange: "—",
+    mentions: "Loading...",
   };
 
   const insiderData = insiderPreview || {
-    symbol: dynamicData?.signals?.insider?.symbol || "—",
-    action: dynamicData?.signals?.insider?.action || "—",
-    price: dynamicData?.signals?.insider?.price || "—",
-    person: dynamicData?.signals?.insider?.person || "—",
+    symbol: "—",
+    action: "—",
+    price: "—",
+    person: "Loading...",
   };
 
   const superInvestorData = superInvestorPreview || {
-    symbol: dynamicData?.signals?.superInvestors?.symbol || "—",
-    action: dynamicData?.signals?.superInvestors?.action || "—",
-    firm: dynamicData?.signals?.superInvestors?.firm || "—",
+    symbol: "—",
+    action: "—",
+    firm: "Loading...",
   };
 
-  const signalsLoaded = Boolean(redditPreview || insiderPreview || congressPreview || superInvestorPreview);
-  const hasSignals = signalsLoaded || dynamicData;
+  const hasSignals = Boolean(redditPreview || insiderPreview || congressPreview || superInvestorPreview);
 
   return (
     <section className="space-y-4 pb-6 pt-1">
@@ -327,7 +326,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
       </div>
 
       {/* Interactive Market Heatmap */}
-      <BuiMarketHeatmap />
+      <BuiMarketHeatmap onSelectStock={onViewStock} />
 
       {/* Market Summary */}
       <div className="glassy rounded-2xl p-5">
@@ -357,39 +356,53 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
 
       {/* Market Trends */}
       <div className="glassy rounded-2xl p-5">
-        <SectionTitle>Market Trends</SectionTitle>
-        {!dynamicData ? (
-          <div className="mt-3 text-sm text-white/50">Loading trends...</div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="flex justify-between items-baseline mb-3">
-                <p className="font-semibold text-white">Mid-Term</p>
-                <p className="text-xs text-white/40">1-3 mo</p>
-              </div>
-              <ul className="space-y-2.5">
-                {(dynamicData?.trends?.midTerm || []).map((t: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-white/80">
-                    <span className="text-emerald-400 text-[10px] mt-1">▲</span> {t}
-                  </li>
-                ))}
-              </ul>
+        <SectionTitle>Market Trends & Regime</SectionTitle>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="rounded-xl bg-white/5 p-4">
+            <div className="flex justify-between items-baseline mb-3">
+              <p className="font-semibold text-white">Mid-Term</p>
+              <p className="text-xs text-white/40">1-3 mo</p>
             </div>
-            <div className="rounded-xl bg-white/5 p-4">
-              <div className="flex justify-between items-baseline mb-3">
-                <p className="font-semibold text-white">Long-Term</p>
-                <p className="text-xs text-white/40">6-12 mo</p>
-              </div>
-              <ul className="space-y-2.5">
-                {(dynamicData?.trends?.longTerm || []).map((t: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-white/80">
-                    <span className="text-emerald-400 text-[10px] mt-1">▲</span> {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ul className="space-y-2.5">
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-emerald-400 text-[10px] mt-1">▲</span>
+                {indicators?.sp500?.changePercent !== undefined && indicators?.sp500?.changePercent !== null
+                  ? indicators.sp500.changePercent >= 0
+                    ? "Equity Momentum Expansion"
+                    : "Equity Volatility Consolidation"
+                  : "Large Cap Valuation Dispersion"}
+              </li>
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-emerald-400 text-[10px] mt-1">▲</span>
+                {vix !== null && vix < 20 ? "Low Volatility Risk-On Regime" : "Elevated Hedging Demand"}
+              </li>
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-emerald-400 text-[10px] mt-1">▲</span>
+                {fearGreed.classification ? `${fearGreed.classification} Regime Positioning` : "Institutional Liquidity Flows"}
+              </li>
+            </ul>
           </div>
-        )}
+          <div className="rounded-xl bg-white/5 p-4">
+            <div className="flex justify-between items-baseline mb-3">
+              <p className="font-semibold text-white">Long-Term</p>
+              <p className="text-xs text-white/40">6-12 mo</p>
+            </div>
+            <ul className="space-y-2.5">
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-[#00D4FF] text-[10px] mt-1">◆</span>
+                AI Compute Infrastructure Scaling
+              </li>
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-[#00D4FF] text-[10px] mt-1">◆</span>
+                Central Bank Rate Normalization
+              </li>
+              <li className="flex items-start gap-2 text-[13px] text-white/80">
+                <span className="text-[#00D4FF] text-[10px] mt-1">◆</span>
+                Semiconductor Supply Re-Shoring
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Potential Early Signals */}

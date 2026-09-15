@@ -15,98 +15,9 @@ export type HeatmapItem = {
   sparkline: number[];
 };
 
-const DEFAULT_HEATMAP_DATA: HeatmapItem[] = [
-  {
-    symbol: "NVDA",
-    name: "NVIDIA Corp",
-    price: 128.5,
-    changePercent: 3.42,
-    marketCap: "$3.15T",
-    sector: "Semiconductors",
-    sparkline: [122, 123.5, 125, 124.8, 127.2, 128.5],
-  },
-  {
-    symbol: "AAPL",
-    name: "Apple Inc",
-    price: 224.2,
-    changePercent: 1.15,
-    marketCap: "$3.42T",
-    sector: "Mega Tech",
-    sparkline: [220, 221, 222.5, 223, 223.8, 224.2],
-  },
-  {
-    symbol: "MSFT",
-    name: "Microsoft Corp",
-    price: 418.9,
-    changePercent: -0.65,
-    marketCap: "$3.11T",
-    sector: "Mega Tech",
-    sparkline: [422, 421, 420.5, 419, 419.5, 418.9],
-  },
-  {
-    symbol: "BTC",
-    name: "Bitcoin",
-    price: 64250,
-    changePercent: 2.88,
-    marketCap: "$1.27T",
-    sector: "Crypto",
-    sparkline: [62100, 62800, 63400, 63100, 63900, 64250],
-  },
-  {
-    symbol: "ETH",
-    name: "Ethereum",
-    price: 3450,
-    changePercent: 4.12,
-    marketCap: "$415B",
-    sector: "Crypto",
-    sparkline: [3310, 3340, 3380, 3410, 3420, 3450],
-  },
-  {
-    symbol: "TSLA",
-    name: "Tesla Inc",
-    price: 215.6,
-    changePercent: -2.34,
-    marketCap: "$685B",
-    sector: "Mega Tech",
-    sparkline: [221, 220, 218, 217.5, 216, 215.6],
-  },
-  {
-    symbol: "AMD",
-    name: "Advanced Micro Devices",
-    price: 148.3,
-    changePercent: 2.15,
-    marketCap: "$240B",
-    sector: "Semiconductors",
-    sparkline: [144, 145.2, 146, 147.1, 147.8, 148.3],
-  },
-  {
-    symbol: "JPM",
-    name: "JPMorgan Chase",
-    price: 212.4,
-    changePercent: 0.82,
-    marketCap: "$608B",
-    sector: "Financials",
-    sparkline: [210, 210.5, 211, 211.8, 212, 212.4],
-  },
-  {
-    symbol: "LLY",
-    name: "Eli Lilly & Co",
-    price: 924.1,
-    changePercent: 1.45,
-    marketCap: "$878B",
-    sector: "Healthcare",
-    sparkline: [905, 910, 915, 918, 921, 924.1],
-  },
-  {
-    symbol: "SOL",
-    name: "Solana",
-    price: 154.2,
-    changePercent: 5.62,
-    marketCap: "$72B",
-    sector: "Crypto",
-    sparkline: [142, 145, 148, 150, 152, 154.2],
-  },
-];
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boolean }) {
   if (!data || data.length < 2) return null;
@@ -137,7 +48,7 @@ function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boole
 }
 
 export function BuiMarketHeatmap({
-  data = DEFAULT_HEATMAP_DATA,
+  data: initialData,
   onSelectStock,
 }: {
   data?: HeatmapItem[];
@@ -145,8 +56,14 @@ export function BuiMarketHeatmap({
 }) {
   const [selectedSector, setSelectedSector] = useState<string>("All");
 
-  const sectors = ["All", "Mega Tech", "Semiconductors", "Crypto", "Financials", "Healthcare"];
+  const { data: apiData, isLoading } = useSWR<HeatmapItem[]>(
+    "/api/market/heatmap",
+    fetcher,
+    { refreshInterval: 60000, revalidateOnFocus: false }
+  );
 
+  const data = initialData || apiData || [];
+  const sectors = ["All", "Mega Tech", "Semiconductors", "Crypto", "Financials", "Healthcare"];
   const filtered = selectedSector === "All" ? data : data.filter((d) => d.sector === selectedSector);
 
   return (
@@ -184,63 +101,78 @@ export function BuiMarketHeatmap({
 
       {/* Grid Heatmap */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-        <AnimatePresence>
-          {filtered.map((item, idx) => {
-            const isPos = item.changePercent >= 0;
-            return (
-              <motion.div
-                key={item.symbol}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2, delay: idx * 0.02 }}
-                onClick={() => onSelectStock?.(item.symbol)}
-                className={cn(
-                  "relative group flex flex-col justify-between p-3 rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden",
-                  isPos
-                    ? "bg-gradient-to-br from-emerald-950/40 to-emerald-900/10 border-emerald-500/30 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-950/50"
-                    : "bg-gradient-to-br from-rose-950/40 to-rose-900/10 border-rose-500/30 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-950/50"
-                )}
-              >
-                {/* Symbol + Sector */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-sm font-bold text-white tracking-wide block">
-                      {item.symbol}
-                    </span>
-                    <span className="text-[10px] text-white/50 truncate max-w-[80px] block">
-                      {item.name}
+        {isLoading && filtered.length === 0 ? (
+          Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="h-24 rounded-xl border border-white/5 bg-white/[0.03] p-3 animate-pulse flex flex-col justify-between">
+              <div className="flex justify-between">
+                <div className="h-4 w-12 rounded bg-white/10" />
+                <div className="h-4 w-10 rounded bg-white/10" />
+              </div>
+              <div className="flex justify-between items-end">
+                <div className="h-3 w-14 rounded bg-white/10" />
+                <div className="h-4 w-10 rounded bg-white/10" />
+              </div>
+            </div>
+          ))
+        ) : (
+          <AnimatePresence>
+            {filtered.map((item, idx) => {
+              const isPos = item.changePercent >= 0;
+              return (
+                <motion.div
+                  key={item.symbol}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2, delay: idx * 0.02 }}
+                  onClick={() => onSelectStock?.(item.symbol)}
+                  className={cn(
+                    "relative group flex flex-col justify-between p-3 rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden",
+                    isPos
+                      ? "bg-gradient-to-br from-emerald-950/40 to-emerald-900/10 border-emerald-500/30 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-950/50"
+                      : "bg-gradient-to-br from-rose-950/40 to-rose-900/10 border-rose-500/30 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-950/50"
+                  )}
+                >
+                  {/* Symbol + Sector */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-white tracking-wide block">
+                        {item.symbol}
+                      </span>
+                      <span className="text-[10px] text-white/50 truncate max-w-[80px] block">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-[11px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5",
+                        isPos ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                      )}
+                    >
+                      {isPos ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {isPos ? "+" : ""}
+                      {item.changePercent.toFixed(2)}%
                     </span>
                   </div>
-                  <span
-                    className={cn(
-                      "text-[11px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5",
-                      isPos ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
-                    )}
-                  >
-                    {isPos ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                    {isPos ? "+" : ""}
-                    {item.changePercent.toFixed(2)}%
-                  </span>
-                </div>
 
-                {/* Sparkline + Price */}
-                <div className="flex items-end justify-between mt-3">
-                  <div>
-                    <span className="text-xs font-semibold text-white/90 font-mono">
-                      ${item.price >= 1000 ? item.price.toLocaleString() : item.price.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-white/40 block font-mono">
-                      {item.marketCap}
-                    </span>
+                  {/* Sparkline + Price */}
+                  <div className="flex items-end justify-between mt-3">
+                    <div>
+                      <span className="text-xs font-semibold text-white/90 font-mono">
+                        ${item.price >= 1000 ? item.price.toLocaleString() : item.price.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-white/40 block font-mono">
+                        {item.marketCap}
+                      </span>
+                    </div>
+                    <MiniSparkline data={item.sparkline} isPositive={isPos} />
                   </div>
-                  <MiniSparkline data={item.sparkline} isPositive={isPos} />
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
       </div>
     </div>
   );
