@@ -2,68 +2,106 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    # Runs every day at 12:00 UTC - daily pings prevent any inactivity gap
-    - cron: '0 12 * * *'
+    # Runs twice every day (00:00 and 12:00 UTC) to guarantee active database transactions
+    - cron: '0 0,12 * * *'
   workflow_dispatch: # Allows manual run from GitHub Actions tab
+
+permissions:
+  contents: write
+  issues: write
 
 jobs:
   ping-supabase:
-    name: Ping Supabase REST API
+    name: Ping & Heartbeat Supabase Postgres
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST Endpoint
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Keep GitHub Actions cron active
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          committer_username: 'github-actions[bot]'
+          committer_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'chore: keep GitHub Actions active [skip ci]'
+          time_elapsed: 25
+
+      - name: Ping Supabase & Perform Database Heartbeat
         id: ping
         run: |
           SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
           SUPABASE_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}"
 
-          # Fallback to hardcoded project URL if secret is missing
+          # Fallback to hardcoded project URL and key if secrets are missing
           if [ -z "$SUPABASE_URL" ]; then
             SUPABASE_URL="https://wgufujxqmdqugcyzetaa.supabase.co"
           fi
+          if [ -z "$SUPABASE_KEY" ]; then
+            SUPABASE_KEY="sb_publishable_j2-EF2Ug44vEOPxMDoGsqw_C7j3zLMi"
+          fi
 
-          ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal?select=id&limit=1"
-          echo "Pinging Supabase endpoint: ${ENDPOINT}"
+          echo "Supabase Target: ${SUPABASE_URL}"
 
-          # Capture both HTTP status and curl exit code
+          # Step 1: Healthcheck GET endpoint
+          READ_ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal?select=id&limit=1"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 15 \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            "${ENDPOINT}")
+            "${READ_ENDPOINT}")
           CURL_EXIT=$?
 
-          echo "HTTP Status: ${HTTP_STATUS} | curl exit code: ${CURL_EXIT}"
+          echo "GET Status: ${HTTP_STATUS} | curl exit: ${CURL_EXIT}"
 
-          # curl exit code 6 = DNS resolution failure (project offline/paused)
           if [ "$CURL_EXIT" = "6" ] || [ "$CURL_EXIT" = "7" ]; then
             echo "CRITICAL: Cannot reach Supabase host (curl exit ${CURL_EXIT}). Project may be PAUSED."
-            echo "Restore at: https://supabase.com/dashboard"
             exit 1
           fi
 
-          # 540 = Supabase-specific "Project Paused" status
-          if [ "$HTTP_STATUS" = "540" ]; then
-            echo "CRITICAL: Supabase project is PAUSED (HTTP 540)."
-            echo "Restore at: https://supabase.com/dashboard"
+          if [ "$HTTP_STATUS" = "540" ] || [ "$HTTP_STATUS" = "000" ]; then
+            echo "CRITICAL: Supabase project is PAUSED (HTTP ${HTTP_STATUS})."
             exit 1
           fi
 
-          # 000 = curl returned no HTTP status (connection failed)
-          if [ "$HTTP_STATUS" = "000" ]; then
-            echo "CRITICAL: No HTTP response from Supabase (HTTP 000). Project may be offline."
-            exit 1
+          # Step 2: Real Postgres Transaction (INSERT + DELETE)
+          # Supabase requires active database transactions to reset the 7-day inactivity timer
+          WRITE_ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal"
+          WRITE_RESP=$(curl -s -w "\n%{http_code}" \
+            --max-time 15 \
+            -X POST \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d '{"phase":"heartbeat","raw_text":"automated-keepalive-ping"}' \
+            "${WRITE_ENDPOINT}")
+
+          WRITE_STATUS=$(echo "$WRITE_RESP" | tail -n1)
+          WRITE_BODY=$(echo "$WRITE_RESP" | sed '$d')
+
+          echo "POST Status: ${WRITE_STATUS}"
+
+          # Extract row ID if created
+          ROW_ID=$(echo "$WRITE_BODY" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4)
+
+          if [ -n "$ROW_ID" ]; then
+            echo "Heartbeat row created (ID: ${ROW_ID}). Cleaning up row..."
+            DEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              -X DELETE \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              "${WRITE_ENDPOINT}?id=eq.${ROW_ID}")
+            echo "DELETE cleanup status: ${DEL_STATUS}"
           fi
 
-          # 2xx or 4xx = project is alive (401 Unauthorized is fine - project is active)
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
-            echo "SUCCESS: Supabase is active (HTTP ${HTTP_STATUS}). Database kept alive!"
+            echo "SUCCESS: Supabase database heartbeat verified and active!"
           else
-            echo "ERROR: Unexpected HTTP response code ${HTTP_STATUS}"
+            echo "ERROR: Unexpected status code: ${HTTP_STATUS}"
             exit 1
           fi
 
-  # This job only runs if ping-supabase fails — sends a notification issue on GitHub
   alert-on-failure:
     name: Alert on Supabase Failure
     runs-on: ubuntu-latest
@@ -92,7 +130,6 @@ jobs:
             ---
             *This issue was auto-created by the Keep Supabase Alive workflow.*`;
 
-            // Check if a similar open issue already exists to avoid spam
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
