@@ -6,26 +6,11 @@ on:
     - cron: '0 0,12 * * *'
   workflow_dispatch: # Allows manual run from GitHub Actions tab
 
-permissions:
-  contents: write
-  issues: write
-
 jobs:
   ping-supabase:
     name: Ping & Heartbeat Supabase Postgres
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4.2.2
-
-      - name: Keep GitHub Actions cron active
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          committer_username: 'github-actions[bot]'
-          committer_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'chore: keep GitHub Actions active [skip ci]'
-          time_elapsed: 25
-
       - name: Ping Supabase & Perform Database Heartbeat
         id: ping
         run: |
