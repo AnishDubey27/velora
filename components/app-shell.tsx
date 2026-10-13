@@ -47,10 +47,9 @@ export function AppShell({
   const supabase = createClient();
 
   useEffect(() => {
-    // Check if it's the first visit to open drawer & tour automatically
+    // Check if it's the first visit to open tour automatically
     const hasVisited = localStorage.getItem("velora_has_visited");
     if (hasVisited !== "true") {
-      setDrawerOpen(true);
       setOnboardingOpen(true);
       localStorage.setItem("velora_has_visited", "true");
     }
