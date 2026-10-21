@@ -115,7 +115,7 @@ export function GlobalSearchModal({ isOpen, onClose, onSelect }: GlobalSearchPro
                 </div>
               ) : query.trim() && !isLoading ? (
                 <div className="p-8 text-center text-sm text-white/40">
-                  No results found for "{query}"
+                  No results found for &quot;{query}&quot;
                 </div>
               ) : !query.trim() ? (
                 <div className="p-8 text-center text-sm text-white/40">

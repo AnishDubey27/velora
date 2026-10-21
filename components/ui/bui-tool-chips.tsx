@@ -33,7 +33,7 @@ export function BuiToolChips({ chips = [], className }: BuiToolChipsProps) {
             <span className="font-semibold text-cyan-200">{chip.name}</span>
             {chip.query && (
               <span className="text-white/50 max-w-[150px] truncate">
-                "{chip.query}"
+                &quot;{chip.query}&quot;
               </span>
             )}
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" />
