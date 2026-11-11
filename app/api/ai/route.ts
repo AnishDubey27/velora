@@ -174,10 +174,10 @@ Always include highlighted trade parameters and risk score formatted as blockquo
     const modelsToTry = isDeepMode
       ? [
           "nvidia/nemotron-3-ultra-550b-a55b", // Primary Deep: flagship analyst
-          "google/diffusiongemma-26b-a4b-it",  // Fallback 1: Fast reasoning
+          "nvidia/nemotron-3.5-lightning-30b-a3b", // Fallback 1: Fast reasoning
         ]
       : [
-          "google/diffusiongemma-26b-a4b-it",  // Primary Fast Reasoning
+          "nvidia/nemotron-3.5-lightning-30b-a3b", // Primary Fast Reasoning
           "nvidia/nemotron-3-ultra-550b-a55b", // Fallback 1: Deep analyst
         ];
 

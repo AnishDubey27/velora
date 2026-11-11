@@ -17,7 +17,7 @@ export type ModelOption = {
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
-    id: "google/diffusiongemma-26b-a4b-it",
+    id: "nvidia/nemotron-3.5-lightning-30b-a3b",
     name: "Fast Mode",
     badge: "⚡ Fast • 800ms",
     badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -32,7 +32,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
     badge: "🧠 Deep • Ultra",
     badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     latency: "🧠 Deep",
-    description: "Flagship Nemotron 3 Ultra Wall Street quantitative analyst. Automatic DiffusionGemma fallback.",
+    description: "Flagship Nemotron 3 Ultra Wall Street quantitative analyst. Automatic Lightning fallback.",
     icon: Brain,
   },
 ];

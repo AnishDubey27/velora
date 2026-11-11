@@ -5,7 +5,7 @@ export const NVIDIA_API_URL =
 
 export const NVIDIA_ALLOWED_MODELS = [
   "nvidia/nemotron-3-ultra-550b-a55b",
-  "google/diffusiongemma-26b-a4b-it"
+  "nvidia/nemotron-3.5-lightning-30b-a3b"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];
