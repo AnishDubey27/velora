@@ -170,15 +170,15 @@ Always include highlighted trade parameters and risk score formatted as blockquo
     }
 
     // Define explicit Fast and Deep hierarchy fallback chains
-    const isDeepMode = model.includes("ultra") || model.includes("70b") || model === "deep";
+    const isDeepMode = model.includes("minimax") || model === "deep";
     const modelsToTry = isDeepMode
       ? [
-          "nvidia/nemotron-3-ultra-550b-a55b", // Primary Deep: flagship analyst
+          "minimaxai/minimax-m3.1-flash",      // Primary Deep analyst
           "nvidia/nemotron-3.5-lightning-30b-a3b", // Fallback 1: Fast reasoning
         ]
       : [
-          "nvidia/nemotron-3.5-lightning-30b-a3b", // Primary Fast Reasoning
-          "nvidia/nemotron-3-ultra-550b-a55b", // Fallback 1: Deep analyst
+          "nvidia/nemotron-3.5-bolt-e4b",      // Primary Fast: instant answers
+          "minimaxai/minimax-m3.1-flash",      // Fallback 1: Deep analyst
         ];
 
     let lastError: any = null;
@@ -197,6 +197,9 @@ Always include highlighted trade parameters and risk score formatted as blockquo
             temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
             max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
             stream: true,
+            ...(attemptModel.includes("nemotron")
+              ? { chat_template_kwargs: { enable_thinking: false } }
+              : {}),
           }),
           signal: AbortSignal.timeout(15000),
         });

@@ -4,7 +4,8 @@ export const NVIDIA_API_URL =
   getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 
 export const NVIDIA_ALLOWED_MODELS = [
-  "nvidia/nemotron-3-ultra-550b-a55b",
+  "minimaxai/minimax-m3.1-flash",
+  "nvidia/nemotron-3.5-bolt-e4b",
   "nvidia/nemotron-3.5-lightning-30b-a3b"
 ] as const;
 
@@ -15,7 +16,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "nvidia/nemotron-3-ultra-550b-a55b";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "minimaxai/minimax-m3.1-flash";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;

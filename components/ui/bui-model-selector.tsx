@@ -17,22 +17,22 @@ export type ModelOption = {
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
-    id: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    id: "nvidia/nemotron-3.5-bolt-e4b",
     name: "Fast Mode",
     badge: "⚡ Fast • 800ms",
     badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     latency: "⚡ Fast",
-    description: "Ultra-fast market reasoning & instant answers. Automatic Nemotron Ultra fallback.",
+    description: "Instant market answers & quick reasoning. Automatic MiniMax fallback.",
     icon: Zap,
     isDefault: true,
   },
   {
-    id: "nvidia/nemotron-3-ultra-550b-a55b",
+    id: "minimaxai/minimax-m3.1-flash",
     name: "Deep Mode",
     badge: "🧠 Deep • Ultra",
     badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     latency: "🧠 Deep",
-    description: "Flagship Nemotron 3 Ultra Wall Street quantitative analyst. Automatic Lightning fallback.",
+    description: "MiniMax M3.1 deep-dive Wall Street analyst. Automatic Lightning fallback.",
     icon: Brain,
   },
 ];
