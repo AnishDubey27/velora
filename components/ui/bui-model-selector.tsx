@@ -17,22 +17,22 @@ export type ModelOption = {
 
 export const MODEL_OPTIONS: ModelOption[] = [
   {
-    id: "stepfun-ai/step-3.7-flash",
+    id: "google/diffusiongemma-26b-a4b-it",
     name: "Fast Mode",
     badge: "⚡ Fast • 800ms",
     badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     latency: "⚡ Fast",
-    description: "Ultra-fast market reasoning & instant answers. Automatic Llama 3.1 8B fallback.",
+    description: "Ultra-fast market reasoning & instant answers. Automatic Nemotron Ultra fallback.",
     icon: Zap,
     isDefault: true,
   },
   {
-    id: "meta/llama-3.3-70b-instruct",
+    id: "nvidia/nemotron-3-ultra-550b-a55b",
     name: "Deep Mode",
-    badge: "🧠 Deep • 70B",
+    badge: "🧠 Deep • Ultra",
     badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     latency: "🧠 Deep",
-    description: "Flagship 70B Wall Street quantitative analyst. Automatic Step 3.7 & 8B fallbacks.",
+    description: "Flagship Nemotron 3 Ultra Wall Street quantitative analyst. Automatic DiffusionGemma fallback.",
     icon: Brain,
   },
 ];

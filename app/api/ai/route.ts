@@ -170,17 +170,15 @@ Always include highlighted trade parameters and risk score formatted as blockquo
     }
 
     // Define explicit Fast and Deep hierarchy fallback chains
-    const isDeepMode = model.includes("70b") || model === "deep";
+    const isDeepMode = model.includes("ultra") || model.includes("70b") || model === "deep";
     const modelsToTry = isDeepMode
       ? [
-          "meta/llama-3.3-70b-instruct",       // Primary Deep 70B Wall Street Analyst
-          "stepfun-ai/step-3.7-flash",         // Fallback 1: Fast reasoning
-          "meta/llama-3.1-8b-instruct",       // Fallback 2: Ultra-fast 450ms
+          "nvidia/nemotron-3-ultra-550b-a55b", // Primary Deep: flagship analyst
+          "google/diffusiongemma-26b-a4b-it",  // Fallback 1: Fast reasoning
         ]
       : [
-          "stepfun-ai/step-3.7-flash",         // Primary Fast Reasoning
-          "meta/llama-3.1-8b-instruct",       // Fallback 1: Ultra-fast 450ms
-          "mistralai/mistral-nemotron",        // Fallback 2: Financial benchmark
+          "google/diffusiongemma-26b-a4b-it",  // Primary Fast Reasoning
+          "nvidia/nemotron-3-ultra-550b-a55b", // Fallback 1: Deep analyst
         ];
 
     let lastError: any = null;
