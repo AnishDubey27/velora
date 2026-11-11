@@ -4,10 +4,8 @@ export const NVIDIA_API_URL =
   getEnv('NVIDIA_API_URL') ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 
 export const NVIDIA_ALLOWED_MODELS = [
-  "stepfun-ai/step-3.7-flash",
-  "meta/llama-3.3-70b-instruct",
-  "meta/llama-3.1-8b-instruct",
-  "mistralai/mistral-nemotron"
+  "nvidia/nemotron-3-ultra-550b-a55b",
+  "google/diffusiongemma-26b-a4b-it"
 ] as const;
 
 export type NvidiaAllowedModel = (typeof NVIDIA_ALLOWED_MODELS)[number];
@@ -17,7 +15,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "stepfun-ai/step-3.7-flash";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "nvidia/nemotron-3-ultra-550b-a55b";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;
