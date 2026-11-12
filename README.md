@@ -43,7 +43,7 @@ graph TD
     end
 
     subgraph Intelligence["Cognitive & Analytics Layer"]
-        NVIDIA["NVIDIA NIM Inference<br/>(Nemotron, Mistral, Gemma)"]
+        NVIDIA["NVIDIA NIM Inference<br/>(Nemotron, MiniMax)"]
         Microservices["Python Microservices<br/>(SEC 10-K & Transcript Parsers)"]
     end
 
@@ -134,7 +134,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **Yes** | Supabase anonymous public key for authentication and client requests |
 | `NEXT_PUBLIC_SITE_URL` | No | Base URL for auth redirects (default: `http://localhost:9999`) |
 | `NVIDIA_API_KEY` | **Yes** | NVIDIA NIM API key for AI chat and contextual research skills |
-| `NVIDIA_DEFAULT_MODEL` | No | Model identifier (defaults to `mistralai/mistral-nemotron`) |
+| `NVIDIA_DEFAULT_MODEL` | No | Model identifier (defaults to `nvidia/nemotron-3.5-bolt-e4b`) |
 | `FINNHUB_API_KEY` | **Yes** | API key for stock quotes, analyst targets, insider trades, and earnings |
 | `MARKETAUX_API_KEY` | **Yes** | API key for live global financial news streams and sentiment |
 | `FRED_API_KEY` | No | Federal Reserve Economic Data API key for macroeconomic & VIX data |

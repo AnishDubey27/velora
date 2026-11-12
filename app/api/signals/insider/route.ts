@@ -61,13 +61,15 @@ export async function GET() {
 
         for (const tx of transactions) {
           if (!tx.name || !tx.filingDate) continue;
+          // Filter out derivatives and non-monetary grants with zero price
+          if (tx.isDerivative || !tx.transactionPrice || tx.transactionPrice <= 0) continue;
 
           allTransactions.push({
             symbol,
             name: tx.name || "Unknown",
             transactionDate: tx.transactionDate || tx.filingDate,
             filingDate: tx.filingDate,
-            transactionCode: tx.transactionCode || "S",
+            transactionCode: tx.transactionCode || (tx.change > 0 ? "P" : "S"),
             transactionPrice: tx.transactionPrice ?? 0,
             change: tx.change ?? 0,
             share: tx.share ?? 0,

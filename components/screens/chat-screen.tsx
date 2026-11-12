@@ -715,6 +715,9 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
             </button>
           )}
         </form>
+        <p className="mt-2 text-center text-[10px] text-white/40">
+          Velora AI is a market intelligence and quantitative research tool. Insights are for educational purposes only, not financial advice.
+        </p>
       </div>
 
       <BuiSelectionActions onAskAI={(selected) => sendMessage(`Analyze this excerpt: "${selected}"`)} />

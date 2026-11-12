@@ -24,7 +24,7 @@ export function StockQuickStats({
   const stats = keyStats?.[0];
 
   const currentPrice = quote?.price ?? 0;
-  const parsedRange = stats?.weekRange52?.split(" - ");
+  const parsedRange = stats?.weekRange52 ? stats.weekRange52.split(/\s*-\s*/) : null;
   const rawLow = typeof quote?.yearLow === "number" && quote.yearLow > 0
     ? quote.yearLow
     : parsedRange?.[0] ? parseFloat(parsedRange[0]) : null;
@@ -47,7 +47,7 @@ export function StockQuickStats({
       <div className="p-3 rounded-xl border border-white/10 bg-[#0A0F1C]/90 backdrop-blur-md">
         <span className="text-[11px] text-white/50 block font-medium">Market Cap</span>
         <span className="text-sm font-bold text-white font-mono mt-0.5 block">
-          {marketCap ? `${currencySymbol}${formatLargeNumber(marketCap)}` : "—"}
+          {marketCap ? formatLargeNumber(marketCap, currencySymbol) : "—"}
         </span>
       </div>
 

@@ -68,7 +68,7 @@ export async function GET() {
         const validCloses = closes.filter((c): c is number => typeof c === "number" && !isNaN(c));
 
         const price = meta?.regularMarketPrice ?? validCloses[validCloses.length - 1] ?? 0;
-        const prevClose = meta?.chartPreviousClose ?? meta?.previousClose ?? validCloses[0] ?? price;
+        const prevClose = meta?.previousClose ?? meta?.regularMarketPreviousClose ?? meta?.chartPreviousClose ?? validCloses[0] ?? price;
         const changePercent = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
 
         // Downsample sparkline to ~6 points

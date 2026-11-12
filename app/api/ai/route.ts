@@ -49,7 +49,9 @@ When asked for trade ideas, stock breakdowns, or market analysis, format your ou
 
 Always include highlighted trade parameters and risk score formatted as blockquotes:
 > **TRADE SETUP:** Entry $X | Target $Y (+Z%) | Stop $W (-V%) | Conviction High
-> **RISK SCORE:** 7/10 (High Momentum / Growth)`;
+> **RISK SCORE:** 7/10 (High Momentum / Growth)
+
+IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitative analysis for informational and research purposes only, not financial or investment advice. Always append a brief disclaimer at the end of full analyses: "*Velora AI provides financial intelligence for informational and research purposes only, not investment advice.*"`;
 
     messages.unshift({ role: "system", content: baseSystemPrompt });
 
@@ -72,33 +74,94 @@ Always include highlighted trade parameters and risk score formatted as blockquo
           
         if (holdings && holdings.length > 0) {
           const finnhubKey = getEnv('FINNHUB_API_KEY');
-          const holdingsTextPromises = holdings.map(async (h) => {
-            let currentPriceStr = "";
-            if (finnhubKey) {
-              try {
-                const quoteRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${h.symbol}&token=${finnhubKey}`, { cache: "no-store" });
-                if (quoteRes.ok) {
-                  const quoteData = await quoteRes.json();
-                  if (quoteData && quoteData.c) {
-                    const currentPrice = quoteData.c;
-                    const percentChange = (((currentPrice - h.purchase_price) / h.purchase_price) * 100).toFixed(2);
-                    const isUp = currentPrice >= h.purchase_price;
-                    currentPriceStr = ` (Current Price: $${currentPrice}, Return: ${isUp ? '+' : ''}${percentChange}%)`;
+          
+          let totalPortfolioValue = 0;
+          let totalCostBasis = 0;
+          
+          const analyzedHoldings = await Promise.all(
+            holdings.map(async (h) => {
+              const shares = Number(h.shares) || 0;
+              const purchasePrice = Number(h.purchase_price) || 0;
+              let currentPrice = purchasePrice;
+              
+              if (finnhubKey) {
+                try {
+                  const quoteRes = await fetch(
+                    `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(h.symbol)}&token=${encodeURIComponent(finnhubKey)}`,
+                    { cache: "no-store", signal: AbortSignal.timeout(3000) }
+                  );
+                  if (quoteRes.ok) {
+                    const quoteData = await quoteRes.json();
+                    if (typeof quoteData?.c === "number" && quoteData.c > 0) {
+                      currentPrice = quoteData.c;
+                    }
                   }
+                } catch {
+                  // Fall back to purchase price
                 }
-              } catch (e) {
-                console.error(`Failed to fetch quote for ${h.symbol}`);
               }
-            }
-            return `${h.shares} shares of ${h.symbol} purchased at $${h.purchase_price}${currentPriceStr}`;
-          });
-          
-          const holdingsTexts = await Promise.all(holdingsTextPromises);
-          const holdingsText = holdingsTexts.join(", ");
-          
+              
+              const positionValue = shares * currentPrice;
+              const positionCost = shares * purchasePrice;
+              const returnDollar = positionValue - positionCost;
+              const returnPercent = positionCost > 0 ? (returnDollar / positionCost) * 100 : 0;
+              const isProfit = returnDollar >= 0;
+
+              return {
+                symbol: h.symbol,
+                shares,
+                purchasePrice,
+                currentPrice,
+                positionValue,
+                positionCost,
+                returnDollar,
+                returnPercent,
+                isProfit,
+              };
+            })
+          );
+
+          for (const item of analyzedHoldings) {
+            totalPortfolioValue += item.positionValue;
+            totalCostBasis += item.positionCost;
+          }
+
+          const totalReturnDollar = totalPortfolioValue - totalCostBasis;
+          const totalReturnPercent = totalCostBasis > 0 ? (totalReturnDollar / totalCostBasis) * 100 : 0;
+          const isTotalProfit = totalReturnDollar >= 0;
+
+          const winners = analyzedHoldings.filter((h) => h.isProfit);
+          const losers = analyzedHoldings.filter((h) => !h.isProfit);
+
+          const winnersText = winners.length > 0
+            ? winners.map(w => `  • ${w.symbol} (${w.shares} shs): Mkt Val $${w.positionValue.toFixed(2)} (Cur $${w.currentPrice.toFixed(2)}, Cost $${w.purchasePrice.toFixed(2)}) | Return: +$${w.returnDollar.toFixed(2)} (+${w.returnPercent.toFixed(2)}%) [WINNER/GAIN]`).join("\n")
+            : "  • None";
+
+          const losersText = losers.length > 0
+            ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (Cur $${l.currentPrice.toFixed(2)}, Cost $${l.purchasePrice.toFixed(2)}) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
+            : "  • None";
+
           const portfolioContext: ChatMessage = {
             role: "system",
-            content: `You are Velora AI. The user currently has the following portfolio holdings: ${holdingsText}. Keep this in mind and provide personalized advice if they ask about their portfolio.`
+            content: `======================================================================
+OFFICIAL VERIFIED PORTFOLIO METRICS (Source of Truth - Velora Portfolio Engine)
+======================================================================
+• Total Portfolio Market Value: $${totalPortfolioValue.toFixed(2)}
+• Total Portfolio Cost Basis: $${totalCostBasis.toFixed(2)}
+• All-Time Unrealized Return: ${isTotalProfit ? '+' : '-'}$${Math.abs(totalReturnDollar).toFixed(2)} (${isTotalProfit ? '+' : ''}${totalReturnPercent.toFixed(2)}%) [${isTotalProfit ? 'OVERALL PROFIT' : 'OVERALL LOSS'}]
+
+WINNERS / PROFITABLE POSITIONS (Return >= 0%):
+${winnersText}
+
+UNDERPERFORMERS / UNPROFITABLE POSITIONS (Return < 0%):
+${losersText}
+
+CRITICAL ACCURACY & GROUNDING RULES:
+1. The Total Portfolio Market Value is EXACTLY $${totalPortfolioValue.toFixed(2)}. NEVER cite any other total (do NOT hallucinate $13,370 or any other unverified number).
+2. POSITIONS LISTED UNDER "WINNERS" HAVE POSITIVE RETURNS (+). Never classify a winner as a loss, drag, or underperformer.
+3. POSITIONS LISTED UNDER "UNDERPERFORMERS" HAVE NEGATIVE RETURNS (-).
+4. When performing a Portfolio Health Check or answering questions about holdings, cite these EXACT numbers and metrics.
+======================================================================`
           };
           messages.splice(1, 0, portfolioContext);
         }
@@ -173,14 +236,15 @@ Always include highlighted trade parameters and risk score formatted as blockquo
     const isDeepMode = model.includes("minimax") || model === "deep";
     const modelsToTry = isDeepMode
       ? [
-          "minimaxai/minimax-m3.1-flash",      // Primary Deep analyst
+          "minimaxai/minimax-m3.1-flash",          // Primary Deep analyst
           "nvidia/nemotron-3.5-lightning-30b-a3b", // Fallback 1: Fast reasoning
         ]
       : [
-          "nvidia/nemotron-3.5-bolt-e4b",      // Primary Fast: instant answers
-          "minimaxai/minimax-m3.1-flash",      // Fallback 1: Deep analyst
+          "nvidia/nemotron-3.5-bolt-e4b",          // Primary Fast: instant answers
+          "minimaxai/minimax-m3.1-flash",          // Fallback 1: Deep analyst
         ];
 
+    const timeoutMs = isDeepMode ? 30000 : 15000;
     let lastError: any = null;
 
     for (const attemptModel of modelsToTry) {
@@ -197,11 +261,9 @@ Always include highlighted trade parameters and risk score formatted as blockquo
             temperature: typeof payload?.temperature === "number" ? payload.temperature : 0.2,
             max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
             stream: true,
-            ...(attemptModel.includes("nemotron")
-              ? { chat_template_kwargs: { enable_thinking: false } }
-              : {}),
+            chat_template_kwargs: { enable_thinking: false },
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
         if (!res.ok || !res.body) {
@@ -218,6 +280,7 @@ Always include highlighted trade parameters and risk score formatted as blockquo
             const reader = res.body!.getReader();
             let buffer = "";
             let inThinkingBlock = false;
+            let tokensEmitted = 0;
 
             try {
               while (true) {
@@ -240,20 +303,23 @@ Always include highlighted trade parameters and risk score formatted as blockquo
                     try {
                       const json = JSON.parse(trimmed.slice(6));
                       const delta = json.choices?.[0]?.delta;
-                      let token = delta?.content || delta?.reasoning_content || "";
+                      // STRICTLY stream final content only. NEVER stream reasoning/thinking tokens to user!
+                      let token = delta?.content || "";
 
                       if (token) {
                         // Filter out <think> tags if present
-                        if (token.includes("<think>")) {
+                        if (token.includes("<think>") && token.includes("</think>")) {
+                          token = token.replace(/<think>[\s\S]*?<\/think>/gi, "");
+                        } else if (token.includes("<think>")) {
                           inThinkingBlock = true;
                           token = token.replace(/<think>[\s\S]*/gi, "");
-                        }
-                        if (token.includes("</think>")) {
+                        } else if (token.includes("</think>")) {
                           inThinkingBlock = false;
                           token = token.replace(/[\s\S]*<\/think>/gi, "");
                         }
 
                         if (!inThinkingBlock && token) {
+                          tokensEmitted++;
                           controller.enqueue(
                             encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`)
                           );

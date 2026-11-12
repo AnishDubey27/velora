@@ -134,6 +134,12 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
   const [insiderPreview, setInsiderPreview] = useState<InsiderPreview | null>(null);
   const [congressPreview, setCongressPreview] = useState<CongressPreview | null>(null);
   const [superInvestorPreview, setSuperInvestorPreview] = useState<SuperInvestorPreview | null>(null);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoadTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // We keep signal previews in a useEffect with a simple local cache or just fetch directly 
   // since SWR for 4 separate signal fetches might be overkill to type out, but let's just use SWR for them too.
@@ -158,7 +164,7 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
   useEffect(() => {
     // Process Insider
     const trades = insiderDataRaw?.trades || insiderDataRaw?.data || insiderDataRaw;
-    if (Array.isArray(trades) && trades[0]) {
+    if (Array.isArray(trades) && trades.length > 0 && trades[0]) {
       const t = trades[0];
       const isBuy = (t.change > 0) || t.transactionCode === "P" || t.action === "BUY";
       setInsiderPreview({
@@ -173,7 +179,7 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
   useEffect(() => {
     // Process Congress
     const trades = congressDataRaw?.trades || congressDataRaw;
-    if (Array.isArray(trades) && trades[0]) {
+    if (Array.isArray(trades) && trades.length > 0 && trades[0]) {
       const t = trades[0];
       const isBuy = (t.action || t.transaction_type || "").toLowerCase().includes("purchase") ||
                     (t.action || "").toUpperCase() === "BUY";
@@ -183,18 +189,33 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
         amount: t.amount || "—",
         person: `${t.politician || t.representative || t.senator || "Unknown"} • ${t.date ? new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent"}`,
       });
+    } else if (congressDataRaw && Array.isArray(trades) && trades.length === 0) {
+      setCongressPreview({
+        symbol: "—",
+        action: "—",
+        amount: "—",
+        person: "No recent filings",
+      });
     }
   }, [congressDataRaw]);
 
   useEffect(() => {
     // Process Super Investors
-    const plays = superInvestorsDataRaw?.convictionPlays || superInvestorsDataRaw?.topPlays;
-    if (plays && plays[0]) {
-      const p = plays[0];
+    const plays = superInvestorsDataRaw?.convictionPlays;
+    const topPlay = Array.isArray(plays)
+      ? plays[0]
+      : plays?.added?.[0] || plays?.new?.[0] || superInvestorsDataRaw?.notableTrades?.[0];
+    if (topPlay) {
       setSuperInvestorPreview({
-        symbol: p.ticker || p.symbol || "—",
-        action: p.investorCount ? `${p.investorCount} investors added` : p.action || "Added",
-        firm: p.investors?.join(", ") || p.firm || "—",
+        symbol: topPlay.ticker || topPlay.symbol || "—",
+        action: topPlay.investorCount ? `${topPlay.investorCount} funds buying` : topPlay.action || "Added",
+        firm: Array.isArray(topPlay.investors) ? topPlay.investors.slice(0, 2).join(", ") : topPlay.investor || topPlay.firm || "Institutional",
+      });
+    } else if (superInvestorsDataRaw) {
+      setSuperInvestorPreview({
+        symbol: "—",
+        action: "—",
+        firm: "13F Filings Current",
       });
     }
   }, [superInvestorsDataRaw]);
@@ -205,10 +226,8 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
     if (scrollContainer) scrollContainer.scrollTop = 0;
   }, []);
 
-
-
-  const snapshotTitle = snapshot?.title || "Loading Snapshot...";
-  const snapshotBody = snapshot?.summary || "Generating market summary...";
+  const snapshotTitle = snapshot?.title || (loadTimedOut ? "Markets Processing Data" : "Loading Snapshot...");
+  const snapshotBody = snapshot?.summary || (loadTimedOut ? "Real-time market telemetry synchronized." : "Generating market summary...");
   const snapshotUpdated = indicators?.asOf ? formatDateTime(indicators.asOf) : null;
   const snapshotTime = snapshot?.updatedAt ? formatDateTime(snapshot.updatedAt) : snapshotUpdated;
 
@@ -217,26 +236,26 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
     symbol: "—",
     action: "—",
     amount: "—",
-    person: "Loading...",
+    person: loadTimedOut ? "Unavailable" : "Loading...",
   };
 
   const redditData = redditPreview || {
     symbol: "—",
     rankChange: "—",
-    mentions: "Loading...",
+    mentions: loadTimedOut ? "Unavailable" : "Loading...",
   };
 
   const insiderData = insiderPreview || {
     symbol: "—",
     action: "—",
     price: "—",
-    person: "Loading...",
+    person: loadTimedOut ? "Unavailable" : "Loading...",
   };
 
   const superInvestorData = superInvestorPreview || {
     symbol: "—",
     action: "—",
-    firm: "Loading...",
+    firm: loadTimedOut ? "Unavailable" : "Loading...",
   };
 
   const hasSignals = Boolean(redditPreview || insiderPreview || congressPreview || superInvestorPreview);

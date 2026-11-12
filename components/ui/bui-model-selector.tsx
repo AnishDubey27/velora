@@ -29,7 +29,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
   {
     id: "minimaxai/minimax-m3.1-flash",
     name: "Deep Mode",
-    badge: "🧠 Deep • Ultra",
+    badge: "🧠 Deep • MiniMax",
     badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
     latency: "🧠 Deep",
     description: "MiniMax M3.1 deep-dive Wall Street analyst. Automatic Lightning fallback.",
@@ -88,7 +88,7 @@ export function BuiModelSelector({ selectedModel, onSelectModel, className }: Bu
               <Sparkles size={13} className="text-vel-teal" />
               <span>NVIDIA NIM Engine</span>
             </div>
-            <span className="text-[10px] text-white/40 font-mono">6 Models Available</span>
+            <span className="text-[10px] text-white/40 font-mono">3 Models Available</span>
           </div>
 
           <div className="mt-1 space-y-1 max-h-72 overflow-y-auto app-scroll">

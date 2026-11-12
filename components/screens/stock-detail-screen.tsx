@@ -204,6 +204,13 @@ export function StockDetailScreen({ symbol, onBack, onStartChat }: { symbol: str
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Persistent Disclaimer */}
+      <div className="px-1 py-6 border-t border-white/5 text-center">
+        <p className="text-[11px] text-white/40 max-w-xl mx-auto leading-relaxed">
+          Disclaimer: Velora provides market data, technical telemetry, and AI synthesis for educational and informational purposes only. Nothing herein constitutes investment advice, financial planning, or a recommendation to buy or sell securities.
+        </p>
+      </div>
     </div>
   );
 }

@@ -16,7 +16,7 @@ export function isAllowedNvidiaModel(model: string): model is NvidiaAllowedModel
 }
 
 /** Default model used when no explicit model is requested */
-export const DEFAULT_MODEL: NvidiaAllowedModel = "minimaxai/minimax-m3.1-flash";
+export const DEFAULT_MODEL: NvidiaAllowedModel = "nvidia/nemotron-3.5-bolt-e4b";
 
 export function resolveNvidiaModel(requested: unknown) {
   const fromRequest = typeof requested === "string" ? requested : undefined;

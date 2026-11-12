@@ -29,19 +29,51 @@ async function fetchJson(url: string, init?: RequestInit) {
 }
 
 async function getSp500() {
+  // Try fetching genuine S&P 500 Index level (^GSPC) via Yahoo Finance Chart API
+  try {
+    const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d";
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const meta = json?.chart?.result?.[0]?.meta;
+      const price = toNumber(meta?.regularMarketPrice);
+      const prev = toNumber(meta?.previousClose ?? meta?.chartPreviousClose);
+      if (price !== null) {
+        const changePercent = prev && prev > 0 ? ((price - prev) / prev) * 100 : null;
+        return {
+          symbol: "^GSPC",
+          price,
+          changePercent,
+          source: "S&P 500 Index",
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Yahoo ^GSPC fetch failed, falling back to Finnhub SPY:", err);
+  }
+
+  // Fallback to Finnhub SPY ETF quote if index quote unavailable
   if (!FINNHUB_KEY) return { symbol: "SPY", price: null, changePercent: null, source: "Finnhub" };
 
-  const data = await fetchJson(
-    `https://finnhub.io/api/v1/quote?symbol=SPY&token=${encodeURIComponent(FINNHUB_KEY)}`,
-    { cache: "no-store" }
-  );
+  try {
+    const data = await fetchJson(
+      `https://finnhub.io/api/v1/quote?symbol=SPY&token=${encodeURIComponent(FINNHUB_KEY)}`,
+      { cache: "no-store", signal: AbortSignal.timeout(3000) }
+    );
 
-  return {
-    symbol: "SPY",
-    price: toNumber(data?.c),
-    changePercent: toNumber(data?.dp),
-    source: "Finnhub",
-  };
+    return {
+      symbol: "SPY",
+      price: toNumber(data?.c),
+      changePercent: toNumber(data?.dp),
+      source: "Finnhub",
+    };
+  } catch {
+    return { symbol: "SPY", price: null, changePercent: null, source: "Finnhub" };
+  }
 }
 
 async function getBitcoin() {
