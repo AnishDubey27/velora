@@ -42,15 +42,27 @@ function InfographicBlockquote({ children }: any) {
 
   // 1. Trade Setup Infographic Card
   if (rawText.toUpperCase().includes("TRADE SETUP")) {
-    const entryMatch = rawText.match(/Entry:\s*([^|]+)/i);
-    const targetMatch = rawText.match(/Target:\s*([^|]+)/i);
-    const stopMatch = rawText.match(/Stop\s*Loss:\s*([^|]+)/i);
-    const biasMatch = rawText.match(/Bias:\s*([^|]+)/i);
+    const entryMatch = rawText.match(/(?:Entry:?|Entry Zone:?)\s*([^|]+)/i);
+    const targetMatch = rawText.match(/(?:Target:?|Price Target:?)\s*([^|]+)/i);
+    const stopMatch = rawText.match(/(?:Stop\s*Loss:?|Stop:?)\s*([^|]+)/i);
+    const biasMatch = rawText.match(/(?:Bias:?|Conviction:?)\s*([^|]+)/i);
 
     const entry = entryMatch ? entryMatch[1].trim() : null;
     const target = targetMatch ? targetMatch[1].trim() : null;
     const stop = stopMatch ? stopMatch[1].trim() : null;
     const bias = biasMatch ? biasMatch[1].trim() : "Bullish";
+
+    const isTargetInvalid = !target || target.toUpperCase() === "N/A" || target.toUpperCase().includes("N/A");
+    const isStopInvalid = !stop || stop.toUpperCase() === "N/A" || stop.toUpperCase().includes("N/A");
+
+    // Task D: Never render "N/A" for trade plan. If target and stop are both missing/invalid, omit card
+    if (isTargetInvalid && isStopInvalid) {
+      return (
+        <blockquote className="my-3.5 rounded-2xl border-l-4 border-vel-teal bg-gradient-to-r from-vel-teal/20 via-cyan-500/10 to-transparent p-4 text-white/95 text-xs md:text-sm font-medium shadow-lg shadow-black/40 backdrop-blur-md">
+          {children}
+        </blockquote>
+      );
+    }
 
     const isBullish = bias.toLowerCase().includes("bull");
     const isBearish = bias.toLowerCase().includes("bear");
@@ -77,7 +89,7 @@ function InfographicBlockquote({ children }: any) {
           </span>
         </div>
 
-        {/* 3 Visual Pillar Stat Boxes */}
+        {/* Visual Pillar Stat Boxes - Never render N/A */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
           {/* Entry Box */}
           <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 flex flex-col">
@@ -90,24 +102,28 @@ function InfographicBlockquote({ children }: any) {
           </div>
 
           {/* Target Box */}
-          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex flex-col">
-            <span className="text-[11px] font-medium uppercase text-emerald-400 mb-1 flex items-center gap-1">
-              <TrendingUp size={12} /> Price Target
-            </span>
-            <span className="text-sm md:text-base font-bold text-emerald-300 font-mono">
-              {target || "N/A"}
-            </span>
-          </div>
+          {!isTargetInvalid && (
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex flex-col">
+              <span className="text-[11px] font-medium uppercase text-emerald-400 mb-1 flex items-center gap-1">
+                <TrendingUp size={12} /> Price Target
+              </span>
+              <span className="text-sm md:text-base font-bold text-emerald-300 font-mono">
+                {target}
+              </span>
+            </div>
+          )}
 
           {/* Stop Loss Box */}
-          <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 flex flex-col">
-            <span className="text-[11px] font-medium uppercase text-rose-400 mb-1 flex items-center gap-1">
-              <TrendingDown size={12} /> Stop Loss
-            </span>
-            <span className="text-sm md:text-base font-bold text-rose-300 font-mono">
-              {stop || "N/A"}
-            </span>
-          </div>
+          {!isStopInvalid && (
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 flex flex-col">
+              <span className="text-[11px] font-medium uppercase text-rose-400 mb-1 flex items-center gap-1">
+                <TrendingDown size={12} /> Stop Loss
+              </span>
+              <span className="text-sm md:text-base font-bold text-rose-300 font-mono">
+                {stop}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -293,6 +309,8 @@ const STOCK_SUGGESTIONS = [
   { label: "Tell me more about this company", icon: "🏢" },
 ];
 
+const CHAT_STORAGE_KEY = "velora_chat_history_v1";
+
 export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -305,6 +323,44 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const hasSubmittedInitial = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Restore chat history from localStorage on initial load
+  useEffect(() => {
+    if (!initialPrompt && !skillContext) {
+      try {
+        const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore chat history:", e);
+      }
+    }
+  }, [initialPrompt, skillContext]);
+
+  // Persist chat history to localStorage on completion
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      try {
+        const valid = messages.filter(m => m.content && m.content.trim() !== "");
+        if (valid.length > 0) {
+          localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(valid));
+        }
+      } catch (e) {
+        console.error("Failed to save chat history:", e);
+      }
+    }
+  }, [messages, isLoading]);
+
+  const handleClearHistory = () => {
+    setMessages([]);
+    try {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+    } catch {}
+  };
 
   // Auto-submit initial prompt or skill context (only once)
   useEffect(() => {
@@ -605,6 +661,15 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           </div>
         </div>
         <div className="flex-1" />
+        {messages.length > 0 && (
+          <button
+            onClick={handleClearHistory}
+            className="text-xs px-2.5 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition"
+            title="Clear conversation"
+          >
+            Clear
+          </button>
+        )}
         <BuiModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
       </div>
 
