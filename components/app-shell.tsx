@@ -84,7 +84,7 @@ export function AppShell({
             {/* Navigation Items */}
             <nav className="p-2.5 pt-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1.5">
               {navItems.map(({ key, label, icon: Icon }) => {
-                const isActive = active === key;
+                const isActive = active === key || (key === "research" && active === "chat");
                 return (
                   <button
                     key={key}

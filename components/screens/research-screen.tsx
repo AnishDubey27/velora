@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp, Sparkles, Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/types";
+import { BuiModelSelector } from "@/components/ui/bui-model-selector";
+import { DEFAULT_MODEL } from "@/lib/nvidia";
 
 type ResearchScreenProps = {
   skills: Skill[];
@@ -25,6 +27,23 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   const popular = skills.filter((skill) => skill.popular).slice(0, 3);
   const shouldCenterPopular = popular.length <= 3;
   const [hasSavedChat, setHasSavedChat] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("velora_chat_model_v1");
+        if (saved && (saved.includes("minimax") || saved.includes("nemotron"))) {
+          return saved;
+        }
+      } catch {}
+    }
+    return DEFAULT_MODEL;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("velora_chat_model_v1", selectedModel);
+    } catch {}
+  }, [selectedModel]);
 
   useEffect(() => {
     try {
@@ -48,6 +67,20 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
 
   return (
     <div className="relative overflow-hidden bg-[#05080F] flex flex-col justify-between min-h-[calc(100dvh-152px)] md:min-h-[calc(100dvh-136px)] pb-4 pt-0 md:pb-6">
+      {/* Header bar matching ChatScreen */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-[#05080F]/90 backdrop-blur-md z-20 relative">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-full bg-vel-teal/20 flex items-center justify-center">
+            <Bot size={16} className="text-vel-teal" />
+          </div>
+          <div>
+            <h2 className="text-[15px] font-semibold text-white">Velora AI</h2>
+            <p className="text-[11px] text-white/50">Powered by NVIDIA NIM & Tavily</p>
+          </div>
+        </div>
+        <div className="flex-1" />
+        <BuiModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
+      </div>
       {/* Layer 2: Seamless Atmospheric Financial Intelligence Network Video */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <video

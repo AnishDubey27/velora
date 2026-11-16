@@ -187,7 +187,9 @@ function InfographicBlockquote({ children }: any) {
 
 // ── Smart Table Cell Badge Renderer ──
 function SmartTableCell({ children }: any) {
-  const text = extractText(children).trim();
+  const rawText = extractText(children).trim();
+  // Strip self-correction arrow patterns like "$3.92T → $1.50T" or "$100 -> $150"
+  const text = rawText.replace(/(\$[\d.]+[TMBk]?)\s*(?:→|->)\s*(\$[\d.]+[TMBk]?)/g, "$2");
   const upper = text.toUpperCase();
 
   const isBuy = ["BUY", "STRONG BUY", "BULLISH", "BEAT", "OUTPERFORM", "POSITIVE"].includes(upper);
@@ -209,7 +211,7 @@ function SmartTableCell({ children }: any) {
     );
   }
 
-  return <td className="px-3.5 py-2.5 text-white/85">{children}</td>;
+  return <td className="px-3.5 py-2.5 text-white/85">{text !== rawText ? text : children}</td>;
 }
 
 const markdownComponents = {
@@ -376,8 +378,12 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   };
 
   const handleNewChat = () => {
+    if (isLoading && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+    }
     handleClearHistory();
-    onBack();
   };
 
   // Auto-submit initial prompt or skill context (only once per unique prompt)
@@ -690,7 +696,46 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       </div>
 
       <div className="flex-1 overflow-y-auto app-scroll px-4 py-6 space-y-6">
-        {messages.filter(m => m.role !== "system").map((msg, i) => (
+        {messages.filter(m => m.role !== "system").length === 0 ? (
+          <div className="h-full min-h-[360px] flex flex-col items-center justify-center text-center px-4 py-8 max-w-xl mx-auto space-y-6">
+            <div className="h-14 w-14 rounded-2xl bg-vel-teal/10 border border-vel-teal/20 flex items-center justify-center shadow-lg shadow-vel-teal/10">
+              <Bot size={28} className="text-vel-teal" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-white mb-2 tracking-tight">
+                Velora Financial Intelligence
+              </h1>
+              <p className="text-xs md:text-sm text-white/60 max-w-md mx-auto leading-relaxed">
+                Institutional-grade AI stock analysis, portfolio health diagnostics, and multi-ticker comparisons grounded in live market data.
+              </p>
+            </div>
+
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+              {[
+                { title: "Portfolio Health Check", desc: "Concentration, win rates, and exposure risk", prompt: "Run a full portfolio health check on my Velora portfolio" },
+                { title: "Multi-Ticker Analysis", desc: "Compare NVDA & TSLA fundamentals", prompt: "Give me a combined full analysis of NVDA and TSLA" },
+                { title: "Earnings & News Impact", desc: "Analyze recent price action and catalysts", prompt: "Why did Nvidia fall today?" },
+                { title: "Stock Valuation", desc: "Current price, P/E ratio, and market cap", prompt: "What is Tesla's current stock price and P/E ratio?" },
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => sendMessage(item.prompt)}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left hover:border-vel-teal/40 hover:bg-white/[0.06] transition group"
+                >
+                  <div className="text-xs font-semibold text-white group-hover:text-teal-300 flex items-center justify-between">
+                    <span>{item.title}</span>
+                    <Sparkles size={13} className="text-vel-teal opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <div className="text-[11px] text-white/50 mt-1 line-clamp-1">
+                    {item.desc}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          messages.filter(m => m.role !== "system").map((msg, i) => (
           <motion.div 
             key={i}
             initial={{ opacity: 0, y: 10 }}
@@ -755,7 +800,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
               )}
             </div>
           </motion.div>
-        ))}
+        )))}
         <div ref={endOfMessagesRef} />
       </div>
 

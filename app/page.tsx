@@ -55,6 +55,8 @@ export default function Home() {
       } else if (cikParam && tabParam === "super-investor-profile") {
         setSelectedInvestorCik(cikParam);
         setActive("super-investor-profile");
+      } else if (tabParam === "research") {
+        setActive("chat");
       } else if (tabParam) {
         setActive(tabParam);
       }
@@ -94,8 +96,8 @@ export default function Home() {
     } else if (key === "super-investor-profile" && extraParams?.cik) {
       url.searchParams.set("tab", "super-investor-profile");
       url.searchParams.set("cik", extraParams.cik);
-    } else if (key !== "research") {
-      url.searchParams.set("tab", key);
+    } else {
+      url.searchParams.set("tab", key === "research" ? "chat" : key);
     }
 
     window.history.pushState(null, "", url.pathname + (url.search ? url.search : ""));
@@ -104,17 +106,9 @@ export default function Home() {
   const handleNavigate = (key: NavKey) => {
     setSkillLibraryOpen(false);
     if (key === "research") {
-      try {
-        const saved = typeof window !== "undefined" ? localStorage.getItem("velora_chat_history_v1") : null;
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setActive("chat");
-            updateUrl("chat");
-            return;
-          }
-        }
-      } catch {}
+      setActive("chat");
+      updateUrl("chat");
+      return;
     }
     setActive(key);
     updateUrl(key);
@@ -226,7 +220,8 @@ export default function Home() {
             initialPrompt={chatPrompt}
             skillContext={skillContext}
             onBack={() => {
-              setActive("research");
+              setActive("dashboard");
+              updateUrl("dashboard");
               setChatPrompt("");
               setSkillContext(undefined);
             }} 
@@ -269,18 +264,18 @@ export default function Home() {
             }}
           />
         );
+      case "research":
       default:
         return (
-          <ResearchScreen
-            skills={skills}
-            onOpenSkills={() => setSkillLibraryOpen(true)}
-            onSelectSkill={handleSelectSkill}
-            onStartChat={(prompt) => {
+          <ChatScreen 
+            initialPrompt={chatPrompt}
+            skillContext={skillContext}
+            onBack={() => {
+              setActive("dashboard");
+              updateUrl("dashboard");
+              setChatPrompt("");
               setSkillContext(undefined);
-              setChatPrompt(prompt);
-              setActive("chat");
-              updateUrl("chat");
-            }}
+            }} 
           />
         );
     }

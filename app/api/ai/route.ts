@@ -185,22 +185,34 @@ When asked for trade ideas, stock breakdowns, or market analysis, format your ou
 ## 4. Technical Setup & Trade Plan
 ## 5. Downside Risks & Portfolio Impact
 
-MANDATORY TRADE PLAN & TECHNICAL RULES:
+MANDATORY TRADE PLAN & TECHNICAL RULES (SECTION 4):
+- UNIFORMLY OMIT all unverified third-party technical levels (such as guessing secondary support, resistance, pivot, or dip-buying levels).
+- You may ONLY cite verified price metrics provided in the official data: Current Price ($X.XX) and 52-Week Range ($Low - $High).
+- In Section 4 ("## 4. Technical Setup & Trade Plan"), evaluate price action strictly relative to its Current Price and 52-Week Range (e.g. trading near the upper or lower boundary of its 52-week range). Discuss technical momentum, trends, and volume qualitatively WITHOUT fabricating arbitrary dollar support or resistance numbers.
 - If and ONLY IF a "Verified Trade Setup" is provided in the official market data below, output:
 > **TRADE SETUP:** Entry $X | Target $Y (+Z%) | Stop $W (-V%) | Conviction High
 > **RISK SCORE:** 7/10 (High Momentum / Growth)
 - NEVER invent a Target Price or percentage. NEVER output an inverted percentage (e.g. Target below Entry labelled with positive percentage).
 - If NO verified trade setup is provided above (or marked as NO VERIFIED ANALYST PRICE TARGET AVAILABLE), you MUST completely OMIT the "> **TRADE SETUP:**" block from your answer.
 - NEVER write "N/A" for Target or Stop (e.g. NEVER output "PRICE TARGET: N/A" or "STOP LOSS: N/A").
-- ABSOLUTELY NO INVENTED TECHNICAL LEVELS: Do NOT invent, hallucinate, or guess technical price levels (such as guessing "Resistance $168.50", "Support $160.00", or "buy on dips toward $200-$220" when the stock is at $162.85). You may ONLY cite verified price levels present in the data (e.g. 52-Week Low, 52-Week High, or Current Price). If secondary support or resistance levels are not provided in the data, discuss technical trends, momentum, or chart patterns qualitatively without fabricating specific dollar numbers.
+- STRICT NUMERICAL DIRECTION & ORDERING: NEVER make inverted directional claims. For example, NEVER claim that a higher price ($220) is "below" a lower price ($162.85), or that a lower price is "above" a higher price. Verify all numerical comparisons.
 - ABSOLUTE PERCENTAGE & UNIT DISCIPLINE: In prose narrative, percentage changes MUST match the verified changePercent (e.g. "-2.01%"). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%" — write "it fell $3.34 (-2.01%)").
+
+CRITICAL TABLE FORMATTING RULE:
+- In Markdown tables, each cell must contain exactly one clean, final value.
+- NEVER output self-correction arrows, transitions, or revision patterns (such as "$3.92T → $1.50T" or "A -> B") inside table cells. Output ONLY the single final verified number (e.g. "$1.50T").
 
 MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
 - For ANY subject stock, check its verified portfolio standing:
   * If the stock IS held in the user's portfolio: state its exact holding size, return, and Winner/Underperformer status from the verified portfolio data as a single indivisible unit.
   * If the stock is NOT held in the user's portfolio: state explicitly that it is NOT currently held in the user's portfolio.
   * NEVER cross-assign or swap returns between different stocks (e.g. NEVER assign a loss from another stock like FSLR to TSLA).
+- STRICT COST BASIS & PER-SHARE DISTINCTION:
+  * Clearly distinguish between Total Cost Basis ($X.XX) and Per-Share Purchase Price ($Y.YY/share).
+  * When mentioning cost in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)" (e.g. "Total Cost of $14.15 ($283.00 per share)").
+  * NEVER state that the cost basis is $283.00 without specifying "per share", and NEVER claim the entire position cost $283.00 when the total cost was $14.15.
 - Derived Portfolio Aggregates: When discussing portfolio concentration or holdings weights in narrative, quote the exact pre-computed percentages from the official data. Never confuse "% of portfolio value" with "% of unrealized gains".
+- Citing Individual Holding P&L: ALWAYS copy the exact dollar P&L directly from the verified table (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate in your head.
 
 MANDATORY SOURCES FORMATTING:
 At the very end of your response, you MUST provide a "## Sources" section listing every source:
@@ -238,13 +250,6 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
           .select('symbol, shares, purchase_price')
           .eq('user_id', user.id);
         userHoldings = holdings;
-      }
-      if ((!userHoldings || userHoldings.length === 0) && Array.isArray(payload?.holdings) && payload.holdings.length > 0) {
-        userHoldings = payload.holdings.map((h: any) => ({
-          symbol: String(h.symbol || "").toUpperCase(),
-          shares: Number(h.shares) || 0,
-          purchase_price: Number(h.purchase_price ?? h.purchasePrice) || 0,
-        }));
       }
 
       if (userHoldings && userHoldings.length > 0) {
@@ -353,18 +358,18 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
 
           // Underperformers individual weights breakdown
           const underperformersWeightsList = sortedLosers.map(l =>
-            `  • ${l.symbol}: Value $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of total portfolio value) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%)`
+            `  • ${l.symbol}: Value $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of total portfolio value) | Total Cost: $${l.positionCost.toFixed(2)} ($${l.purchasePrice.toFixed(2)} per share purchase price) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%)`
           ).join("\n");
           const largestLoserByWeight = sortedLosers[0]
             ? `${sortedLosers[0].symbol} at $${sortedLosers[0].positionValue.toFixed(2)} (${sortedLosers[0].weightPercent.toFixed(1)}% of portfolio value)`
             : "None";
 
           const winnersText = winners.length > 0
-            ? winners.map(w => `  • ${w.symbol} (${w.shares} shs): Mkt Val $${w.positionValue.toFixed(2)} (${w.weightPercent.toFixed(1)}% of port) | Return: +$${w.returnDollar.toFixed(2)} (+${w.returnPercent.toFixed(2)}%) [WINNER/GAIN]`).join("\n")
+            ? winners.map(w => `  • ${w.symbol} (${w.shares} shs): Mkt Val $${w.positionValue.toFixed(2)} (${w.weightPercent.toFixed(1)}% of port) | Total Cost: $${w.positionCost.toFixed(2)} ($${w.purchasePrice.toFixed(2)} per share purchase price) | Return: +$${w.returnDollar.toFixed(2)} (+${w.returnPercent.toFixed(2)}%) [WINNER/GAIN]`).join("\n")
             : "  • None";
 
           const losersText = losers.length > 0
-            ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of port) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
+            ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of port) | Total Cost: $${l.positionCost.toFixed(2)} ($${l.purchasePrice.toFixed(2)} per share purchase price) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
             : "  • None";
 
           const portfolioContext: ChatMessage = {
@@ -396,11 +401,13 @@ ${losersText}
 CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 1. The Total Portfolio Market Value is EXACTLY $${totalPortfolioValue.toFixed(2)}. NEVER cite any other total (do NOT hallucinate $13,370 or any other unverified number).
 2. ALWAYS quote the exact pre-computed percentages and dollars from the verified data above. DO NOT calculate concentration percentages, sums, or weights in your head.
-3. Denominator Discipline: Distinguish strictly between "% of portfolio value" (denominator is Total Portfolio Market Value $${totalPortfolioValue.toFixed(2)}) and "% of unrealized gains" or "% return on cost". NEVER describe a dollar amount representing a share of portfolio value as a share of unrealized gains.
-4. Concentration Labels: Do NOT mislabel Top-5 concentration as Top-3 concentration. Top-3 overall holdings concentration is EXACTLY ${top3Weight.toFixed(1)}% (or Top-3 winners ${top3WinnersWeight.toFixed(1)}%); Top-5 concentration is EXACTLY ${top5Weight.toFixed(1)}%.
-5. Underperformer Claims: NEVER say "no single losing position exceeds X%" unless that claim is strictly true against the verified Underperformers list above (e.g. if CRSP is 5.0% and FSLR is 4.3%, do NOT claim no losing position exceeds 3.5%).
-6. POSITIONS LISTED UNDER "WINNERS" HAVE POSITIVE RETURNS (+). Never classify a winner as a loss, drag, or underperformer.
-7. POSITIONS LISTED UNDER "UNDERPERFORMERS" HAVE NEGATIVE RETURNS (-).
+3. CENT-LEVEL P&L ACCURACY: When citing dollar profit or loss for individual holdings (e.g. CRSP, BWXT, TSLA, FSLR), you MUST COPY the exact dollar figures directly from the verified lists above (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate individual dollar P&L in your head.
+4. Denominator Discipline: Distinguish strictly between "% of portfolio value" (denominator is Total Portfolio Market Value $${totalPortfolioValue.toFixed(2)}) and "% of unrealized gains" or "% return on cost". NEVER describe a dollar amount representing a share of portfolio value as a share of unrealized gains.
+5. Concentration Labels: Do NOT mislabel Top-5 concentration as Top-3 concentration. Top-3 overall holdings concentration is EXACTLY ${top3Weight.toFixed(1)}% (or Top-3 winners ${top3WinnersWeight.toFixed(1)}%); Top-5 concentration is EXACTLY ${top5Weight.toFixed(1)}%.
+6. Underperformer Claims: NEVER say "no single losing position exceeds X%" unless that claim is strictly true against the verified Underperformers list above (e.g. if CRSP is 5.0% and FSLR is 4.3%, do NOT claim no losing position exceeds 3.5%).
+7. POSITIONS LISTED UNDER "WINNERS" HAVE POSITIVE RETURNS (+). Never classify a winner as a loss, drag, or underperformer.
+8. POSITIONS LISTED UNDER "UNDERPERFORMERS" HAVE NEGATIVE RETURNS (-).
+9. COST BASIS CLARITY: When citing cost basis in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)". Never confuse total cost with purchase price per share.
 ======================================================================`
           };
           messages.splice(1, 0, portfolioContext);
@@ -483,9 +490,9 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
   - User Holding Status: CURRENTLY HELD IN PORTFOLIO (${holdingMatch.shares} shares)
   - Classification: ${holdingMatch.isProfit ? "WINNER / PROFITABLE POSITION" : "UNDERPERFORMER / LOSS"}
   - Position Market Value: $${holdingMatch.positionValue.toFixed(2)} (${holdingMatch.weightPercent.toFixed(1)}% of total portfolio value)
-  - Cost Basis: $${holdingMatch.positionCost.toFixed(2)} ($${holdingMatch.purchasePrice.toFixed(2)}/share)
+  - Total Position Cost Basis: $${holdingMatch.positionCost.toFixed(2)} ($${holdingMatch.purchasePrice.toFixed(2)} per share purchase price)
   - Unrealized Return: ${holdingMatch.returnDollar >= 0 ? '+' : '-'}$${Math.abs(holdingMatch.returnDollar).toFixed(2)} (${holdingMatch.returnDollar >= 0 ? '+' : ''}${holdingMatch.returnPercent.toFixed(2)}%)
-  - MANDATORY RULE FOR SECTION 5 (PORTFOLIO IMPACT): ${sym} IS A CURRENT HOLDING. State clearly that the user holds ${holdingMatch.shares} shares of ${sym} with an unrealized return of ${holdingMatch.returnDollar >= 0 ? '+' : ''}${holdingMatch.returnPercent.toFixed(2)}% [${holdingMatch.isProfit ? 'WINNER/GAIN' : 'UNDERPERFORMER/LOSS'}]. NEVER claim ${sym} is an underperformer if it is a winner, and NEVER assign another stock's return to ${sym}.`;
+  - MANDATORY RULE FOR SECTION 5 (PORTFOLIO IMPACT): ${sym} IS A CURRENT HOLDING. State clearly that the user holds ${holdingMatch.shares} shares of ${sym} with a Total Cost of $${holdingMatch.positionCost.toFixed(2)} ($${holdingMatch.purchasePrice.toFixed(2)} per share) and an unrealized return of ${holdingMatch.returnDollar >= 0 ? '+' : ''}${holdingMatch.returnPercent.toFixed(2)}% (${holdingMatch.returnDollar >= 0 ? '+' : '-'}$${Math.abs(holdingMatch.returnDollar).toFixed(2)}) [${holdingMatch.isProfit ? 'WINNER/GAIN' : 'UNDERPERFORMER/LOSS'}]. NEVER claim ${sym} is an underperformer if it is a winner, and NEVER assign another stock's return to ${sym}.`;
               } else {
                 tickerHoldingStatus = `• Velora Portfolio Standing for ${sym}:
   - User Holding Status: NOT HELD IN PORTFOLIO
@@ -511,7 +518,7 @@ ${tickerHoldingStatus}
 CRITICAL GROUNDING RULES FOR ${sym}:
 1. Use the official verified Current Price ($${currentPrice.toFixed(2)}), Daily Change (${change >= 0 ? "+" : ""}${change.toFixed(2)} / ${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%), P/E Ratio (${peRatio}), and Market Capitalization (${marketCapStr}) VERBATIM.
 2. In prose, percentage changes MUST match the verified changePercent (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%").
-3. DO NOT invent or guess technical support, resistance, or dip-buying levels outside the verified 52-week range (${week52}) and Current Price ($${currentPrice.toFixed(2)}).
+3. UNIFORMLY OMIT unverified secondary support/resistance/dip levels. Cite ONLY Current Price ($${currentPrice.toFixed(2)}) and 52-Week Range (${week52}). Discuss technical momentum qualitatively without inventing specific price targets or support levels.
 4. Strictly follow the Velora Portfolio Standing above in Section 5 (Portfolio Impact).
 ======================================================================`);
             } catch (err) {
@@ -527,7 +534,7 @@ CRITICAL GROUNDING FOR SECTION 5 ("Downside Risks & Portfolio Impact"):
 ${detectedTickers.map(sym => {
   const h = userAnalyzedHoldings.find(item => item.symbol.toUpperCase() === sym.toUpperCase());
   if (h) {
-    return `• ${sym}: CURRENT HOLDING | Classification: ${h.isProfit ? "WINNER / PROFITABLE" : "UNDERPERFORMER / LOSS"} | Return: ${h.returnDollar >= 0 ? '+' : ''}${h.returnPercent.toFixed(2)}% (+$${h.returnDollar.toFixed(2)}) | Value: $${h.positionValue.toFixed(2)} (${h.weightPercent.toFixed(1)}% of portfolio)`;
+    return `• ${sym}: CURRENT HOLDING | Classification: ${h.isProfit ? "WINNER / PROFITABLE" : "UNDERPERFORMER / LOSS"} | Return: ${h.returnDollar >= 0 ? '+' : ''}${h.returnPercent.toFixed(2)}% (${h.returnDollar >= 0 ? '+' : '-'}$${Math.abs(h.returnDollar).toFixed(2)}) | Value: $${h.positionValue.toFixed(2)} (${h.weightPercent.toFixed(1)}% of portfolio) | Total Cost: $${h.positionCost.toFixed(2)} ($${h.purchasePrice.toFixed(2)} per share purchase price)`;
   } else {
     return `• ${sym}: NOT HELD IN PORTFOLIO | The user holds 0 shares of ${sym} in their Velora portfolio.`;
   }
