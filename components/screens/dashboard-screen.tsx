@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { SectionTitle } from "@/components/ui/section-title";
 import { BuiMarketHeatmap } from "@/components/ui/bui-market-heatmap";
 import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
+import { BuiInsightCards } from "@/components/ui/bui-insight-cards";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
 
@@ -276,6 +277,15 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
         <h2 className="text-[20px] leading-[1.15] font-bold text-white mt-3 mb-2">{snapshotTitle}</h2>
         <p className="text-[14px] leading-relaxed text-white/70">{snapshotBody}</p>
       </div>
+
+      {/* Beautiful UI Insight Carousel Cards */}
+      <BuiInsightCards
+        indicators={indicators}
+        fearGreed={fearGreed}
+        vix={vix}
+        snapshot={snapshot}
+        onSelectStock={onViewStock}
+      />
 
       {/* Fear & Greed + Indicators */}
       <div className="glassy rounded-2xl p-5">

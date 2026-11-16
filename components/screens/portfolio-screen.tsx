@@ -8,6 +8,7 @@ import { Bot, Edit2, Check, Plus, Trash2, TrendingUp, TrendingDown, LogIn, Spark
 import { OrbLoader } from "@/components/ui/orb-loader";
 import { BuiPortfolioAnalytics } from "@/components/ui/bui-portfolio-analytics";
 import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
+import { BuiRecordsTable, HoldingRow } from "@/components/ui/bui-records-table";
 import { cn, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ export function PortfolioScreen({
   
   // Edit Mode & Autocomplete State
   const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [newSymbol, setNewSymbol] = useState("");
   const [newShares, setNewShares] = useState("");
   const [newPrice, setNewPrice] = useState("");
@@ -182,6 +184,21 @@ export function PortfolioScreen({
 
     return { totalValue, dayChangePercent, allTimeReturn, allTimePercent, enrichedHoldings };
   }, [holdings, quotes]);
+
+  const tableHoldings: HoldingRow[] = useMemo(() => {
+    return portfolioStats.enrichedHoldings.map((h) => ({
+      id: h.id,
+      symbol: h.symbol,
+      name: h.name,
+      shares: h.shares,
+      purchasePrice: h.purchasePrice,
+      currentPrice: h.price || h.purchasePrice,
+      value: h.value,
+      totalCost: h.shares * (h.purchasePrice || (h.price || 0)),
+      totalReturn: h.totalReturn,
+      totalReturnPercent: h.totalReturnPercent,
+    }));
+  }, [portfolioStats.enrichedHoldings]);
 
   const pulseMetrics = useMemo(() => {
     const enriched = portfolioStats.enrichedHoldings;
@@ -459,106 +476,148 @@ export function PortfolioScreen({
 
       {/* Portfolio Holdings & Allocation Breakdown */}
       <div className="px-1">
-        <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-teal/60 to-transparent" />
-          {!isEditing && (
-            <div className="relative h-64 mb-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={portfolioStats.enrichedHoldings} dataKey="value"
-                    innerRadius={78} outerRadius={110} paddingAngle={3} cornerRadius={8} stroke="none"
-                  >
-                    {portfolioStats.enrichedHoldings.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-                  </Pie>
-                </RechartsPieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-xs uppercase tracking-widest text-white/50">AI Risk Score</p>
-                <p className="text-4xl font-semibold text-white">{pulseMetrics.riskScore}</p>
-              </div>
+        {!isEditing && (
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-300">
+              Holdings Breakdown
+            </span>
+            <div className="flex items-center gap-1 bg-white/[0.05] p-1 rounded-xl border border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={cn(
+                  "px-3 py-1 rounded-lg font-semibold transition cursor-pointer text-xs",
+                  viewMode === "table"
+                    ? "bg-vel-teal text-[#041018] shadow-sm"
+                    : "text-white/60 hover:text-white"
+                )}
+              >
+                Records Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={cn(
+                  "px-3 py-1 rounded-lg font-semibold transition cursor-pointer text-xs",
+                  viewMode === "cards"
+                    ? "bg-vel-teal text-[#041018] shadow-sm"
+                    : "text-white/60 hover:text-white"
+                )}
+              >
+                Grid Cards
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          <div className={cn("grid gap-3", isEditing ? "grid-cols-1" : "grid-cols-2 mt-4")}>
-            <AnimatePresence>
-              {portfolioStats.enrichedHoldings.map((holding, i) => (
-                <motion.div 
-                  key={holding.symbol} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                  className={cn("rounded-2xl bg-white/5 p-4 flex justify-between items-center transition", !isEditing && "cursor-pointer hover:bg-white/10 active:scale-[0.98]")}
-                  onClick={() => !isEditing && onViewStock?.(holding.symbol)}
-                >
-                  <div className="flex-1 pointer-events-none">
-                    <div className="flex items-center gap-2">
-                      {!isEditing && <div className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i % colors.length] }} />}
-                      <span className="font-semibold text-white">{holding.symbol}</span>
-                      {!isEditing && (
-                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-sm flex items-center gap-0.5", holding.totalReturnPercent >= 0 ? "bg-green-400/20 text-green-400" : "bg-red-400/20 text-red-400")}>
-                          {holding.totalReturnPercent >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                          {Math.abs(holding.totalReturnPercent).toFixed(1)}%
-                        </span>
-                      )}
-                    </div>
-                    
-                    {isEditing ? (
-                      <div className="mt-2 text-sm text-white/60">
-                        {holding.shares} shrs @ ${holding.purchasePrice?.toFixed(2)}
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-xs text-white/60 mt-1">{holding.shares} shrs • Avg ${holding.purchasePrice?.toFixed(2)}</p>
-                        <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(holding.value)}</p>
-                      </>
-                    )}
-                  </div>
-                  {isEditing && <button onClick={() => removeHolding(holding.symbol, holding.id)} className="p-2 text-red-400/70 hover:text-red-400"><Trash2 size={18} /></button>}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-
-            {isEditing && (
-              <div className="rounded-2xl border border-dashed border-white/20 p-4 relative" ref={searchRef}>
-                <div className="flex items-center gap-2">
-                  <div className="relative w-24">
-                    <input 
-                      placeholder="TICKER" value={newSymbol} onChange={handleSymbolChange}
-                      className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal uppercase"
-                    />
-                    <AnimatePresence>
-                      {showDropdown && searchResults.length > 0 && (
-                        <motion.ul 
-                          initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-vel-panel2 border border-white/10 shadow-card overflow-hidden z-50"
-                        >
-                          {searchResults.slice(0, 5).map(res => (
-                            <li 
-                              key={res.symbol} onClick={() => selectTicker(res)}
-                              className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer flex justify-between group transition-colors"
-                            >
-                              <span className="text-white font-semibold">{res.symbol}</span>
-                              <span className="text-white/50 text-xs truncate ml-2 group-hover:text-white/70">{res.name}</span>
-                            </li>
-                          ))}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  <input 
-                    type="number" placeholder="Shares" value={newShares} onChange={(e) => setNewShares(e.target.value)}
-                    className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
-                  />
-                  <input 
-                    type="number" placeholder="Avg $" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
-                    className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
-                  />
-                  <button onClick={addHolding} className="ml-auto p-1.5 bg-vel-teal/20 text-vel-teal rounded-lg hover:bg-vel-teal/30 transition-colors">
-                    <Plus size={18} />
-                  </button>
+        {viewMode === "table" && !isEditing ? (
+          <BuiRecordsTable
+            holdings={tableHoldings}
+            totalPortfolioValue={portfolioStats.totalValue}
+            onSelectStock={onViewStock}
+          />
+        ) : (
+          <div className="glassy relative overflow-hidden rounded-3xl p-5 shadow-card">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-vel-teal/60 to-transparent" />
+            {!isEditing && (
+              <div className="relative h-64 mb-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={portfolioStats.enrichedHoldings} dataKey="value"
+                      innerRadius={78} outerRadius={110} paddingAngle={3} cornerRadius={8} stroke="none"
+                    >
+                      {portfolioStats.enrichedHoldings.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+                    </Pie>
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-xs uppercase tracking-widest text-white/50">AI Risk Score</p>
+                  <p className="text-4xl font-semibold text-white">{pulseMetrics.riskScore}</p>
                 </div>
               </div>
             )}
+
+            <div className={cn("grid gap-3", isEditing ? "grid-cols-1" : "grid-cols-2 mt-4")}>
+              <AnimatePresence>
+                {portfolioStats.enrichedHoldings.map((holding, i) => (
+                  <motion.div 
+                    key={holding.symbol} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                    className={cn("rounded-2xl bg-white/5 p-4 flex justify-between items-center transition", !isEditing && "cursor-pointer hover:bg-white/10 active:scale-[0.98]")}
+                    onClick={() => !isEditing && onViewStock?.(holding.symbol)}
+                  >
+                    <div className="flex-1 pointer-events-none">
+                      <div className="flex items-center gap-2">
+                        {!isEditing && <div className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i % colors.length] }} />}
+                        <span className="font-semibold text-white">{holding.symbol}</span>
+                        {!isEditing && (
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded-sm flex items-center gap-0.5", holding.totalReturnPercent >= 0 ? "bg-green-400/20 text-green-400" : "bg-red-400/20 text-red-400")}>
+                            {holding.totalReturnPercent >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                            {Math.abs(holding.totalReturnPercent).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      
+                      {isEditing ? (
+                        <div className="mt-2 text-sm text-white/60">
+                          {holding.shares} shrs @ ${holding.purchasePrice?.toFixed(2)}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-white/60 mt-1">{holding.shares} shrs • Avg ${holding.purchasePrice?.toFixed(2)}</p>
+                          <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(holding.value)}</p>
+                        </>
+                      )}
+                    </div>
+                    {isEditing && <button onClick={() => removeHolding(holding.symbol, holding.id)} className="p-2 text-red-400/70 hover:text-red-400"><Trash2 size={18} /></button>}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {isEditing && (
+                <div className="rounded-2xl border border-dashed border-white/20 p-4 relative" ref={searchRef}>
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-24">
+                      <input 
+                        placeholder="TICKER" value={newSymbol} onChange={handleSymbolChange}
+                        className="w-full bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal uppercase"
+                      />
+                      <AnimatePresence>
+                        {showDropdown && searchResults.length > 0 && (
+                          <motion.ul 
+                            initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 top-full mt-2 w-48 rounded-xl bg-vel-panel2 border border-white/10 shadow-card overflow-hidden z-50"
+                          >
+                            {searchResults.slice(0, 5).map(res => (
+                              <li 
+                                key={res.symbol} onClick={() => selectTicker(res)}
+                                className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer flex justify-between group transition-colors"
+                              >
+                                <span className="text-white font-semibold">{res.symbol}</span>
+                                <span className="text-white/50 text-xs truncate ml-2 group-hover:text-white/70">{res.name}</span>
+                              </li>
+                            ))}
+                          </motion.ul>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <input 
+                      type="number" placeholder="Shares" value={newShares} onChange={(e) => setNewShares(e.target.value)}
+                      className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
+                    />
+                    <input 
+                      type="number" placeholder="Avg $" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
+                      className="w-20 bg-transparent border-b border-white/20 px-1 py-1 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-vel-teal"
+                    />
+                    <button onClick={addHolding} className="ml-auto p-1.5 bg-vel-teal/20 text-vel-teal rounded-lg hover:bg-vel-teal/30 transition-colors">
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Institutional Risk Analytics & Monte Carlo Simulation Deep Dive */}

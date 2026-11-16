@@ -8,7 +8,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DEFAULT_MODEL } from "@/lib/nvidia";
 import { BuiLoadingState } from "@/components/ui/bui-loading-state";
-import { BuiThinkingState } from "@/components/ui/bui-thinking-state";
+import { BuiThinkingState, REAL_PIPELINE_STEPS } from "@/components/ui/bui-thinking-state";
+import { BuiStreamingText } from "@/components/ui/bui-streaming-text";
+import { BuiPromptBar } from "@/components/ui/bui-prompt-bar";
 import { BuiToolChips } from "@/components/ui/bui-tool-chips";
 import { BuiModelSelector } from "@/components/ui/bui-model-selector";
 import { BuiContextCards } from "@/components/ui/bui-context-cards";
@@ -345,9 +347,13 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     return DEFAULT_MODEL;
   });
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [thoughtDurations, setThoughtDurations] = useState<Record<number, number>>({});
+  const requestStartTimeRef = useRef<number>(0);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const submittedPromptRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const isDeep = selectedModel.includes("minimax");
 
   // Persist selected model across reloads and navigation
   useEffect(() => {
@@ -372,6 +378,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
 
   const handleClearHistory = () => {
     setMessages([]);
+    setThoughtDurations({});
     try {
       localStorage.removeItem(CHAT_STORAGE_KEY);
     } catch {}
@@ -483,7 +490,9 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const sendMessageWithHiddenContext = async (displayContent: string, hiddenPrompt: string, systemPrompt: string) => {
     if (isLoading) return;
 
+    requestStartTimeRef.current = performance.now();
     setInput("");
+    const targetIdx = messages.length + 1;
     setMessages((prev) => [
       ...prev,
       { role: "user", content: displayContent },
@@ -530,6 +539,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           });
         },
         () => {
+          const elapsed = (performance.now() - requestStartTimeRef.current) / 1000;
+          setThoughtDurations((prev) => ({
+            ...prev,
+            [targetIdx]: Number(elapsed.toFixed(1)),
+          }));
           setShowSuggestions(true);
           setIsLoading(false);
         },
@@ -583,6 +597,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
+    requestStartTimeRef.current = performance.now();
     setInput("");
     setShowSuggestions(false);
     const newMessages: Message[] = [
@@ -590,6 +605,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       { role: "user", content: content.trim() },
       { role: "assistant", content: "" }
     ];
+    const targetIdx = newMessages.length - 1;
     setMessages(newMessages);
     setIsLoading(true);
 
@@ -629,6 +645,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           });
         },
         () => {
+          const elapsed = (performance.now() - requestStartTimeRef.current) / 1000;
+          setThoughtDurations((prev) => ({
+            ...prev,
+            [targetIdx]: Number(elapsed.toFixed(1)),
+          }));
           setShowSuggestions(true);
           setIsLoading(false);
         },
@@ -761,41 +782,40 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : !msg.content && isLoading && i === messages.length - 1 ? (
                 <div className="flex flex-col gap-2 py-1">
-                  <BuiLoadingState label="Velora is streaming analysis" />
-                  <BuiThinkingState isThinking={true} />
-                </div>
-              ) : (
-                <div className="relative group">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                    {msg.content}
-                  </ReactMarkdown>
-                  
-                  {isLoading && i === messages.length - 1 && (
-                    <span className="inline-block w-1.5 h-4 bg-teal-400 animate-pulse ml-1 align-middle rounded-sm shadow-[0_0_8px_rgba(0,206,209,0.9)]" />
-                  )}
-                  
-                  {!isLoading && msg.content && (
-                    <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      <button
-                        onClick={() => handleRerun(i)}
-                        className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
-                        title="Rerun response"
-                      >
-                        <RotateCcw size={12} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(msg.content);
-                          setCopiedIndex(i);
-                          setTimeout(() => setCopiedIndex(null), 2000);
-                        }}
-                        className="p-1.5 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 text-xs flex items-center gap-1"
-                        title="Copy response"
-                      >
-                        {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                      </button>
+                  {isDeep ? (
+                    <BuiLoadingState
+                      isDeep={true}
+                      label="Velora Deep Analyst is synthesizing market intelligence"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2.5 py-1.5 px-3 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-xs text-emerald-300 font-medium">
+                        Velora is generating instant analysis...
+                      </span>
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="w-full space-y-2">
+                  {isDeep && (
+                    <BuiThinkingState
+                      durationSeconds={thoughtDurations[i]}
+                      steps={REAL_PIPELINE_STEPS}
+                    />
+                  )}
+                  <BuiStreamingText
+                    content={msg.content}
+                    isStreaming={isLoading && i === messages.length - 1}
+                    onRerun={() => handleRerun(i)}
+                    onFollowUp={(prompt) => sendMessage(prompt)}
+                    followUps={
+                      i === messages.length - 1 && showSuggestions
+                        ? activeSuggestions.map((s) => s.label)
+                        : undefined
+                    }
+                    markdownComponents={markdownComponents}
+                  />
                 </div>
               )}
             </div>
@@ -805,42 +825,15 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
       </div>
 
       <div className="p-4 bg-gradient-to-t from-[#05080F] via-[#05080F] to-transparent">
-        <form 
-          onSubmit={handleSubmit}
-          className="flex items-end gap-2 rounded-2xl border border-vel-teal/30 bg-[#0A0F1C]/95 p-2 shadow-2xl shadow-black/80 backdrop-blur-2xl"
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-            placeholder="Ask me anything about the markets..."
-            className="flex-1 bg-transparent text-[15px] text-white placeholder:text-white/40 focus:outline-none resize-none py-2 px-3 max-h-32 app-scroll"
-            rows={input.split("\n").length > 1 ? Math.min(input.split("\n").length, 5) : 1}
-          />
-          {isLoading ? (
-            <button
-              type="button"
-              onClick={handleStop}
-              className="h-10 w-10 flex-none rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center hover:bg-rose-500/30 transition mb-0.5 mr-0.5 cursor-pointer shadow-lg shadow-rose-500/20"
-              title="Stop generating"
-            >
-              <Square size={16} className="fill-current" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="h-10 w-10 flex-none rounded-xl bg-white/10 flex items-center justify-center disabled:opacity-50 hover:bg-white/20 transition mb-0.5 mr-0.5"
-            >
-              <ArrowUp size={18} className="text-white" />
-            </button>
-          )}
-        </form>
+        <BuiPromptBar
+          value={input}
+          onChange={setInput}
+          onSubmit={() => sendMessage(input)}
+          onStop={handleStop}
+          isLoading={isLoading}
+          selectedModel={selectedModel}
+          onSelectModel={setSelectedModel}
+        />
         <p className="mt-2 text-center text-[10px] text-white/40">
           Velora AI is a market intelligence and quantitative research tool. Insights are for educational purposes only, not financial advice.
         </p>
