@@ -70,4 +70,49 @@ assert.deepEqual(payloadMiniMax.chat_template_kwargs, { enable_thinking: false }
 const payloadNemotron = prepareNvidiaPayload("nvidia/nemotron-3.5-bolt-e4b", [{ role: "user", content: "Hi" }]);
 assert.deepEqual(payloadNemotron.chat_template_kwargs, { enable_thinking: false }, "Nemotron must have enable_thinking: false");
 
+// Test 6: Multi-ticker portfolio grounding (NVDA not held, TSLA held)
+function generateMultiTickerGrounding(detectedTickers, userHoldings) {
+  return detectedTickers.map(sym => {
+    const h = userHoldings.find(item => item.symbol.toUpperCase() === sym.toUpperCase());
+    if (h) {
+      return `• ${sym}: CURRENT HOLDING | Classification: ${h.isProfit ? "WINNER / PROFITABLE" : "UNDERPERFORMER / LOSS"} | Return: ${h.returnDollar >= 0 ? '+' : ''}${h.returnPercent.toFixed(2)}% | Value: $${h.positionValue.toFixed(2)}`;
+    } else {
+      return `• ${sym}: NOT HELD IN PORTFOLIO | The user holds 0 shares of ${sym} in their Velora portfolio.`;
+    }
+  }).join("\n");
+}
+
+const mockTestHoldings = [
+  { symbol: "TSLA", shares: 0.08, purchasePrice: 240, currentPrice: 390.22, positionValue: 31.22, returnDollar: 12.02, returnPercent: 37.89, isProfit: true },
+  { symbol: "FSLR", shares: 0.05, purchasePrice: 220, currentPrice: 195.00, positionValue: 9.75, returnDollar: -1.25, returnPercent: -34.33, isProfit: false },
+];
+
+const grounding = generateMultiTickerGrounding(["NVDA", "TSLA"], mockTestHoldings);
+assert.ok(grounding.includes("NVDA: NOT HELD IN PORTFOLIO"), "NVDA must be marked as NOT HELD");
+assert.ok(grounding.includes("TSLA: CURRENT HOLDING | Classification: WINNER / PROFITABLE | Return: +37.89%"), "TSLA must be marked as CURRENT HOLDING and WINNER");
+assert.ok(!grounding.includes("NVDA: CURRENT HOLDING"), "NVDA must NEVER be marked as CURRENT HOLDING");
+assert.ok(!grounding.includes("TSLA: -34.33%"), "TSLA must NEVER be assigned FSLR's return");
+
+// Test 7: Derived Portfolio Concentration Metrics
+function calculateDerivedAggregates(holdings) {
+  const totalVal = holdings.reduce((sum, h) => sum + h.positionValue, 0);
+  const sorted = [...holdings].sort((a, b) => b.positionValue - a.positionValue);
+  const top3Val = sorted.slice(0, 3).reduce((sum, h) => sum + h.positionValue, 0);
+  const top3Weight = (top3Val / totalVal) * 100;
+  const losers = holdings.filter(h => !h.isProfit);
+  return {
+    totalVal,
+    top3Val,
+    top3Weight,
+    losersCount: losers.length,
+    largestLoserWeight: losers.length > 0 ? (losers[0].positionValue / totalVal) * 100 : 0
+  };
+}
+
+const derived = calculateDerivedAggregates(mockTestHoldings);
+assert.equal(derived.totalVal, 40.97);
+assert.ok(Math.abs(derived.top3Weight - 100) < 0.001);
+assert.equal(derived.losersCount, 1);
+assert.ok(Math.abs(derived.largestLoserWeight - 23.8) < 0.1);
+
 console.log(" All AI layer regression tests passed successfully!");

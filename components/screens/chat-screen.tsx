@@ -331,11 +331,28 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestions, setActiveSuggestions] = useState<{ label: string; icon?: string }[]>([]);
   const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("velora_chat_model_v1");
+        if (saved && (saved.includes("minimax") || saved.includes("nemotron"))) {
+          return saved;
+        }
+      } catch {}
+    }
+    return DEFAULT_MODEL;
+  });
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const submittedPromptRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Persist selected model across reloads and navigation
+  useEffect(() => {
+    try {
+      localStorage.setItem("velora_chat_model_v1", selectedModel);
+    } catch {}
+  }, [selectedModel]);
 
   // Persist chat history to localStorage on completion
   useEffect(() => {
