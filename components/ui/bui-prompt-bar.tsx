@@ -128,22 +128,22 @@ export function BuiPromptBar({
 
   return (
     <div className={cn("relative w-full max-w-4xl mx-auto", className)}>
-      {/* Beautiful UI Continuous Ambient Glow (Constant subtle glow, ramping up on focus) */}
+      {/* Beautiful UI Continuous Ambient Glow (360-degree perimeter aura) */}
       <div
         className={cn(
-          "absolute -inset-[1.5px] rounded-3xl transition-all duration-500 pointer-events-none",
+          "absolute -inset-1 rounded-[26px] transition-all duration-700 pointer-events-none",
           isFocused || isListening
-            ? "opacity-100 bg-gradient-to-r from-teal-500/40 via-cyan-400/50 to-teal-500/40 blur-[10px]"
-            : "ambient-glow bg-gradient-to-r from-teal-500/25 via-cyan-400/30 to-teal-500/25"
+            ? "opacity-100 bg-gradient-to-r from-teal-500/60 via-cyan-400/70 to-emerald-500/60 blur-md shadow-[0_0_30px_rgba(20,184,166,0.4)]"
+            : "ambient-glow bg-gradient-to-r from-teal-500/40 via-cyan-400/50 to-emerald-500/40 blur-md"
         )}
       />
 
-      {/* Main Composer Box (Pill / 3XL silhouette) */}
+      {/* Main Composer Box (Rounded-2xl/3xl capsule silhouette) */}
       <div
         className={cn(
-          "relative flex flex-col rounded-3xl border bg-[#090E1A]/95 backdrop-blur-xl shadow-2xl transition-all duration-200 overflow-hidden",
+          "relative flex flex-col rounded-[26px] border bg-[#080D1A]/95 backdrop-blur-2xl shadow-2xl transition-all duration-200 overflow-hidden",
           isFocused
-            ? "border-teal-500/50 shadow-[0_0_24px_rgba(0,212,255,0.2)]"
+            ? "border-teal-500/50 shadow-[0_0_24px_rgba(0,212,255,0.25)]"
             : "border-white/15 hover:border-white/25"
         )}
       >

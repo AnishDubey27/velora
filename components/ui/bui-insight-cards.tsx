@@ -70,8 +70,17 @@ function generateSvgPoints(
       delta = Math.sin(i * 1.8) * 10;
     }
     const y = Math.max(12, Math.min(height - 12, baseY + delta));
-    const valPercent = ((baseY - y) / baseY) * 0.05;
-    const val = baseVal * (1 + valPercent);
+
+    // The series final point (Nov 16) MUST equal baseVal exactly to match card total
+    let val: number;
+    if (i === steps - 1) {
+      val = baseVal;
+    } else {
+      const historicalOffset = (steps - 1 - i) / (steps - 1);
+      const slope = trend === "up" ? -0.10 : trend === "down" ? 0.08 : 0.02;
+      const wave = Math.sin(i * 0.9) * 0.02;
+      val = baseVal * (1 + slope * historicalOffset + wave);
+    }
 
     points.push({ x, y, val, date: dates[i] || `Nov ${i + 1}` });
   }
@@ -181,10 +190,11 @@ export function BuiInsightCards({
 }: BuiInsightCardsProps) {
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Portfolio calculations
-  const totalVal = portfolio?.totalValue ?? 80.82;
-  const allTimePct = portfolio?.allTimeReturnPercent ?? 13.36;
-  const dayChangePct = portfolio?.dayChangePercent ?? 0.98;
+  // Portfolio calculations - strictly figure-free during loading
+  const isPortfolioLoading = !portfolio || typeof portfolio.totalValue !== "number";
+  const totalVal = portfolio?.totalValue ?? 0;
+  const allTimePct = portfolio?.allTimeReturnPercent ?? 0;
+  const dayChangePct = portfolio?.dayChangePercent ?? 0;
   const isPortfolioProfit = allTimePct >= 0;
 
   const sp500Change = indicators?.sp500?.changePercent ?? 0;
@@ -211,7 +221,42 @@ export function BuiInsightCards({
       title: "Portfolio Snapshot & Equity Curve",
       subtitle: "Live Holdings, Total Value & Movers",
       badge: "Portfolio Engine",
-      content: (
+      content: isPortfolioLoading ? (
+        <div className="space-y-3.5 animate-pulse">
+          {/* Header Stats Skeleton */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-3 w-28 bg-white/10 rounded mb-1.5" />
+              <div className="h-7 w-36 bg-white/15 rounded" />
+            </div>
+            <div className="text-right space-y-1.5">
+              <div className="h-5 w-24 bg-white/15 rounded-full ml-auto" />
+              <div className="h-3 w-16 bg-white/10 rounded ml-auto" />
+            </div>
+          </div>
+
+          {/* Sparkline Skeleton */}
+          <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-2.5 w-28 bg-white/10 rounded" />
+              <div className="h-2.5 w-20 bg-white/5 rounded" />
+            </div>
+            <div className="h-16 w-full bg-white/[0.03] rounded-lg" />
+          </div>
+
+          {/* Top Movers Skeleton */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-1.5">
+              <div className="h-2.5 w-16 bg-white/10 rounded" />
+              <div className="h-4 w-20 bg-white/15 rounded" />
+            </div>
+            <div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-1.5">
+              <div className="h-2.5 w-16 bg-white/10 rounded" />
+              <div className="h-4 w-20 bg-white/15 rounded" />
+            </div>
+          </div>
+        </div>
+      ) : (
         <div className="space-y-3.5">
           {/* Header Stats */}
           <div className="flex items-center justify-between">
@@ -260,10 +305,10 @@ export function BuiInsightCards({
               <span className="text-[10px] text-emerald-400/80 uppercase font-semibold block">Top Performer</span>
               <div className="flex items-center justify-between mt-0.5">
                 <span className="font-bold text-white font-mono">
-                  {portfolio?.topWinner?.symbol || "TSLA"}
+                  {portfolio.topWinner?.symbol || "—"}
                 </span>
                 <span className="font-mono text-emerald-400 font-bold">
-                  +{portfolio?.topWinner?.returnPercent?.toFixed(1) || "37.9"}%
+                  {portfolio.topWinner ? `+${portfolio.topWinner.returnPercent.toFixed(1)}%` : "—"}
                 </span>
               </div>
             </div>
@@ -272,10 +317,10 @@ export function BuiInsightCards({
               <span className="text-[10px] text-rose-400/80 uppercase font-semibold block">Underperformer</span>
               <div className="flex items-center justify-between mt-0.5">
                 <span className="font-bold text-white font-mono">
-                  {portfolio?.topLoser?.symbol || "FSLR"}
+                  {portfolio.topLoser?.symbol || "—"}
                 </span>
                 <span className="font-mono text-rose-400 font-bold">
-                  {portfolio?.topLoser?.returnPercent ? `${portfolio.topLoser.returnPercent.toFixed(1)}%` : "-34.3%"}
+                  {portfolio.topLoser ? `${portfolio.topLoser.returnPercent.toFixed(1)}%` : "—"}
                 </span>
               </div>
             </div>

@@ -192,7 +192,7 @@ export function BuiStreamingText({
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
 
   // Progressive reveal for smooth streaming & blur-resolve
-  const [displayedLength, setDisplayedLength] = useState(content.length);
+  const [displayedLength, setDisplayedLength] = useState(() => (content ? Math.min(content.length, 10) : 0));
 
   useEffect(() => {
     if (!isStreaming) {
@@ -201,25 +201,34 @@ export function BuiStreamingText({
     }
 
     if (content.length > displayedLength) {
-      // Step progressive display smoothly (30-50 chars per tick)
+      // Step progressive display smoothly (4-8 chars per 16ms tick)
       const diff = content.length - displayedLength;
-      const step = Math.max(1, Math.min(diff, Math.ceil(diff / 3)));
+      const step = Math.max(3, Math.min(diff, Math.ceil(diff / 3)));
       const timer = setTimeout(() => {
         setDisplayedLength((prev) => Math.min(content.length, prev + step));
-      }, 20);
+      }, 16);
       return () => clearTimeout(timer);
     }
   }, [content, isStreaming, displayedLength]);
 
   const sources = useMemo(() => extractSourcesFromMarkdown(content), [content]);
 
-  // Strip the raw trailing "## Sources" block if rendered separately
+  // Strip the raw trailing "## Sources" block if rendered separately, and guarantee inline citation chip
   const displayContent = useMemo(() => {
-    const raw = isStreaming ? content.slice(0, displayedLength) : content;
+    let raw = isStreaming ? content.slice(0, displayedLength) : content;
     if (sources.length > 0 && !isStreaming) {
       const idx = raw.search(/#{1,3}\s*(?:\d+\.\s*)?(?:verified\s*)?sources/i);
       if (idx !== -1) {
-        return raw.slice(0, idx).trim();
+        raw = raw.slice(0, idx).trim();
+      }
+    }
+    // If the body does not already contain an inline markdown link, inject top verified source chip in Section 2
+    if (sources.length > 0 && !raw.includes("](") && !isStreaming) {
+      const topSource = sources[0];
+      const sec2End = raw.search(/##\s*3\./i);
+      if (sec2End !== -1) {
+        const insertion = `*(Verified via [${topSource.domain || topSource.name}](${topSource.href}))*\n\n`;
+        raw = raw.slice(0, sec2End) + insertion + raw.slice(sec2End);
       }
     }
     return raw;
@@ -251,11 +260,11 @@ export function BuiStreamingText({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-white/[0.06] hover:bg-teal-500/20 border border-white/10 hover:border-teal-500/30 text-teal-300 hover:text-white text-[11px] font-mono align-middle transition-colors shadow-sm"
+            className="inline-flex items-center gap-1 px-2 py-0.5 mx-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 hover:text-white text-[11px] font-mono align-middle transition-all shadow-sm group/chip cursor-pointer"
           >
             <Globe size={11} className="text-teal-400 shrink-0" />
-            <span className="truncate max-w-[120px]">{domain || children}</span>
-            <ExternalLink size={9} className="opacity-50" />
+            <span className="truncate max-w-[130px] font-medium">{domain || children}</span>
+            <ExternalLink size={9} className="opacity-60 group-hover/chip:opacity-100" />
           </a>
         );
       },

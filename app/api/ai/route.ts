@@ -607,6 +607,12 @@ Quote Type: ${quote.quoteType}
 • Previous Session Close: ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Session Date: ${quote.previousCloseDateStr})
 ${sessionGuidance}
 
+MANDATORY PREVIOUS CLOSE FORMAT RULE:
+Whenever citing Previous Session Close in prose narrative or in Section 3's table, you MUST ALWAYS include both the previous close price and its date:
+"${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.previousCloseDateStr})" (e.g. "${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} on ${quote.previousCloseDateStr}").
+In the table, format as: | Previous Session Close | ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.previousCloseDateStr}) |
+NEVER emit the previous close number without its session date in any mode.
+
 ${quote.freshness === "STALE" ? `CRITICAL STALENESS DISCLOSURE MANDATE:
 The data for ${quote.name} is STALE. You MUST OPEN your response with this exact disclosure before giving any figures:
 "${quote.stalenessNote}"` : ""}
@@ -775,6 +781,15 @@ When asked for trade ideas, stock breakdowns, or market analysis, format your ou
 MANDATORY MARKET INDEX & TEMPORAL RULES:
 - When answering questions about market indices (e.g. S&P 500, Nasdaq, Dow, Nifty 50, Sensex), you MUST use the headline figures, price levels, and percentage changes from the OFFICIAL VERIFIED VELORA MARKET DATA provided above.
 - NEVER quote headline index figures from web search news articles. News results may supply colour (drivers, sector moves) but may NEVER supply the headline index figure.
+- PREVIOUS CLOSE AUDITABILITY (BOTH PROSE AND TABLES):
+  Whenever citing the previous session close for an index, you MUST ALWAYS provide both the previous close level AND its session date:
+  * In Section 1 (Executive Takeaway): State both the previous close price and date (e.g. "...from the previous session close of 25,144.30 on Friday, November 13, 2026").
+  * In Section 3 (Quantitative Ratios & Valuation table): You MUST include the date in the previous close row:
+    | Previous Session Close | 25,144.30 (November 13, 2026) |
+    (or "| Previous Session Close | 25,144.30 |\n| Previous Session Date | November 13, 2026 |")
+  * NEVER omit the previous session date in either Fast or Deep mode.
+- INLINE SOURCE CITATIONS:
+  In Section 1 and Section 2, when citing catalysts, market drivers, or external news, you MUST embed at least one inline markdown citation link directly in the body sentence (e.g. "...supported by FII buying [TradingView](https://www.tradingview.com/news) and lower crude prices [Rediff Business](https://www.rediff.com/business)..."). These links render as interactive inline citation chips in the Velora UI.
 - If the injected market data states that the data is STALE, you MUST OPEN your response with the required staleness disclosure before citing any figures.
 - If the injected market data states that a figure is an INTRADAY SNAPSHOT, you MUST state explicitly that it is an intraday level and not the final close.
 - For US markets queried during Asian/European hours before the 09:30 EST open, "today" refers to the latest completed session (Friday's close). You MUST explicitly label it as Friday's close and state that the US market opens tonight at 20:00 IST (09:30 EST).
@@ -1161,6 +1176,7 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (error) {

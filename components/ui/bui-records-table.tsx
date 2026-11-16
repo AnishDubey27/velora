@@ -8,7 +8,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, SlidersHorizontal, TrendingUp, TrendingDown } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -50,40 +50,72 @@ export function BuiRecordsTable({
 
   // Beautiful UI Resizable Columns state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-    symbol: 200,
-    value: 140,
-    totalCost: 140,
-    totalReturn: 190,
-    weight: 130,
+    symbol: 220,
+    value: 150,
+    totalCost: 150,
+    totalReturn: 200,
+    weight: 120,
   });
 
-  const resizingRef = useRef<{ col: string; startX: number; startWidth: number } | null>(null);
+  const totalTableWidth = useMemo(() => {
+    return (
+      (columnWidths.symbol || 220) +
+      (columnWidths.value || 150) +
+      (columnWidths.totalCost || 150) +
+      (columnWidths.totalReturn || 200) +
+      (columnWidths.weight || 120)
+    );
+  }, [columnWidths]);
+
+  const activeCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (activeCleanupRef.current) {
+        activeCleanupRef.current();
+      }
+    };
+  }, []);
 
   const handleResizeStart = (col: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    resizingRef.current = {
-      col,
-      startX: e.clientX,
-      startWidth: columnWidths[col] || 140,
-    };
+
+    // Clean up any prior active listeners
+    if (activeCleanupRef.current) {
+      activeCleanupRef.current();
+    }
+
+    const startX = e.clientX;
+    const startWidth = columnWidths[col] || 150;
+    const colKey = col;
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!resizingRef.current) return;
-      const delta = moveEvent.clientX - resizingRef.current.startX;
-      const newWidth = Math.max(80, resizingRef.current.startWidth + delta);
+      const delta = moveEvent.clientX - startX;
+      // Strict min-width (90px) and max-width (500px) bounds
+      const newWidth = Math.max(90, Math.min(500, startWidth + delta));
       setColumnWidths((prev) => ({
         ...prev,
-        [resizingRef.current!.col]: newWidth,
+        [colKey]: newWidth,
       }));
     };
 
-    const handleMouseUp = () => {
-      resizingRef.current = null;
+    const cleanup = () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      activeCleanupRef.current = null;
     };
 
+    const handleMouseUp = () => {
+      cleanup();
+    };
+
+    activeCleanupRef.current = cleanup;
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   };
@@ -171,16 +203,25 @@ export function BuiRecordsTable({
 
       {/* Responsive Table Container with Resizable Columns */}
       <div className="overflow-x-auto app-scroll">
-        <table className="w-full text-left border-collapse text-xs table-fixed">
+        <table 
+          style={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
+          className="text-left border-collapse text-xs table-fixed"
+        >
+          <colgroup>
+            <col style={{ width: `${columnWidths.symbol}px` }} />
+            <col style={{ width: `${columnWidths.value}px` }} />
+            <col style={{ width: `${columnWidths.totalCost}px` }} />
+            <col style={{ width: `${columnWidths.totalReturn}px` }} />
+            <col style={{ width: `${columnWidths.weight}px` }} />
+          </colgroup>
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 font-semibold uppercase tracking-wider text-[10.5px]">
               {/* Column 1: Symbol / Asset */}
               <th
-                style={{ width: `${columnWidths.symbol}px` }}
                 className="relative py-2.5 px-3.5 cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("symbol")}
               >
-                <div className="flex items-center gap-1 pr-2">
+                <div className="flex items-center gap-1 pr-3">
                   <span>Symbol / Asset</span>
                   {sortField === "symbol" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -191,7 +232,8 @@ export function BuiRecordsTable({
                 {/* Drag Resize Affordance */}
                 <div
                   onMouseDown={(e) => handleResizeStart("symbol", e)}
-                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-teal-400/40 flex items-center justify-center transition z-10"
                   title="Drag to resize column"
                 >
                   <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
@@ -200,11 +242,10 @@ export function BuiRecordsTable({
 
               {/* Column 2: Market Value */}
               <th
-                style={{ width: `${columnWidths.value}px` }}
                 className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("value")}
               >
-                <div className="flex items-center justify-end gap-1 pr-2">
+                <div className="flex items-center justify-end gap-1 pr-3">
                   <span>Market Value</span>
                   {sortField === "value" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -215,7 +256,8 @@ export function BuiRecordsTable({
                 {/* Drag Resize Affordance */}
                 <div
                   onMouseDown={(e) => handleResizeStart("value", e)}
-                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-teal-400/40 flex items-center justify-center transition z-10"
                   title="Drag to resize column"
                 >
                   <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
@@ -224,11 +266,10 @@ export function BuiRecordsTable({
 
               {/* Column 3: Total Cost */}
               <th
-                style={{ width: `${columnWidths.totalCost}px` }}
                 className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("totalCost")}
               >
-                <div className="flex items-center justify-end gap-1 pr-2">
+                <div className="flex items-center justify-end gap-1 pr-3">
                   <span>Total Cost</span>
                   {sortField === "totalCost" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -239,7 +280,8 @@ export function BuiRecordsTable({
                 {/* Drag Resize Affordance */}
                 <div
                   onMouseDown={(e) => handleResizeStart("totalCost", e)}
-                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-teal-400/40 flex items-center justify-center transition z-10"
                   title="Drag to resize column"
                 >
                   <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
@@ -248,11 +290,10 @@ export function BuiRecordsTable({
 
               {/* Column 4: Total Return */}
               <th
-                style={{ width: `${columnWidths.totalReturn}px` }}
                 className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("totalReturn")}
               >
-                <div className="flex items-center justify-end gap-1 pr-2">
+                <div className="flex items-center justify-end gap-1 pr-3">
                   <span>Total Return</span>
                   {sortField === "totalReturn" || sortField === "totalReturnPercent" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -263,7 +304,8 @@ export function BuiRecordsTable({
                 {/* Drag Resize Affordance */}
                 <div
                   onMouseDown={(e) => handleResizeStart("totalReturn", e)}
-                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-teal-400/40 flex items-center justify-center transition z-10"
                   title="Drag to resize column"
                 >
                   <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
@@ -272,11 +314,10 @@ export function BuiRecordsTable({
 
               {/* Column 5: Portfolio Weight */}
               <th
-                style={{ width: `${columnWidths.weight}px` }}
                 className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("weight")}
               >
-                <div className="flex items-center justify-end gap-1 pr-2">
+                <div className="flex items-center justify-end gap-1 pr-3">
                   <span>Weight</span>
                   {sortField === "weight" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -287,7 +328,8 @@ export function BuiRecordsTable({
                 {/* Drag Resize Affordance */}
                 <div
                   onMouseDown={(e) => handleResizeStart("weight", e)}
-                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize hover:bg-teal-400/40 flex items-center justify-center transition z-10"
                   title="Drag to resize column"
                 >
                   <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
