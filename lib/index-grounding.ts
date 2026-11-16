@@ -15,7 +15,7 @@ export type SessionPhase =
   | "POST_CLOSE"
   | "WEEKEND_CLOSED";
 
-export type FreshnessStatus = "FRESH" | "STALE";
+export type FreshnessStatus = "FRESH" | "STALE" | "UNVERIFIED";
 
 export type QuoteType = 
   | "OFFICIAL_CLOSE"
@@ -53,6 +53,7 @@ export interface VerifiedIndexQuote {
   market: MarketCode;
   price: number;
   previousClose: number;
+  previousCloseDateStr: string; // YYYY-MM-DD of candle previousClose was derived from
   change: number;
   changePercent: number;
   dataTimestamp: Date;
@@ -231,10 +232,6 @@ export async function fetchVerifiedIndex(def: IndexDefinition): Promise<Verified
     const price = Number(meta.regularMarketPrice);
     if (!price || isNaN(price)) return null;
 
-    const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
-    const change = price - prevClose;
-    const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-
     const marketTimeSec = meta.regularMarketTime || (timestamps.length > 0 ? timestamps[timestamps.length - 1] : Math.floor(Date.now() / 1000));
     const dataTimestamp = new Date(marketTimeSec * 1000);
 
@@ -278,6 +275,25 @@ export async function fetchVerifiedIndex(def: IndexDefinition): Promise<Verified
       }
     }
 
+    // Derive previousClose strictly from the candle immediately preceding the quoted session.
+    // CRITICAL: meta.chartPreviousClose from Yahoo Finance (range=1mo) returns the price 1 month ago.
+    // It must NEVER be used for daily changes.
+    const candleIndex = candles.findIndex((c) => c.date === dataDateStr);
+    let priorCandle: HistoricalCandle | null = null;
+
+    if (candleIndex > 0) {
+      priorCandle = candles[candleIndex - 1];
+    } else if (candleIndex === -1 && candles.length > 0) {
+      // dataDateStr is today's live/intraday date not yet finalized as a completed daily candle;
+      // the latest completed candle in the series is the prior session.
+      priorCandle = candles[candles.length - 1];
+    }
+
+    const prevClose = priorCandle ? priorCandle.close : price;
+    const previousCloseDateStr = priorCandle ? priorCandle.date : dataDateStr;
+    const change = price - prevClose;
+    const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
     // Determine Quote Type:
     // If session is POST_CLOSE and quote timestamp is at or past market close -> OFFICIAL_CLOSE
     // If session is POST_CLOSE but quote timestamp is before close -> INTRADAY_SNAPSHOT
@@ -296,13 +312,20 @@ export async function fetchVerifiedIndex(def: IndexDefinition): Promise<Verified
       quoteType = "OFFICIAL_CLOSE";
     }
 
-    // Evaluate Freshness:
-    // Quote is FRESH if dataDateStr matches the expected latest completed session date
-    // or if the market is currently in regular hours and dataDateStr is today.
+    // Evaluate Freshness & Sanity Gate (§3):
+    // For broad major market indices, single-session moves rarely exceed ±4.0%.
+    // Any move > 4.0% in normal sessions flags the quote as UNVERIFIED to catch corrupted baselines.
+    const MAX_ALLOWED_DAILY_INDEX_MOVE_PCT = 4.0;
     let freshness: FreshnessStatus = "FRESH";
     let stalenessNote: string | null = null;
 
-    if (session.isOpen) {
+    if (!priorCandle || candles.length < 2) {
+      freshness = "UNVERIFIED";
+      stalenessNote = `Prior trading session candle could not be established from historical series.`;
+    } else if (Math.abs(changePercent) > MAX_ALLOWED_DAILY_INDEX_MOVE_PCT) {
+      freshness = "UNVERIFIED";
+      stalenessNote = `Computed daily change (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%) exceeds sane broad-market index bounds (±${MAX_ALLOWED_DAILY_INDEX_MOVE_PCT}%). Baseline discrepancy suspected; quote is unverified.`;
+    } else if (session.isOpen) {
       if (dataDateStr !== session.localDateStr) {
         freshness = "STALE";
         stalenessNote = `Latest available data is from ${dataDateStr}; today's live session data is not yet reflected.`;
@@ -314,6 +337,11 @@ export async function fetchVerifiedIndex(def: IndexDefinition): Promise<Verified
       }
     }
 
+    // Server-side audit logging
+    console.log(
+      `[AI Verified Index] ${def.name} (${def.symbol}): Quoted Session ${dataDateStr} (${price.toFixed(2)}) | Previous Session ${previousCloseDateStr} (${prevClose.toFixed(2)}) | Change: ${change >= 0 ? "+" : ""}${change.toFixed(2)} (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%) | Freshness: ${freshness}`
+    );
+
     return {
       id: def.id,
       symbol: def.symbol,
@@ -321,6 +349,7 @@ export async function fetchVerifiedIndex(def: IndexDefinition): Promise<Verified
       market: def.market,
       price: Number(price.toFixed(2)),
       previousClose: Number(prevClose.toFixed(2)),
+      previousCloseDateStr,
       change: Number(change.toFixed(2)),
       changePercent: Number(changePercent.toFixed(2)),
       dataTimestamp,

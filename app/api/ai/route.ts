@@ -535,7 +535,7 @@ STRICT INSTRUCTIONS FOR COMBINED / MULTI-TICKER ANALYSIS:
           if (quote) {
             fetchedQuotes.push(quote);
             verifiedDataDates.push(quote.dataDateStr);
-            console.log(`[AI Temporal Grounding] Symbol: ${quote.symbol} (${quote.name}) | Status: ${quote.freshness} | Data Date: ${quote.dataDateStr} | Expected Session: ${quote.expectedSessionDate} | Quote Type: ${quote.quoteType}`);
+            console.log(`[AI Temporal Grounding] Symbol: ${quote.symbol} (${quote.name}) | Status: ${quote.freshness} | Data Date: ${quote.dataDateStr} | Previous Session: ${quote.previousCloseDateStr} (${quote.previousClose}) | Expected Session: ${quote.expectedSessionDate} | Quote Type: ${quote.quoteType}`);
 
             const session = quote.market === "IN" ? sessionIN : sessionUS;
 
@@ -583,12 +583,12 @@ CRITICAL RULE: State honestly and consistently: "Velora's verified historical da
                 sessionGuidance = `• PRE-MARKET US SESSION NOTICE:
   Today is ${session.dayOfWeek}, ${session.localDateStr}. Regular US trading has NOT opened yet (regular market hours: 09:30 - 16:00 EST / 20:00 - 02:30 IST).
   Therefore, when asked how the market performed "today", the latest completed session was Friday's close (${session.latestCompletedSessionLabel}).
-  You MUST explicitly state: "The US market has not yet opened for ${session.dayOfWeek}, ${session.localDateStr} (trading begins at 09:30 EST / 20:00 IST). In the latest completed session on Friday (${session.latestCompletedSessionDate}), the ${quote.name} closed at ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)."`;
+  You MUST explicitly state: "The US market has not yet opened for ${session.dayOfWeek}, ${session.localDateStr} (trading begins at 09:30 EST / 20:00 IST). In the latest completed session on Friday (${session.latestCompletedSessionDate}), the ${quote.name} closed at ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%, a move of ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} from the previous session close of ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} on ${quote.previousCloseDateStr})."`;
               } else if (quote.market === "IN" && session.phase === "POST_CLOSE") {
                 sessionGuidance = `• COMPLETED SESSION NOTICE:
   Today is ${session.dayOfWeek}, ${session.localDateStr}. The Indian market has CLOSED for the day (trading concluded at 15:30 IST).
   Therefore, today's session (${quote.dataDateStr}) IS the official completed session.
-  You MUST cite the final closing level of ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) as today's close.`;
+  You MUST cite the final closing level of ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%, a move of ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} from previous session close of ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} on ${quote.previousCloseDateStr}) as today's close.`;
               }
 
               verifiedIndexBlocks.push(`======================================================================
@@ -604,18 +604,22 @@ Freshness Status: ${quote.freshness}
 Quote Type: ${quote.quoteType}
 • Current / Latest Level: ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
 • Daily Change: ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)
-• Previous Session Close: ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+• Previous Session Close: ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Session Date: ${quote.previousCloseDateStr})
 ${sessionGuidance}
 
 ${quote.freshness === "STALE" ? `CRITICAL STALENESS DISCLOSURE MANDATE:
 The data for ${quote.name} is STALE. You MUST OPEN your response with this exact disclosure before giving any figures:
 "${quote.stalenessNote}"` : ""}
 
+${quote.freshness === "UNVERIFIED" ? `CRITICAL UNVERIFIED DATA DISCLOSURE MANDATE:
+The daily change calculation for ${quote.name} is flagged as UNVERIFIED: ${quote.stalenessNote}
+You MUST state explicitly that this figure is unverified before citing any numbers. Never stamp this quote as fresh or verified.` : ""}
+
 ${quote.quoteType === "INTRADAY_SNAPSHOT" ? `CRITICAL INTRADAY DISCLOSURE MANDATE:
 The market has closed for the day, but the figure in our feed is an intraday snapshot recorded at ${quote.dataTimestamp.toLocaleTimeString()} rather than the official final close. You MUST state explicitly that this is an intraday level and not the final close.` : ""}
 
 STRICT HEADLINE NUMBER RULE:
-News articles may provide commentary or sector colour, but you may NEVER cite index figures or percentages from news search results. You MUST use the official verified index level (${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}) and change (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) above as your headline figures.
+News articles may provide commentary or sector colour, but you may NEVER cite index figures or percentages from news search results. You MUST use the official verified index level (${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}), change (${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)}), change percentage (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%), and previous close (${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} from ${quote.previousCloseDateStr}) above as your headline figures.
 ======================================================================`);
             }
           }

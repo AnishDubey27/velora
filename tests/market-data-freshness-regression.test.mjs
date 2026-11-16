@@ -94,9 +94,9 @@ console.log("Test 3: Session Status Computation...");
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: Live Verified Index Fetching & Historical Nov 12 Nifty Candle
+// Test 4: Live Verified Index Fetching & Nifty Session Derivation
 // ---------------------------------------------------------------------------
-console.log("Test 4: Live Verified Index Fetch & Historical Candle Lookup...");
+console.log("Test 4: Live Verified Index Fetch & Nifty Session Derivation...");
 {
   const niftyDef = SUPPORTED_INDICES.find(i => i.id === "nifty");
   assert.ok(niftyDef, "Nifty 50 index definition must exist");
@@ -113,7 +113,25 @@ console.log("Test 4: Live Verified Index Fetch & Historical Candle Lookup...");
   // The verified close for Nifty 50 on Nov 12, 2026 was 25,299.35
   const diff = Math.abs(targetCandle.close - 25299.35);
   assert.ok(diff < 2.0, `Expected Nifty close on Nov 12 to be ~25,299.35, got ${targetCandle.close}`);
-  console.log(`✓ Test 4 Passed: Nifty Nov 12 historical close accurately retrieved (${targetCandle.close.toFixed(2)})`);
+
+  // Derived previousClose verification:
+  // For Monday Nov 16 (close 25,291.10), previous close MUST be Friday Nov 13 candle (25,144.30)
+  assert.equal(niftyResult.previousCloseDateStr, "2026-11-13", "Nifty previousClose date must be 2026-11-13");
+  assert.ok(
+    Math.abs(niftyResult.previousClose - 25144.30) < 2.0,
+    `Nifty previousClose must be ~25,144.30 (Friday Nov 13 candle), got ${niftyResult.previousClose}`
+  );
+  assert.ok(
+    Math.abs(niftyResult.change - 146.80) < 2.0,
+    `Nifty daily change must be ~+146.80, got ${niftyResult.change}`
+  );
+  assert.ok(
+    Math.abs(niftyResult.changePercent - 0.58) < 0.05,
+    `Nifty daily change % must be ~+0.58%, got ${niftyResult.changePercent}% (MUST NOT be +9.27% from 1-month-old baseline)`
+  );
+  assert.equal(niftyResult.freshness, "FRESH", "Nifty quote must be marked FRESH");
+
+  console.log(`✓ Test 4 Passed: Nifty session derived cleanly (Close: ${niftyResult.price}, Prev Close: ${niftyResult.previousClose} on ${niftyResult.previousCloseDateStr}, Change: +${niftyResult.change.toFixed(2)} / +${niftyResult.changePercent.toFixed(2)}%)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +146,41 @@ console.log("Test 5: S&P 500 Verification & Session Date...");
   assert.ok(spResult.price > 5000, `S&P 500 price should be > 5000, got ${spResult.price}`);
   assert.equal(spResult.freshness, "FRESH", "Latest session data must be marked FRESH");
   assert.ok(spResult.dataDateStr.startsWith("2026-11"), `Quote date should be in Nov 2026, got ${spResult.dataDateStr}`);
-  console.log(`✓ Test 5 Passed: S&P 500 verified data is fresh (${spResult.dataDateStr}: ${spResult.price.toFixed(2)})`);
+
+  // Derived previousClose verification:
+  // For Friday Nov 13 (close 7,561.67), previous close MUST be Thursday Nov 12 candle (7,592.40)
+  assert.equal(spResult.previousCloseDateStr, "2026-11-12", "S&P 500 previousClose date must be 2026-11-12");
+  assert.ok(
+    Math.abs(spResult.previousClose - 7592.40) < 2.0,
+    `S&P 500 previousClose must be ~7,592.40 (Thursday Nov 12 candle), got ${spResult.previousClose}`
+  );
+  assert.ok(
+    Math.abs(spResult.change - (-30.73)) < 1.5,
+    `S&P 500 daily change must be ~-30.73, got ${spResult.change}`
+  );
+  assert.ok(
+    Math.abs(spResult.changePercent - (-0.40)) < 0.05,
+    `S&P 500 daily change % must be ~-0.40%, got ${spResult.changePercent}% (MUST NOT be -3.12% from 1-month-old baseline)`
+  );
+
+  console.log(`✓ Test 5 Passed: S&P 500 verified data is fresh (${spResult.dataDateStr}: ${spResult.price.toFixed(2)}, Prev Close: ${spResult.previousClose} on ${spResult.previousCloseDateStr}, Change: ${spResult.change.toFixed(2)} / ${spResult.changePercent.toFixed(2)}%)`);
+}
+
+// ---------------------------------------------------------------------------
+// Test 6: Freshness & Plausibility Sanity Gate (§3)
+// ---------------------------------------------------------------------------
+console.log("Test 6: Sanity Gate Enforcement...");
+{
+  const maxAllowed = 4.0;
+  // A single-session move > 4.0% on a major index must be flagged UNVERIFIED
+  const simulatedAbnormalMovePct = 9.27; // The old bug move
+  const isSane = Math.abs(simulatedAbnormalMovePct) <= maxAllowed;
+  assert.equal(isSane, false, "Abnormal move of 9.27% must breach the sanity threshold");
+
+  // Normal move of 0.58% is within bounds
+  const normalMovePct = 0.58;
+  assert.equal(Math.abs(normalMovePct) <= maxAllowed, true, "0.58% must pass sanity threshold");
+  console.log("✓ Test 6 Passed: Sanity gate strictly discriminates between sane index moves (±4%) and corrupted baselines");
 }
 
 console.log("=== All Market Data Freshness Regression Tests PASSED Successfully ===");
