@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { fetchVerifiedIndex, SUPPORTED_INDICES } from "@/lib/index-grounding";
 
 const FINNHUB_KEY = getEnv('FINNHUB_API_KEY');
 
@@ -29,31 +30,22 @@ async function fetchJson(url: string, init?: RequestInit) {
 }
 
 async function getSp500() {
-  // Try fetching genuine S&P 500 Index level (^GSPC) via Yahoo Finance Chart API
+  // Use verified index quote from unified index grounding engine
   try {
-    const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d";
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const meta = json?.chart?.result?.[0]?.meta;
-      const price = toNumber(meta?.regularMarketPrice);
-      const prev = toNumber(meta?.previousClose ?? meta?.chartPreviousClose);
-      if (price !== null) {
-        const changePercent = prev && prev > 0 ? ((price - prev) / prev) * 100 : null;
+    const sp500Def = SUPPORTED_INDICES.find((i) => i.id === "sp500");
+    if (sp500Def) {
+      const verified = await fetchVerifiedIndex(sp500Def);
+      if (verified && typeof verified.price === "number") {
         return {
-          symbol: "^GSPC",
-          price,
-          changePercent,
+          symbol: verified.symbol,
+          price: verified.price,
+          changePercent: verified.changePercent,
           source: "S&P 500 Index",
         };
       }
     }
   } catch (err) {
-    console.warn("Yahoo ^GSPC fetch failed, falling back to Finnhub SPY:", err);
+    console.warn("Unified index fetch for S&P 500 failed, falling back:", err);
   }
 
   // Fallback to Finnhub SPY ETF quote if index quote unavailable

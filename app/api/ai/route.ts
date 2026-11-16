@@ -7,6 +7,14 @@ import { createClient } from "@/utils/supabase/server";
 import { getEnv } from "@/lib/env";
 import { DEFAULT_MODEL, NVIDIA_API_URL } from "@/lib/nvidia";
 import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
+import {
+  SUPPORTED_INDICES,
+  getMarketSessionStatus,
+  fetchVerifiedIndex,
+  detectIndicesInQuery,
+  extractRequestedDateFromQuery,
+  VerifiedIndexQuote,
+} from "@/lib/index-grounding";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -166,78 +174,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const messages: ChatMessage[] = payload.messages.map((m: any) => ({
+    const rawMessages: ChatMessage[] = payload.messages.map((m: any) => ({
       role: m.role === "user" ? "user" : m.role === "assistant" ? "assistant" : "system",
       content: String(m.content || "")
     }));
 
-    const dateTodayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const userMessages = rawMessages.filter((m) => m.role === "user");
+    const lastUserMsg = userMessages[userMessages.length - 1]?.content || "";
 
-    // Base System Prompt
-    const baseSystemPrompt = `You are Velora AI — an elite Wall Street financial research assistant and market strategist.
-Your purpose is to deliver highly actionable, quantitative, and risk-calibrated financial insights.
-Be direct, professional, concise, and structured. Always use standard Markdown headings (##), bold text, bullet points, and markdown tables where applicable.
-
-When asked for trade ideas, stock breakdowns, or market analysis, format your output into clear sections using Markdown H2 (##):
-## 1. Executive Takeaway
-## 2. Catalyst & Fundamental Drivers
-## 3. Quantitative Ratios & Valuation (use Markdown tables)
-## 4. Technical Setup & Trade Plan
-## 5. Downside Risks & Portfolio Impact
-
-MANDATORY TRADE PLAN & TECHNICAL RULES (SECTION 4):
-- UNIFORMLY OMIT all unverified third-party technical levels (such as guessing secondary support, resistance, pivot, or dip-buying levels).
-- You may ONLY cite verified price metrics provided in the official data: Current Price ($X.XX) and 52-Week Range ($Low - $High).
-- In Section 4 ("## 4. Technical Setup & Trade Plan"), evaluate price action strictly relative to its Current Price and 52-Week Range (e.g. trading near the upper or lower boundary of its 52-week range). Discuss technical momentum, trends, and volume qualitatively WITHOUT fabricating arbitrary dollar support or resistance numbers.
-- If and ONLY IF a "Verified Trade Setup" is provided in the official market data below, output:
-> **TRADE SETUP:** Entry $X | Target $Y (+Z%) | Stop $W (-V%) | Conviction High
-> **RISK SCORE:** 7/10 (High Momentum / Growth)
-- NEVER invent a Target Price or percentage. NEVER output an inverted percentage (e.g. Target below Entry labelled with positive percentage).
-- If NO verified trade setup is provided above (or marked as NO VERIFIED ANALYST PRICE TARGET AVAILABLE), you MUST completely OMIT the "> **TRADE SETUP:**" block from your answer.
-- NEVER write "N/A" for Target or Stop (e.g. NEVER output "PRICE TARGET: N/A" or "STOP LOSS: N/A").
-- STRICT NUMERICAL DIRECTION & ORDERING: NEVER make inverted directional claims. For example, NEVER claim that a higher price ($220) is "below" a lower price ($162.85), or that a lower price is "above" a higher price. Verify all numerical comparisons.
-- ABSOLUTE PERCENTAGE & UNIT DISCIPLINE: In prose narrative, percentage changes MUST match the verified changePercent (e.g. "-2.01%"). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%" — write "it fell $3.34 (-2.01%)").
-
-CRITICAL TABLE FORMATTING RULE:
-- In Markdown tables, each cell must contain exactly one clean, final value.
-- NEVER output self-correction arrows, transitions, or revision patterns (such as "$3.92T → $1.50T" or "A -> B") inside table cells. Output ONLY the single final verified number (e.g. "$1.50T").
-
-MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
-- For ANY subject stock, check its verified portfolio standing:
-  * If the stock IS held in the user's portfolio: state its exact holding size, return, and Winner/Underperformer status from the verified portfolio data as a single indivisible unit.
-  * If the stock is NOT held in the user's portfolio: state explicitly that it is NOT currently held in the user's portfolio.
-  * NEVER cross-assign or swap returns between different stocks (e.g. NEVER assign a loss from another stock like FSLR to TSLA).
-- STRICT COST BASIS & PER-SHARE DISTINCTION:
-  * Clearly distinguish between Total Cost Basis ($X.XX) and Per-Share Purchase Price ($Y.YY/share).
-  * When mentioning cost in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)" (e.g. "Total Cost of $14.15 ($283.00 per share)").
-  * NEVER state that the cost basis is $283.00 without specifying "per share", and NEVER claim the entire position cost $283.00 when the total cost was $14.15.
-- Derived Portfolio Aggregates: When discussing portfolio concentration or holdings weights in narrative, quote the exact pre-computed percentages from the official data. Never confuse "% of portfolio value" with "% of unrealized gains".
-- Citing Individual Holding P&L: ALWAYS copy the exact dollar P&L directly from the verified table (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate in your head.
-
-MANDATORY SOURCES FORMATTING:
-At the very end of your response, you MUST provide a "## Sources" section listing every source:
-- For web search sources: cite each web source using its exact markdown link and date from the search results below:
-  \`• [Publisher / Title](URL) — Date\`
-- For Velora market & portfolio data:
-  \`• Velora data as of ${dateTodayStr}\`
-NEVER output bare source names like "Snapshot from Robinhood data" or "Yahoo Finance" without links.
-NEVER label sources as "— Recent" without an actual date.
-
-IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitative analysis for informational and research purposes only, not financial or investment advice. Always append this exact disclaimer at the very end: "*Velora AI provides financial intelligence for informational and research purposes only, not investment advice.*"`;
-
-    messages.unshift({ role: "system", content: baseSystemPrompt });
-
-    // Inject skill-specific system prompt if provided
-    if (typeof payload?.systemPrompt === "string" && payload.systemPrompt.trim()) {
-      messages.splice(1, 0, { role: "system", content: payload.systemPrompt.trim() });
-    }
+    const verifiedDataDates: string[] = [];
 
     let knownHoldingsSymbols: string[] = [];
     let userAnalyzedHoldings: AnalyzedHolding[] = [];
     let userTotalPortfolioValue = 0;
     let userTotalCostBasis = 0;
+    let portfolioContextMsg: ChatMessage | null = null;
 
-    // Fetch Portfolio Context
+    // 1. Fetch Portfolio Context
     try {
       const cookieStore = await cookies();
       const supabase = createClient(cookieStore);
@@ -372,7 +325,9 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
             ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of port) | Total Cost: $${l.positionCost.toFixed(2)} ($${l.purchasePrice.toFixed(2)} per share purchase price) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
             : "  • None";
 
-          const portfolioContext: ChatMessage = {
+          verifiedDataDates.push(new Date().toISOString().slice(0, 10));
+
+          portfolioContextMsg = {
             role: "system",
             content: `======================================================================
 OFFICIAL VERIFIED PORTFOLIO METRICS (Source of Truth - Velora Portfolio Engine)
@@ -410,16 +365,14 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 9. COST BASIS CLARITY: When citing cost basis in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)". Never confuse total cost with purchase price per share.
 ======================================================================`
           };
-          messages.splice(1, 0, portfolioContext);
         }
     } catch (e) {
       console.error("Failed to fetch user portfolio context:", e);
     }
 
-    // ── Ticker Grounding (Task B) ──────────────────────────────────
-    const userMessages = messages.filter((m) => m.role === "user");
-    const lastUserMsg = userMessages[userMessages.length - 1]?.content || "";
+    // 2. Ticker Grounding
     const detectedTickers = extractTickersFromQuery(lastUserMsg, knownHoldingsSymbols);
+    let verifiedTickerContextMsg: ChatMessage | null = null;
 
     if (detectedTickers.length > 0) {
       const finnhubKey = getEnv('FINNHUB_API_KEY');
@@ -439,6 +392,8 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
               if (!quoteRes || typeof quoteRes.c !== "number" || quoteRes.c <= 0) {
                 return;
               }
+
+              verifiedDataDates.push(new Date().toISOString().slice(0, 10));
 
               const currentPrice = quoteRes.c;
               const change = quoteRes.d ?? 0;
@@ -550,16 +505,157 @@ STRICT INSTRUCTIONS FOR COMBINED / MULTI-TICKER ANALYSIS:
         }
 
         if (verifiedTickerContexts.length > 0) {
-          messages.splice(1, 0, {
+          verifiedTickerContextMsg = {
             role: "system",
             content: verifiedTickerContexts.join("\n\n")
-          });
+          };
         }
       }
     }
 
-    // ── Real-Time Web Grounding via Tavily (topic: "news") / Brave Search ──
+    // 3. Verified Index Grounding & Temporal Engine
+    const sessionIN = getMarketSessionStatus("IN");
+    const sessionUS = getMarketSessionStatus("US");
+    const isTemporalQuery = /\b(today'?s date|current date|what date is it|latest session|session data|which session|latest date|as of today)\b/i.test(lastUserMsg);
+    const detectedIndices = detectIndicesInQuery(lastUserMsg);
+    const requestedHistoricalDate = extractRequestedDateFromQuery(lastUserMsg);
+    let verifiedIndexContextMsg: ChatMessage | null = null;
+
+    if (detectedIndices.length > 0 || isTemporalQuery) {
+      const indicesToFetch = isTemporalQuery
+        ? [SUPPORTED_INDICES.find(i => i.id === "sp500")!, SUPPORTED_INDICES.find(i => i.id === "nifty")!].filter(Boolean)
+        : detectedIndices;
+
+      const verifiedIndexBlocks: string[] = [];
+      const fetchedQuotes: VerifiedIndexQuote[] = [];
+
+      await Promise.all(
+        indicesToFetch.map(async (def) => {
+          const quote = await fetchVerifiedIndex(def);
+          if (quote) {
+            fetchedQuotes.push(quote);
+            verifiedDataDates.push(quote.dataDateStr);
+            console.log(`[AI Temporal Grounding] Symbol: ${quote.symbol} (${quote.name}) | Status: ${quote.freshness} | Data Date: ${quote.dataDateStr} | Expected Session: ${quote.expectedSessionDate} | Quote Type: ${quote.quoteType}`);
+
+            const session = quote.market === "IN" ? sessionIN : sessionUS;
+
+            if (requestedHistoricalDate) {
+              const candle = quote.candles.find(c => c.date === requestedHistoricalDate.dateStr);
+              if (candle) {
+                verifiedIndexBlocks.push(`======================================================================
+OFFICIAL VERIFIED HISTORICAL SESSION DATA (Source of Truth - Velora Market Engine)
+Index: ${quote.name} (${quote.symbol})
+Requested Date: ${requestedHistoricalDate.displayLabel} (${requestedHistoricalDate.dateStr})
+• Verified Close: ${candle.close.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+• Previous Session Close: ${candle.previousClose != null ? candle.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "N/A"}
+• Daily Change: ${candle.change != null && candle.change >= 0 ? "+" : ""}${candle.change ?? 0} (${candle.changePercent != null && candle.changePercent >= 0 ? "+" : ""}${candle.changePercent ?? 0}%)
+Status: VERIFIED HISTORICAL CLOSE
+CRITICAL RULE: You MUST cite the exact verified close of ${candle.close.toLocaleString("en-US", { minimumFractionDigits: 2 })} for ${requestedHistoricalDate.displayLabel}. DO NOT refuse to answer when verified historical session data is provided above.
+======================================================================`);
+              } else {
+                const reqDateObj = new Date(`${requestedHistoricalDate.dateStr}T12:00:00Z`);
+                const dayOfWeekNum = reqDateObj.getUTCDay();
+                const isWeekend = dayOfWeekNum === 0 || dayOfWeekNum === 6;
+                if (isWeekend) {
+                  verifiedIndexBlocks.push(`======================================================================
+OFFICIAL HISTORICAL CALENDAR NOTICE (Velora Market Engine)
+Index: ${quote.name} (${quote.symbol})
+Requested Date: ${requestedHistoricalDate.displayLabel} (${requestedHistoricalDate.dateStr})
+Status: NON-TRADING DAY (WEEKEND - MARKETS CLOSED)
+• ${requestedHistoricalDate.displayLabel} was a ${dayOfWeekNum === 6 ? "Saturday" : "Sunday"}, when equity markets are closed.
+• The nearest preceding trading session was Friday (${quote.candles[quote.candles.length - 1]?.date}), when ${quote.name} closed at ${quote.candles[quote.candles.length - 1]?.close.toLocaleString("en-US", { minimumFractionDigits: 2 })}.
+CRITICAL RULE: State clearly that ${requestedHistoricalDate.displayLabel} was a weekend and markets were closed, and cite the nearest trading session.
+======================================================================`);
+                } else {
+                  verifiedIndexBlocks.push(`======================================================================
+OFFICIAL HISTORICAL DATA STATUS (Velora Market Engine)
+Index: ${quote.name} (${quote.symbol})
+Requested Date: ${requestedHistoricalDate.displayLabel} (${requestedHistoricalDate.dateStr})
+Status: OUT OF AVAILABLE HISTORICAL RANGE
+CRITICAL RULE: State honestly and consistently: "Velora's verified historical data covers the past 30 days (${quote.candles[0]?.date || "recent"} to ${quote.candles[quote.candles.length - 1]?.date || "latest"}). Verified historical session data for ${requestedHistoricalDate.displayLabel} is not available in our 30-day feed."
+======================================================================`);
+                }
+              }
+            } else {
+              // Latest session quote block
+              let sessionGuidance = "";
+              if (quote.market === "US" && session.phase === "PRE_MARKET") {
+                sessionGuidance = `• PRE-MARKET US SESSION NOTICE:
+  Today is ${session.dayOfWeek}, ${session.localDateStr}. Regular US trading has NOT opened yet (regular market hours: 09:30 - 16:00 EST / 20:00 - 02:30 IST).
+  Therefore, when asked how the market performed "today", the latest completed session was Friday's close (${session.latestCompletedSessionLabel}).
+  You MUST explicitly state: "The US market has not yet opened for ${session.dayOfWeek}, ${session.localDateStr} (trading begins at 09:30 EST / 20:00 IST). In the latest completed session on Friday (${session.latestCompletedSessionDate}), the ${quote.name} closed at ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)."`;
+              } else if (quote.market === "IN" && session.phase === "POST_CLOSE") {
+                sessionGuidance = `• COMPLETED SESSION NOTICE:
+  Today is ${session.dayOfWeek}, ${session.localDateStr}. The Indian market has CLOSED for the day (trading concluded at 15:30 IST).
+  Therefore, today's session (${quote.dataDateStr}) IS the official completed session.
+  You MUST cite the final closing level of ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) as today's close.`;
+              }
+
+              verifiedIndexBlocks.push(`======================================================================
+OFFICIAL VERIFIED INDEX DATA (Source of Truth - Velora Market Data Engine)
+Index: ${quote.name} (${quote.symbol})
+Market: ${quote.market === "IN" ? "India (NSE / BSE)" : "United States (NYSE / NASDAQ)"}
+Current Market Time: ${session.localTimeStr}
+Session Phase: ${session.phase} (Market is ${session.isOpen ? "OPEN" : "CLOSED"})
+Latest Completed Session: ${session.latestCompletedSessionLabel}
+Data Vintage Date: ${quote.dataDateStr}
+Data Timestamp: ${quote.dataTimestamp.toISOString()}
+Freshness Status: ${quote.freshness}
+Quote Type: ${quote.quoteType}
+• Current / Latest Level: ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+• Daily Change: ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)
+• Previous Session Close: ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+${sessionGuidance}
+
+${quote.freshness === "STALE" ? `CRITICAL STALENESS DISCLOSURE MANDATE:
+The data for ${quote.name} is STALE. You MUST OPEN your response with this exact disclosure before giving any figures:
+"${quote.stalenessNote}"` : ""}
+
+${quote.quoteType === "INTRADAY_SNAPSHOT" ? `CRITICAL INTRADAY DISCLOSURE MANDATE:
+The market has closed for the day, but the figure in our feed is an intraday snapshot recorded at ${quote.dataTimestamp.toLocaleTimeString()} rather than the official final close. You MUST state explicitly that this is an intraday level and not the final close.` : ""}
+
+STRICT HEADLINE NUMBER RULE:
+News articles may provide commentary or sector colour, but you may NEVER cite index figures or percentages from news search results. You MUST use the official verified index level (${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}) and change (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) above as your headline figures.
+======================================================================`);
+            }
+          }
+        })
+      );
+
+      if (isTemporalQuery) {
+        const niftyQuote = fetchedQuotes.find(q => q.symbol === "^NSEI");
+        const sp500Quote = fetchedQuotes.find(q => q.symbol === "^GSPC");
+
+        verifiedIndexBlocks.unshift(`======================================================================
+OFFICIAL TEMPORAL CALENDAR & SESSION GROUNDING (Source of Truth - Velora Engine)
+• Current Wall-Clock Date: ${sessionIN.dayOfWeek}, ${sessionIN.localDateStr}
+• Indian Market (NSE / BSE):
+  - Current Local Time: ${sessionIN.localTimeStr}
+  - Market Status: ${sessionIN.phase === "POST_CLOSE" ? "Closed for the day (trading ended at 15:30 IST)" : sessionIN.phase === "REGULAR_HOURS" ? "Open (Trading session in progress)" : "Pre-Market (Opens 09:15 IST)"}
+  - Latest Completed Session: ${sessionIN.latestCompletedSessionLabel} (${niftyQuote ? `Nifty 50 close: ${niftyQuote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "session complete"})
+• US Market (NYSE / NASDAQ):
+  - Current Local Time: ${sessionUS.localTimeStr}
+  - Market Status: ${sessionUS.phase === "POST_CLOSE" ? "Closed for the day (trading ended at 16:00 EST)" : sessionUS.phase === "REGULAR_HOURS" ? "Open (Trading session in progress)" : `Pre-Market (Opens ${sessionUS.nextSessionOpensLabel})`}
+  - Latest Completed Session: ${sessionUS.latestCompletedSessionLabel} (${sp500Quote ? `S&P 500 close: ${sp500Quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "Friday close"})
+
+CRITICAL TEMPORAL MANDATE:
+When asked "What is today's date / latest session you have data for?", you MUST state:
+1. Today's date (${sessionIN.dayOfWeek}, ${sessionIN.localDateStr}).
+2. The latest completed session for each covered market (Indian market: ${sessionIN.latestCompletedSessionLabel}; US market: ${sessionUS.latestCompletedSessionLabel}), completely consistent with the verified figures above.
+======================================================================`);
+      }
+
+      if (verifiedIndexBlocks.length > 0) {
+        verifiedIndexContextMsg = {
+          role: "system",
+          content: verifiedIndexBlocks.join("\n\n")
+        };
+      }
+    }
+
+    // 4. Real-Time Web Grounding via Tavily (topic: "news") / Brave Search
     const needsSearch = /stock|price|market|news|earnings|crypto|nvda|aapl|tsla|msft|report|today|ratio|fed|rate|inflation|war|cpi|gdp|why|fall|drop/i.test(lastUserMsg);
+    let searchContextMsg: ChatMessage | null = null;
 
     if (needsSearch) {
       if (isTavilyConfigured()) {
@@ -574,30 +670,35 @@ STRICT INSTRUCTIONS FOR COMBINED / MULTI-TICKER ANALYSIS:
             const contextText = searchResult.results
               .map((r: any) => {
                 let dateStr = "";
+                let isHistorical = false;
                 if (r.published_date) {
                   try {
                     const d = new Date(r.published_date);
                     if (!isNaN(d.getTime())) {
                       dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      const ageDays = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+                      if (ageDays > 5) {
+                        isHistorical = true;
+                      }
                     }
                   } catch {}
                 }
-                if (!dateStr) dateStr = dateTodayStr;
 
                 let publisher = "Web";
                 try {
                   const host = new URL(r.url).hostname.replace(/^www\./, "");
                   publisher = host.split('.')[0].toUpperCase();
                 } catch {}
-                return `• [${publisher} / ${r.title}](${r.url}) — ${dateStr}\n  Summary: ${r.content}`;
+
+                const dateTag = dateStr ? ` — ${dateStr}${isHistorical ? " [HISTORICAL ARTICLE — DO NOT CITE AS TODAY'S SESSION]" : ""}` : "";
+                return `• [${publisher} / ${r.title}](${r.url})${dateTag}\n  Summary: ${r.content}`;
               })
               .join("\n\n");
 
-            const searchContextMsg: ChatMessage = {
+            searchContextMsg = {
               role: "system",
-              content: `Real-time web search results from Tavily News (as of today):\n\n${contextText}\n\nGround your narrative, catalysts, and news in these sources. In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL) — Date\` format above.`,
+              content: `Real-time web search results from Tavily News:\n\n${contextText}\n\nCRITICAL TEMPORAL RULES FOR WEB SOURCES:\n- Any article tagged [HISTORICAL ARTICLE] or published in prior weeks/months MUST NOT be cited as today's performance.\n- Web news results may supply colour, market drivers, and sector moves, but may NEVER supply the headline index or stock figures. Use the official verified data above.\n- In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL) — Date\` format above.`,
             };
-            messages.splice(1, 0, searchContextMsg);
           }
         } catch (searchError) {
           console.error("Tavily search failed or timed out:", searchError);
@@ -626,15 +727,14 @@ STRICT INSTRUCTIONS FOR COMBINED / MULTI-TICKER ANALYSIS:
                       const host = new URL(r.url).hostname.replace(/^www\./, "");
                       publisher = host.split('.')[0].toUpperCase();
                     } catch {}
-                    return `• [${publisher} / ${r.title}](${r.url}) — ${dateTodayStr}\n  Summary: ${r.description}`;
+                    return `• [${publisher} / ${r.title}](${r.url})\n  Summary: ${r.description}`;
                   })
                   .join("\n\n");
 
-                const searchContextMsg: ChatMessage = {
+                searchContextMsg = {
                   role: "system",
-                  content: `Real-time web search results from Brave Search:\n\n${contextText}\n\nGround your narrative, catalysts, and news in these sources. In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL) — Date\` format above.`,
+                  content: `Real-time web search results from Brave Search:\n\n${contextText}\n\nGround your narrative, catalysts, and news in these sources. In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL)\` format above.`,
                 };
-                messages.splice(1, 0, searchContextMsg);
               }
             }
           } catch (searchError) {
@@ -643,6 +743,100 @@ STRICT INSTRUCTIONS FOR COMBINED / MULTI-TICKER ANALYSIS:
         }
       }
     }
+
+    // 5. Compute As-Of Stamp
+    let asOfDataDateStr: string | null = null;
+    if (verifiedDataDates.length > 0) {
+      const oldestIso = [...verifiedDataDates].sort()[0];
+      const oldestDateObj = new Date(oldestIso + "T12:00:00Z");
+      asOfDataDateStr = oldestDateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    const veloraDataAsOfRule = asOfDataDateStr
+      ? `- For Velora market & portfolio data:\n  \`• Velora data as of ${asOfDataDateStr}\``
+      : `- If no verified Velora market or portfolio data was injected into this prompt, DO NOT output a 'Velora data as of' line. Only cite real web search sources with their markdown links and dates.`;
+
+    // 6. Base System Prompt
+    const baseSystemPrompt = `You are Velora AI — an elite Wall Street financial research assistant and market strategist.
+Your purpose is to deliver highly actionable, quantitative, and risk-calibrated financial insights.
+Be direct, professional, concise, and structured. Always use standard Markdown headings (##), bold text, bullet points, and markdown tables where applicable.
+
+When asked for trade ideas, stock breakdowns, or market analysis, format your output into clear sections using Markdown H2 (##):
+## 1. Executive Takeaway
+## 2. Catalyst & Fundamental Drivers
+## 3. Quantitative Ratios & Valuation (use Markdown tables)
+## 4. Technical Setup & Trade Plan
+## 5. Downside Risks & Portfolio Impact
+
+MANDATORY MARKET INDEX & TEMPORAL RULES:
+- When answering questions about market indices (e.g. S&P 500, Nasdaq, Dow, Nifty 50, Sensex), you MUST use the headline figures, price levels, and percentage changes from the OFFICIAL VERIFIED VELORA MARKET DATA provided above.
+- NEVER quote headline index figures from web search news articles. News results may supply colour (drivers, sector moves) but may NEVER supply the headline index figure.
+- If the injected market data states that the data is STALE, you MUST OPEN your response with the required staleness disclosure before citing any figures.
+- If the injected market data states that a figure is an INTRADAY SNAPSHOT, you MUST state explicitly that it is an intraday level and not the final close.
+- For US markets queried during Asian/European hours before the 09:30 EST open, "today" refers to the latest completed session (Friday's close). You MUST explicitly label it as Friday's close and state that the US market opens tonight at 20:00 IST (09:30 EST).
+- NEVER present an old close (such as from May, June, or a prior week) as today's market performance.
+- For explicit past-date questions (e.g. "What did the Nifty 50 close at on November 12, 2026?"), quote the verified historical close from the official data provided. Never refuse when verified historical data is present, and never guess from news articles.
+
+MANDATORY TRADE PLAN & TECHNICAL RULES (SECTION 4):
+- UNIFORMLY OMIT all unverified third-party technical levels (such as guessing secondary support, resistance, pivot, or dip-buying levels).
+- You may ONLY cite verified price metrics provided in the official data: Current Price ($X.XX) and 52-Week Range ($Low - $High).
+- In Section 4 ("## 4. Technical Setup & Trade Plan"), evaluate price action strictly relative to its Current Price and 52-Week Range (e.g. trading near the upper or lower boundary of its 52-week range). Discuss technical momentum, trends, and volume qualitatively WITHOUT fabricating arbitrary dollar support or resistance numbers.
+- If and ONLY IF a "Verified Trade Setup" is provided in the official market data below, output:
+> **TRADE SETUP:** Entry $X | Target $Y (+Z%) | Stop $W (-V%) | Conviction High
+> **RISK SCORE:** 7/10 (High Momentum / Growth)
+- NEVER invent a Target Price or percentage. NEVER output an inverted percentage (e.g. Target below Entry labelled with positive percentage).
+- If NO verified trade setup is provided above (or marked as NO VERIFIED ANALYST PRICE TARGET AVAILABLE), you MUST completely OMIT the "> **TRADE SETUP:**" block from your answer.
+- NEVER write "N/A" for Target or Stop (e.g. NEVER output "PRICE TARGET: N/A" or "STOP LOSS: N/A").
+- STRICT NUMERICAL DIRECTION & ORDERING: NEVER make inverted directional claims. For example, NEVER claim that a higher price ($220) is "below" a lower price ($162.85), or that a lower price is "above" a higher price. Verify all numerical comparisons.
+- ABSOLUTE PERCENTAGE & UNIT DISCIPLINE: In prose narrative, percentage changes MUST match the verified changePercent (e.g. "-2.01%"). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%" — write "it fell $3.34 (-2.01%)").
+
+CRITICAL TABLE FORMATTING RULE:
+- In Markdown tables, each cell must contain exactly one clean, final value.
+- NEVER output self-correction arrows, transitions, or revision patterns (such as "$3.92T → $1.50T" or "A -> B") inside table cells. Output ONLY the single final verified number (e.g. "$1.50T").
+
+MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
+- For ANY subject stock, check its verified portfolio standing:
+  * If the stock IS held in the user's portfolio: state its exact holding size, return, and Winner/Underperformer status from the verified portfolio data as a single indivisible unit.
+  * If the stock is NOT held in the user's portfolio: state explicitly that it is NOT currently held in the user's portfolio.
+  * NEVER cross-assign or swap returns between different stocks (e.g. NEVER assign a loss from another stock like FSLR to TSLA).
+- STRICT COST BASIS & PER-SHARE DISTINCTION:
+  * Clearly distinguish between Total Cost Basis ($X.XX) and Per-Share Purchase Price ($Y.YY/share).
+  * When mentioning cost in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)" (e.g. "Total Cost of $14.15 ($283.00 per share)").
+  * NEVER state that the cost basis is $283.00 without specifying "per share", and NEVER claim the entire position cost $283.00 when the total cost was $14.15.
+- Derived Portfolio Aggregates: When discussing portfolio concentration or holdings weights in narrative, quote the exact pre-computed percentages from the official data. Never confuse "% of portfolio value" with "% of unrealized gains".
+- Citing Individual Holding P&L: ALWAYS copy the exact dollar P&L directly from the verified table (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate in your head.
+
+MANDATORY SOURCES FORMATTING:
+At the very end of your response, you MUST provide a "## Sources" section listing every source:
+- For web search sources: cite each web source using its exact markdown link and date from the search results below:
+  \`• [Publisher / Title](URL) — Date\`
+${veloraDataAsOfRule}
+NEVER output bare source names like "Snapshot from Robinhood data" or "Yahoo Finance" without links.
+NEVER label sources as "— Recent" without an actual date.
+
+IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitative analysis for informational and research purposes only, not financial or investment advice. Always append this exact disclaimer at the very end: "*Velora AI provides financial intelligence for informational and research purposes only, not investment advice.*"`;
+
+    // 7. Assemble Complete Messages Array
+    const messages: ChatMessage[] = [
+      { role: "system", content: baseSystemPrompt }
+    ];
+
+    if (typeof payload?.systemPrompt === "string" && payload.systemPrompt.trim()) {
+      messages.push({ role: "system", content: payload.systemPrompt.trim() });
+    }
+    if (portfolioContextMsg) {
+      messages.push(portfolioContextMsg);
+    }
+    if (verifiedTickerContextMsg) {
+      messages.push(verifiedTickerContextMsg);
+    }
+    if (verifiedIndexContextMsg) {
+      messages.push(verifiedIndexContextMsg);
+    }
+    if (searchContextMsg) {
+      messages.push(searchContextMsg);
+    }
+    messages.push(...rawMessages);
 
     // ── Model Selection & Fallback Hierarchy ─────────────────────────
     const isDeepMode = model.includes("minimax") || model === "deep";
