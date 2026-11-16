@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/portfolio-healthcheck-regression.test.mjs"
+    "test": "node tests/portfolio-healthcheck-regression.test.mjs && node tests/ai-thinking-and-guard-regression.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

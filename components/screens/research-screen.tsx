@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { ArrowUp, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,19 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
   const videoRef = useRef<HTMLVideoElement>(null);
   const popular = skills.filter((skill) => skill.popular).slice(0, 3);
   const shouldCenterPopular = popular.length <= 3;
+  const [hasSavedChat, setHasSavedChat] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("velora_chat_history_v1") : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setHasSavedChat(true);
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -136,13 +149,25 @@ export function ResearchScreen({ skills, onOpenSkills, onStartChat, onSelectSkil
             </button>
           </form>
 
-          <button
-            onClick={onOpenSkills}
-            className="mt-3 flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-white/80 active:bg-white/10"
-          >
-            <Sparkles size={16} />
-            Skills
-          </button>
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={onOpenSkills}
+              className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-white/80 active:bg-white/10 hover:bg-white/10 transition"
+            >
+              <Sparkles size={16} />
+              Skills
+            </button>
+            {hasSavedChat && (
+              <button
+                type="button"
+                onClick={() => onStartChat("")}
+                className="flex items-center gap-1.5 rounded-xl bg-vel-teal/15 border border-vel-teal/30 px-3.5 py-2 text-xs font-semibold text-teal-300 hover:bg-vel-teal/25 transition shadow-sm"
+              >
+                <span>Resume Chat</span>
+                <ArrowUp className="rotate-45" size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>

@@ -67,7 +67,7 @@ export function SidebarDrawer({ active, onNavigate, isOpen, onClose, onOpenTour 
             {/* Scrollable Navigation */}
             <nav className="p-3 pt-6 flex-1 overflow-y-auto no-scrollbar">
               {navItems.map(({ key, label, icon: Icon }) => {
-                const isActive = active === key;
+                const isActive = active === key || (key === "research" && active === "chat");
                 return (
                   <button
                     key={key}

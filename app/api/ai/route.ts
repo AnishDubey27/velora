@@ -173,20 +173,21 @@ When asked for trade ideas, stock breakdowns, or market analysis, format your ou
 ## 5. Downside Risks & Portfolio Impact
 
 MANDATORY TRADE PLAN RULES:
-- If and ONLY IF valid numeric Entry, Target, and Stop Loss prices are available from verified data or computed, format the trade plan as:
+- If and ONLY IF a "Verified Trade Setup" is provided in the official market data below, output:
 > **TRADE SETUP:** Entry $X | Target $Y (+Z%) | Stop $W (-V%) | Conviction High
 > **RISK SCORE:** 7/10 (High Momentum / Growth)
+- NEVER invent a Target Price or percentage. NEVER output an inverted percentage (e.g. Target below Entry labelled with positive percentage).
+- If NO verified trade setup is provided above (or marked as NO VERIFIED ANALYST PRICE TARGET AVAILABLE), you MUST completely OMIT the "> **TRADE SETUP:**" block from your answer.
 - NEVER write "N/A" for Target or Stop (e.g. NEVER output "PRICE TARGET: N/A" or "STOP LOSS: N/A").
-- If Target or Stop is not available, completely OMIT the "> **TRADE SETUP:**" block from your answer.
 
 MANDATORY SOURCES FORMATTING:
 At the very end of your response, you MUST provide a "## Sources" section listing every source:
-- For web search sources: use the exact markdown link and date from search results:
+- For web search sources: cite each web source using its exact markdown link and date from the search results below:
   \`• [Publisher / Title](URL) — Date\`
 - For Velora market & portfolio data:
   \`• Velora data as of ${dateTodayStr}\`
 NEVER output bare source names like "Snapshot from Robinhood data" or "Yahoo Finance" without links.
-NEVER fabricate links.
+NEVER label sources as "— Recent" without an actual date.
 
 IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitative analysis for informational and research purposes only, not financial or investment advice. Always append this exact disclaimer at the very end: "*Velora AI provides financial intelligence for informational and research purposes only, not investment advice.*"`;
 
@@ -355,13 +356,26 @@ CRITICAL ACCURACY & GROUNDING RULES:
                 ? `$${Number(metric["52WeekLow"]).toFixed(2)} - $${Number(metric["52WeekHigh"]).toFixed(2)}` 
                 : "Unavailable";
 
-              const targetPrice = targetRes?.targetMean ? Number(targetRes.targetMean) : (targetRes?.targetMedian ? Number(targetRes.targetMedian) : null);
+              const targetPrice = (targetRes?.targetMean && Number(targetRes.targetMean) > 0)
+                ? Number(targetRes.targetMean)
+                : (targetRes?.targetMedian && Number(targetRes.targetMedian) > 0 ? Number(targetRes.targetMedian) : null);
+
               const stopLoss = (targetRes?.targetLow && Number(targetRes.targetLow) > 0 && Number(targetRes.targetLow) < currentPrice)
                 ? Number(targetRes.targetLow)
                 : currentPrice * 0.92;
 
-              const upsideStr = targetPrice ? ` (+${(((targetPrice - currentPrice) / currentPrice) * 100).toFixed(1)}%)` : "";
               const downsidePercent = (((stopLoss - currentPrice) / currentPrice) * 100).toFixed(1);
+
+              let tradeSetupContext = "";
+              if (targetPrice && targetPrice > currentPrice) {
+                const upsidePct = (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(1);
+                tradeSetupContext = `• Velora Verified Trade Setup:
+  > **TRADE SETUP:** Entry $${currentPrice.toFixed(2)} | Target $${targetPrice.toFixed(2)} (+${upsidePct}%) | Stop $${stopLoss.toFixed(2)} (${downsidePercent}%) | Conviction High
+  (Strict Instruction: Output this verified trade setup block verbatim)`;
+              } else {
+                tradeSetupContext = `• Trade Setup Status: NO VERIFIED ANALYST PRICE TARGET AVAILABLE.
+  CRITICAL RULE: You MUST completely OMIT the "> **TRADE SETUP:**" block. Do NOT invent a price target, do NOT compute a target, and NEVER write "N/A".`;
+              }
 
               verifiedTickerContexts.push(`======================================================================
 OFFICIAL VERIFIED VELORA MARKET DATA (Source of Truth - Velora Data Engine)
@@ -374,11 +388,8 @@ Data Timestamp: ${new Date().toISOString()}
 • EPS (TTM): ${eps}
 • Beta: ${beta}
 • 52-Week Range: ${week52}
-• Wall Street Consensus Target: ${targetPrice ? `$${targetPrice.toFixed(2)}${upsideStr}` : "Unavailable"}
-• Velora Risk-Calibrated Trade Setup:
-  - Entry Zone: $${currentPrice.toFixed(2)}
-  - Target Price: ${targetPrice ? `$${targetPrice.toFixed(2)}${upsideStr}` : "Unavailable"}
-  - Stop Loss: $${stopLoss.toFixed(2)} (${downsidePercent}%)
+• Wall Street Consensus Target: ${targetPrice ? `$${targetPrice.toFixed(2)}` : "Unavailable"}
+${tradeSetupContext}
 
 CRITICAL GROUNDING RULES FOR ${sym}:
 1. Use the official verified Current Price ($${currentPrice.toFixed(2)}), Daily Change, P/E Ratio (${peRatio}), and Market Capitalization (${marketCapStr}) VERBATIM.
@@ -400,7 +411,7 @@ CRITICAL GROUNDING RULES FOR ${sym}:
       }
     }
 
-    // ── Real-Time Web Grounding via Tavily / Brave Search (Task C) ──
+    // ── Real-Time Web Grounding via Tavily (topic: "news") / Brave Search ──
     const needsSearch = /stock|price|market|news|earnings|crypto|nvda|aapl|tsla|msft|report|today|ratio|fed|rate|inflation|war|cpi|gdp|why|fall|drop/i.test(lastUserMsg);
 
     if (needsSearch) {
@@ -409,15 +420,23 @@ CRITICAL GROUNDING RULES FOR ${sym}:
           const searchResult = await tavilySearch({
             query: lastUserMsg,
             maxResults: 5,
-            topic: "general",
+            topic: "news",
           });
 
           if (searchResult.results.length > 0) {
             const contextText = searchResult.results
               .map((r: any) => {
-                let dateStr = r.published_date 
-                  ? new Date(r.published_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
-                  : "Recent";
+                let dateStr = "";
+                if (r.published_date) {
+                  try {
+                    const d = new Date(r.published_date);
+                    if (!isNaN(d.getTime())) {
+                      dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    }
+                  } catch {}
+                }
+                if (!dateStr) dateStr = dateTodayStr;
+
                 let publisher = "Web";
                 try {
                   const host = new URL(r.url).hostname.replace(/^www\./, "");
@@ -429,7 +448,7 @@ CRITICAL GROUNDING RULES FOR ${sym}:
 
             const searchContextMsg: ChatMessage = {
               role: "system",
-              content: `Real-time web search results from Tavily (as of today):\n\n${contextText}\n\nGround your narrative, catalysts, and news in these sources. In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL) — Date\` format above.`,
+              content: `Real-time web search results from Tavily News (as of today):\n\n${contextText}\n\nGround your narrative, catalysts, and news in these sources. In your final "## Sources" section, cite these sources using the exact \`• [Publisher / Title](URL) — Date\` format above.`,
             };
             messages.splice(1, 0, searchContextMsg);
           }
@@ -460,7 +479,7 @@ CRITICAL GROUNDING RULES FOR ${sym}:
                       const host = new URL(r.url).hostname.replace(/^www\./, "");
                       publisher = host.split('.')[0].toUpperCase();
                     } catch {}
-                    return `• [${publisher} / ${r.title}](${r.url}) — Recent\n  Summary: ${r.description}`;
+                    return `• [${publisher} / ${r.title}](${r.url}) — ${dateTodayStr}\n  Summary: ${r.description}`;
                   })
                   .join("\n\n");
 
@@ -490,15 +509,29 @@ CRITICAL GROUNDING RULES FOR ${sym}:
           "minimaxai/minimax-m3.1-flash",          // Fallback 1: Deep analyst
         ];
 
-    // Initial connection timeout (before headers arrive): 20s for Deep, 15s for Fast
-    // Once headers arrive, connection timeout is cleared and stream watchdog takes over.
-    const connectTimeoutMs = isDeepMode ? 20000 : 15000;
+    let selectedModel = "";
+    let selectedReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let prebufferTokens: string[] = [];
+    let initialBuffer = "";
     let lastError: any = null;
+    const requestStartTime = Date.now();
 
+    // ── First-Visible-Token Guard Loop ─────────────────────────────
+    // For each model in the fallback chain:
+    // 1. Fetch with enable_thinking: false
+    // 2. Wait up to 15s for the first VISIBLE content token
+    // 3. If model stalls (e.g. burns reasoning or freezes), abort and switch to fallback
     for (const attemptModel of modelsToTry) {
-      let connectTimeout: NodeJS.Timeout | null = null;
+      console.log(`[AI Routing] Initiating attempt with ${attemptModel} (Mode: ${isDeepMode ? 'Deep' : 'Fast'})`);
+      const modelAttemptStart = Date.now();
+      const firstTokenCtrl = new AbortController();
+
+      const firstTokenTimer = setTimeout(() => {
+        console.warn(`[First-Token Guard] 15s elapsed without visible content token from ${attemptModel}. Aborting to fallback.`);
+        firstTokenCtrl.abort(new Error("First visible content token timeout (15s)"));
+      }, 15000);
+
       try {
-        const isNemotron = attemptModel.includes("nemotron");
         const isMiniMax = attemptModel.includes("minimax");
 
         const requestBody: any = {
@@ -509,17 +542,9 @@ CRITICAL GROUNDING RULES FOR ${sym}:
             : (isMiniMax ? 0.4 : 0.2),
           max_tokens: typeof payload?.max_tokens === "number" ? payload.max_tokens : 4096,
           stream: true,
+          // CRITICAL: Unconditionally disable thinking across models so reasoning doesn't burn budget
+          chat_template_kwargs: { enable_thinking: false },
         };
-
-        // Strictly apply chat_template_kwargs ONLY to Nemotron models
-        if (isNemotron) {
-          requestBody.chat_template_kwargs = { enable_thinking: false };
-        }
-
-        const connectController = new AbortController();
-        connectTimeout = setTimeout(() => {
-          connectController.abort(new Error(`Connection timed out after ${connectTimeoutMs / 1000}s`));
-        }, connectTimeoutMs);
 
         const res = await fetch(NVIDIA_API_URL, {
           method: "POST",
@@ -528,194 +553,268 @@ CRITICAL GROUNDING RULES FOR ${sym}:
             "Content-Type": "application/json",
           },
           body: JSON.stringify(requestBody),
-          signal: connectController.signal,
+          signal: firstTokenCtrl.signal,
         });
 
-        // Response headers received: cancel connect timeout so streaming is never truncated
-        clearTimeout(connectTimeout);
-        connectTimeout = null;
-
         if (!res.ok || !res.body) {
+          clearTimeout(firstTokenTimer);
           const errText = await res.text().catch(() => "");
-          console.warn(`Attempt with ${attemptModel} returned ${res.status}: ${errText.slice(0, 150)}`);
+          console.warn(`Attempt with ${attemptModel} returned HTTP ${res.status}: ${errText.slice(0, 150)}`);
           lastError = errText || `Status ${res.status}`;
           continue;
         }
 
-        const encoder = new TextEncoder();
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
+        let foundFirstVisibleToken = false;
+        let inThinkingBlock = false;
+        const capturedPretokens: string[] = [];
 
-        const stream = new ReadableStream({
-          async start(controller) {
-            const reader = res.body!.getReader();
-            let buffer = "";
-            let inThinkingBlock = false;
-            let tokensEmitted = 0;
-            let currentLine = "";
-            let finishReason = "unknown";
-            let streamClosed = false;
-            const t0 = Date.now();
-            let firstTokenTime = 0;
-            let lastTokenTime = 0;
-            const repetitionGuard = new RepetitionGuard(3);
+        // Read until first visible content token
+        while (!foundFirstVisibleToken) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-            let watchdogTimer: NodeJS.Timeout | null = null;
-            const cancelWatchdog = () => {
-              if (watchdogTimer) {
-                clearTimeout(watchdogTimer);
-                watchdogTimer = null;
-              }
-            };
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-            const finalizeCleanly = (reason: string) => {
-              if (streamClosed) return;
-              streamClosed = true;
-              cancelWatchdog();
-              console.log(`[Stream Finalized] Reason: ${reason} | Model: ${attemptModel} | Tokens: ${tokensEmitted} | Duration: ${Date.now() - t0}ms`);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":")) continue;
+            if (trimmed === "data: [DONE]") continue;
+
+            if (trimmed.startsWith("data: ")) {
               try {
-                if (tokensEmitted > 0) {
-                  const finalNote = "\n\n*[Analysis finalized. Velora AI provides financial intelligence for informational and research purposes only, not investment advice.]*\n\n";
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: finalNote })}\n\n`));
-                }
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                controller.close();
-              } catch {}
-              try {
-                reader.cancel().catch(() => {});
-              } catch {}
-            };
+                const json = JSON.parse(trimmed.slice(6));
+                let token = json.choices?.[0]?.delta?.content || "";
 
-            const armWatchdog = () => {
-              cancelWatchdog();
-              watchdogTimer = setTimeout(() => {
-                console.warn(`[Stream Watchdog] 10s idle token timeout on ${attemptModel}`);
-                finalizeCleanly("watchdog_idle_timeout");
-              }, 10000);
-            };
-
-            // Arm initial watchdog
-            armWatchdog();
-
-            try {
-              while (!streamClosed) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                // Reset watchdog on receiving fresh chunks
-                armWatchdog();
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop() || "";
-
-                for (const line of lines) {
-                  if (streamClosed) break;
-                  const trimmed = line.trim();
-                  if (!trimmed || trimmed.startsWith(":")) continue;
-                  if (trimmed === "data: [DONE]") {
-                    continue;
+                if (token) {
+                  // Filter out <think> tags if present
+                  if (token.includes("<think>") && token.includes("</think>")) {
+                    token = token.replace(/<think>[\s\S]*?<\/think>/gi, "");
+                  } else if (token.includes("<think>")) {
+                    inThinkingBlock = true;
+                    token = token.replace(/<think>[\s\S]*/gi, "");
+                  } else if (token.includes("</think>")) {
+                    inThinkingBlock = false;
+                    token = token.replace(/[\s\S]*<\/think>/gi, "");
                   }
 
-                  if (trimmed.startsWith("data: ")) {
-                    try {
-                      const json = JSON.parse(trimmed.slice(6));
-                      const choice = json.choices?.[0];
-                      if (choice?.finish_reason) {
-                        finishReason = choice.finish_reason;
-                      }
-
-                      const delta = choice?.delta;
-                      let token = delta?.content || "";
-
-                      if (token) {
-                        // Filter out <think> tags if present
-                        if (token.includes("<think>") && token.includes("</think>")) {
-                          token = token.replace(/<think>[\s\S]*?<\/think>/gi, "");
-                        } else if (token.includes("<think>")) {
-                          inThinkingBlock = true;
-                          token = token.replace(/<think>[\s\S]*/gi, "");
-                        } else if (token.includes("</think>")) {
-                          inThinkingBlock = false;
-                          token = token.replace(/[\s\S]*<\/think>/gi, "");
-                        }
-
-                        if (!inThinkingBlock && token) {
-                          // Repetition guard check on completed lines
-                          let shouldHalt = false;
-                          currentLine += token;
-                          if (currentLine.includes("\n")) {
-                            const splitLines = currentLine.split("\n");
-                            currentLine = splitLines.pop() || "";
-                            for (const completedLine of splitLines) {
-                              if (repetitionGuard.feedLine(completedLine)) {
-                                console.warn(`[Repetition Guard Triggered] Loop detected on: "${completedLine}". Stopping stream.`);
-                                shouldHalt = true;
-                                break;
-                              }
-                            }
-                          }
-
-                          if (shouldHalt) {
-                            finalizeCleanly("repetition_guard_triggered");
-                            break;
-                          }
-
-                          tokensEmitted++;
-                          if (!firstTokenTime) firstTokenTime = Date.now() - t0;
-                          lastTokenTime = Date.now() - t0;
-
-                          controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`)
-                          );
-                        }
-                      }
-                    } catch {
-                      // ignore parse errors on partial lines
-                    }
+                  if (!inThinkingBlock && token) {
+                    foundFirstVisibleToken = true;
+                    capturedPretokens.push(token);
+                    break;
                   }
                 }
-              }
-
-              cancelWatchdog();
-              if (!streamClosed) {
-                streamClosed = true;
-                console.log(`[AI Instrumentation] Model: ${attemptModel} | Emitted: ${tokensEmitted} tokens | TTFT: ${firstTokenTime}ms | Duration: ${Date.now() - t0}ms | FinishReason: ${finishReason}`);
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                controller.close();
-              }
-            } catch (streamErr) {
-              cancelWatchdog();
-              if (!streamClosed) {
-                controller.error(streamErr);
-              }
-            } finally {
-              cancelWatchdog();
-              reader.releaseLock();
+              } catch {}
             }
-          },
-        });
-
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-          },
-        });
-      } catch (err: any) {
-        if (connectTimeout) {
-          clearTimeout(connectTimeout);
-          connectTimeout = null;
+          }
         }
-        console.error(`Attempt with model ${attemptModel} failed:`, err.message || err);
+
+        clearTimeout(firstTokenTimer);
+
+        if (!foundFirstVisibleToken) {
+          console.warn(`[First-Token Guard] Model ${attemptModel} completed without emitting visible content tokens! Falling back.`);
+          try { await reader.cancel(); } catch {}
+          continue;
+        }
+
+        console.log(`[First-Token Guard] Received first visible content token from ${attemptModel} in ${Date.now() - modelAttemptStart}ms.`);
+        selectedModel = attemptModel;
+        selectedReader = reader;
+        prebufferTokens = capturedPretokens;
+        initialBuffer = buffer;
+        break;
+      } catch (err: any) {
+        clearTimeout(firstTokenTimer);
+        console.warn(`Attempt with ${attemptModel} failed: ${err.message || err}`);
         lastError = err.message || "Model timeout";
       }
     }
 
-    return NextResponse.json(
-      { error: `AI request failed across available models (${lastError}). Please try again.` },
-      { status: 502 }
-    );
+    if (!selectedReader) {
+      console.error(`All models in hierarchy failed to yield content tokens. Last error: ${lastError}`);
+      return NextResponse.json(
+        { error: `AI service temporarily unavailable (${lastError}). Please try again or switch to Fast mode.` },
+        { status: 502 }
+      );
+    }
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const activeModel = selectedModel;
+    const activeReader = selectedReader;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        let buffer = initialBuffer;
+        let inThinkingBlock = false;
+        let tokensEmitted = 0;
+        let currentLine = "";
+        let finishReason = "unknown";
+        let streamClosed = false;
+        const streamStartTime = Date.now();
+        let firstTokenTime = Date.now() - requestStartTime;
+        let lastTokenTime = firstTokenTime;
+        const repetitionGuard = new RepetitionGuard(3);
+
+        let watchdogTimer: NodeJS.Timeout | null = null;
+        const cancelWatchdog = () => {
+          if (watchdogTimer) {
+            clearTimeout(watchdogTimer);
+            watchdogTimer = null;
+          }
+        };
+
+        const finalizeCleanly = (reason: string) => {
+          if (streamClosed) return;
+          streamClosed = true;
+          cancelWatchdog();
+          console.log(`[Stream Finalized] Reason: ${reason} | Model: ${activeModel} | Tokens: ${tokensEmitted} | Duration: ${Date.now() - streamStartTime}ms`);
+          try {
+            if (tokensEmitted > 0) {
+              const finalNote = "\n\n*[Analysis finalized. Velora AI provides financial intelligence for informational and research purposes only, not investment advice.]*\n\n";
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: finalNote })}\n\n`));
+            } else {
+              // Never emit an empty answer
+              const fallbackMsg = "Velora AI was unable to generate a complete response for this query. Please try again or switch to Fast mode for an instant response.";
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: fallbackMsg })}\n\n`));
+            }
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch {}
+          try {
+            activeReader.cancel().catch(() => {});
+          } catch {}
+        };
+
+        const armWatchdog = () => {
+          cancelWatchdog();
+          watchdogTimer = setTimeout(() => {
+            console.warn(`[Stream Watchdog] 10s idle token timeout on ${activeModel}`);
+            finalizeCleanly("watchdog_idle_timeout");
+          }, 10000);
+        };
+
+        // Enqueue prebuffered tokens
+        for (const token of prebufferTokens) {
+          tokensEmitted++;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`));
+        }
+
+        // Arm watchdog
+        armWatchdog();
+
+        try {
+          while (!streamClosed) {
+            const { done, value } = await activeReader.read();
+            if (done) break;
+
+            armWatchdog();
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (streamClosed) break;
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(":")) continue;
+              if (trimmed === "data: [DONE]") continue;
+
+              if (trimmed.startsWith("data: ")) {
+                try {
+                  const json = JSON.parse(trimmed.slice(6));
+                  const choice = json.choices?.[0];
+                  if (choice?.finish_reason) {
+                    finishReason = choice.finish_reason;
+                  }
+
+                  const delta = choice?.delta;
+                  let token = delta?.content || "";
+
+                  if (token) {
+                    // Filter out <think> tags if present
+                    if (token.includes("<think>") && token.includes("</think>")) {
+                      token = token.replace(/<think>[\s\S]*?<\/think>/gi, "");
+                    } else if (token.includes("<think>")) {
+                      inThinkingBlock = true;
+                      token = token.replace(/<think>[\s\S]*/gi, "");
+                    } else if (token.includes("</think>")) {
+                      inThinkingBlock = false;
+                      token = token.replace(/[\s\S]*<\/think>/gi, "");
+                    }
+
+                    if (!inThinkingBlock && token) {
+                      // Repetition guard check on completed lines
+                      let shouldHalt = false;
+                      currentLine += token;
+                      if (currentLine.includes("\n")) {
+                        const splitLines = currentLine.split("\n");
+                        currentLine = splitLines.pop() || "";
+                        for (const completedLine of splitLines) {
+                          if (repetitionGuard.feedLine(completedLine)) {
+                            console.warn(`[Repetition Guard Triggered] Loop detected on: "${completedLine}". Stopping stream.`);
+                            shouldHalt = true;
+                            break;
+                          }
+                        }
+                      }
+
+                      if (shouldHalt) {
+                        finalizeCleanly("repetition_guard_triggered");
+                        break;
+                      }
+
+                      tokensEmitted++;
+                      lastTokenTime = Date.now() - requestStartTime;
+
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`)
+                      );
+                    }
+                  }
+                } catch {
+                  // ignore parse errors on partial lines
+                }
+              }
+            }
+          }
+
+          cancelWatchdog();
+          if (!streamClosed) {
+            streamClosed = true;
+            console.log(`[AI Instrumentation] Model: ${activeModel} | Emitted: ${tokensEmitted} tokens | TTFT: ${firstTokenTime}ms | Duration: ${Date.now() - requestStartTime}ms | FinishReason: ${finishReason}`);
+            
+            if (tokensEmitted === 0) {
+              const fallbackMsg = "Velora AI was unable to generate a complete response for this query. Please try again or switch to Fast mode for an instant response.";
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: fallbackMsg })}\n\n`));
+            }
+            
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          }
+        } catch (streamErr) {
+          cancelWatchdog();
+          if (!streamClosed) {
+            controller.error(streamErr);
+          }
+        } finally {
+          cancelWatchdog();
+          activeReader.releaseLock();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Request failed." },

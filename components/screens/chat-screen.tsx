@@ -312,7 +312,20 @@ const STOCK_SUGGESTIONS = [
 const CHAT_STORAGE_KEY = "velora_chat_history_v1";
 
 export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -321,25 +334,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
-  const hasSubmittedInitial = useRef(false);
+  const submittedPromptRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Restore chat history from localStorage on initial load
-  useEffect(() => {
-    if (!initialPrompt && !skillContext) {
-      try {
-        const saved = localStorage.getItem(CHAT_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to restore chat history:", e);
-      }
-    }
-  }, [initialPrompt, skillContext]);
 
   // Persist chat history to localStorage on completion
   useEffect(() => {
@@ -362,14 +358,16 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     } catch {}
   };
 
-  // Auto-submit initial prompt or skill context (only once)
-  useEffect(() => {
-    if (hasSubmittedInitial.current) return;
-    if (messages.length > 0) return;
+  const handleNewChat = () => {
+    handleClearHistory();
+    onBack();
+  };
 
+  // Auto-submit initial prompt or skill context (only once per unique prompt)
+  useEffect(() => {
     // Skill context takes priority
-    if (skillContext) {
-      hasSubmittedInitial.current = true;
+    if (skillContext && submittedPromptRef.current !== skillContext.displayMessage) {
+      submittedPromptRef.current = skillContext.displayMessage;
       setActiveSystemPrompt(skillContext.systemPrompt);
       setActiveSuggestions(skillContext.suggestions.map(s => ({ label: s })));
       sendMessageWithHiddenContext(
@@ -381,8 +379,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     }
 
     // Legacy: stock-context from Ask Velora AI button
-    if (initialPrompt) {
-      hasSubmittedInitial.current = true;
+    if (initialPrompt && submittedPromptRef.current !== initialPrompt) {
+      submittedPromptRef.current = initialPrompt;
       const isStock = initialPrompt.includes("portfolio") && initialPrompt.includes("Do not list any suggest buying");
       if (isStock) {
         const symbolMatch = initialPrompt.match(/have (\w+) in my portfolio/);
@@ -463,11 +461,11 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
     if (isLoading) return;
 
     setInput("");
-    const displayMessages: Message[] = [
+    setMessages((prev) => [
+      ...prev,
       { role: "user", content: displayContent },
       { role: "assistant", content: "" }
-    ];
-    setMessages(displayMessages);
+    ]);
     setIsLoading(true);
 
     const controller = new AbortController();
@@ -663,11 +661,12 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         <div className="flex-1" />
         {messages.length > 0 && (
           <button
-            onClick={handleClearHistory}
-            className="text-xs px-2.5 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition"
-            title="Clear conversation"
+            onClick={handleNewChat}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition flex items-center gap-1.5"
+            title="Start fresh conversation"
           >
-            Clear
+            <RotateCcw size={12} />
+            <span>New Chat</span>
           </button>
         )}
         <BuiModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />

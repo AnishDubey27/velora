@@ -103,6 +103,19 @@ export default function Home() {
 
   const handleNavigate = (key: NavKey) => {
     setSkillLibraryOpen(false);
+    if (key === "research") {
+      try {
+        const saved = typeof window !== "undefined" ? localStorage.getItem("velora_chat_history_v1") : null;
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setActive("chat");
+            updateUrl("chat");
+            return;
+          }
+        }
+      } catch {}
+    }
     setActive(key);
     updateUrl(key);
   };

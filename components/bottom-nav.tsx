@@ -28,7 +28,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.06] bg-[#0A0F1C]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-2xl">
       <div className="grid grid-cols-4 max-w-md mx-auto">
         {items.map(({ key, label, Icon }) => {
-          const selected = active === key;
+          const selected = active === key || (key === "research" && active === "chat");
           return (
             <button
               key={key}

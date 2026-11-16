@@ -20,7 +20,7 @@ export function SidebarNav({ active, onNavigate }: SidebarNavProps) {
   return (
     <nav className="px-3">
       {navItems.map(({ key, label, icon: Icon }) => {
-        const isActive = active === key;
+        const isActive = active === key || (key === "research" && active === "chat");
         return (
           <button
             key={key}
