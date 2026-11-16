@@ -2,7 +2,7 @@
 
 const LIVE_URL = "https://velora.anishdubey.com/api/ai";
 
-async function queryVeloraAI(prompt, model, hiddenPrompt = null, systemPrompt = null) {
+async function queryVeloraAI(prompt, model, hiddenPrompt = null, systemPrompt = null, holdings = null) {
   const startTime = Date.now();
   let firstTokenTime = null;
   let fullText = "";
@@ -21,7 +21,8 @@ async function queryVeloraAI(prompt, model, hiddenPrompt = null, systemPrompt = 
       messages,
       model,
       stream: true,
-      hiddenPrompt: hiddenPrompt || undefined
+      hiddenPrompt: hiddenPrompt || undefined,
+      holdings: holdings || undefined
     })
   });
 

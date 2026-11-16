@@ -2,6 +2,20 @@ import { queryVeloraAI } from "./run-live-acceptance.mjs";
 
 const DEEP_MODEL = "minimaxai/minimax-m3.1-flash";
 
+const testPortfolioHoldings = [
+  { symbol: "TSLA", shares: 0.08, purchase_price: 240.00 }, // Winner (+37.89%)
+  { symbol: "LUNR", shares: 1.5, purchase_price: 8.50 },
+  { symbol: "AMD", shares: 0.1, purchase_price: 120.00 },
+  { symbol: "META", shares: 0.02, purchase_price: 500.00 },
+  { symbol: "RKLB", shares: 1.0, purchase_price: 12.00 },
+  { symbol: "NRGV", shares: 2.0, purchase_price: 2.00 },
+  { symbol: "CRSP", shares: 0.1, purchase_price: 45.00 },
+  { symbol: "FSLR", shares: 0.05, purchase_price: 220.00 }, // Underperformer (-34.33%)
+  { symbol: "BWXT", shares: 0.05, purchase_price: 90.00 },
+  { symbol: "BABA", shares: 0.1, purchase_price: 85.00 },
+  { symbol: "IONQ", shares: 0.5, purchase_price: 18.00 },
+];
+
 async function main() {
   console.log("================================================================================");
   console.log("STARTING LIVE ACCEPTANCE SUITE FOR SPRINT SEND-BACK (https://velora.anishdubey.com)");
@@ -13,7 +27,7 @@ async function main() {
   console.log(">>> [1/2] Deep Mode: 'Give me a combined full analysis of NVDA and TSLA' (3 runs)");
   for (let i = 1; i <= 3; i++) {
     console.log(`\n--- Combined NVDA+TSLA Run ${i}/3 ---`);
-    const r = await queryVeloraAI("Give me a combined full analysis of NVDA and TSLA", DEEP_MODEL);
+    const r = await queryVeloraAI("Give me a combined full analysis of NVDA and TSLA", DEEP_MODEL, null, null, testPortfolioHoldings);
     console.log(`Status: ${r.status} | TTFT: ${r.ttft}ms | Duration: ${r.duration}ms | Length: ${r.textLength} chars`);
     
     // Extract Section 5 Portfolio Impact
@@ -48,11 +62,12 @@ async function main() {
       "Analyze my whole portfolio using Velora",
       DEEP_MODEL,
       portfolioHiddenPrompt,
-      "You are a personal financial advisor at Velora. Analyze the user's actual portfolio holdings with care, precision, and a constructive tone."
+      "You are a personal financial advisor at Velora. Analyze the user's actual portfolio holdings with care, precision, and a constructive tone.",
+      testPortfolioHoldings
     );
     console.log(`Status: ${r.status} | TTFT: ${r.ttft}ms | Duration: ${r.duration}ms | Length: ${r.textLength} chars`);
     
-    console.log("\n[Health Check Sample Preview]:\n" + r.fullText.slice(0, 800) + "...\n");
+    console.log("\n[Health Check Sample Preview]:\n" + r.fullText.slice(0, 1000) + "...\n");
     results.push({
       test: `Portfolio Health Check Run ${i}`,
       ...r

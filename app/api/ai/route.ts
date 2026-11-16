@@ -231,21 +231,31 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
       const supabase = createClient(cookieStore);
       const { data: { user } } = await supabase.auth.getUser();
       
+      let userHoldings: any[] | null = null;
       if (user) {
         const { data: holdings } = await supabase
           .from('holdings')
           .select('symbol, shares, purchase_price')
           .eq('user_id', user.id);
-          
-        if (holdings && holdings.length > 0) {
-          knownHoldingsSymbols = holdings.map((h: any) => h.symbol);
-          const finnhubKey = getEnv('FINNHUB_API_KEY');
-          
-          let totalPortfolioValue = 0;
-          let totalCostBasis = 0;
-          
-          const rawAnalyzed = await Promise.all(
-            holdings.map(async (h) => {
+        userHoldings = holdings;
+      }
+      if ((!userHoldings || userHoldings.length === 0) && Array.isArray(payload?.holdings) && payload.holdings.length > 0) {
+        userHoldings = payload.holdings.map((h: any) => ({
+          symbol: String(h.symbol || "").toUpperCase(),
+          shares: Number(h.shares) || 0,
+          purchase_price: Number(h.purchase_price ?? h.purchasePrice) || 0,
+        }));
+      }
+
+      if (userHoldings && userHoldings.length > 0) {
+        knownHoldingsSymbols = userHoldings.map((h: any) => h.symbol);
+        const finnhubKey = getEnv('FINNHUB_API_KEY');
+        
+        let totalPortfolioValue = 0;
+        let totalCostBasis = 0;
+        
+        const rawAnalyzed = await Promise.all(
+          userHoldings.map(async (h) => {
               const shares = Number(h.shares) || 0;
               const purchasePrice = Number(h.purchase_price) || 0;
               let currentPrice = purchasePrice;
@@ -395,7 +405,6 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
           };
           messages.splice(1, 0, portfolioContext);
         }
-      }
     } catch (e) {
       console.error("Failed to fetch user portfolio context:", e);
     }
