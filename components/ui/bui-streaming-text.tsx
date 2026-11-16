@@ -8,7 +8,7 @@
 
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check, RotateCcw, Sparkles, ExternalLink, Globe } from "lucide-react";
@@ -31,27 +31,31 @@ export type BuiStreamingTextProps = {
 };
 
 /**
- * Parses real Velora sources from the Markdown content
- * Expected format:
+ * Extracts verified sources and citations from Markdown content
+ * Handles:
+ * • ## Sources / ## Verified Sources / ### Sources / ## 6. Sources
  * • [Publisher / Title](URL) — Date
  * • Velora data as of Date
  */
 export function extractSourcesFromMarkdown(content: string): StreamingSource[] {
   const sources: StreamingSource[] = [];
+  if (!content) return sources;
+
   const lines = content.split("\n");
   let inSourcesSection = false;
 
   for (const line of lines) {
-    if (line.trim().startsWith("## Sources") || line.trim().startsWith("### Sources")) {
+    const trimmed = line.trim();
+    if (/^#{1,4}\s*(?:\d+\.\s*)?(?:verified\s*)?sources/i.test(trimmed) || /^\*\*(?:verified\s*)?sources:?\*\*/i.test(trimmed)) {
       inSourcesSection = true;
       continue;
     }
-    if (inSourcesSection && line.startsWith("## ")) {
+    if (inSourcesSection && /^#{1,3}\s+[A-Za-z0-9]/.test(trimmed) && !/sources/i.test(trimmed)) {
       inSourcesSection = false;
       continue;
     }
 
-    if (inSourcesSection) {
+    if (inSourcesSection || line.includes("Velora data as of")) {
       // Match markdown link: [Name](url)
       const linkMatch = line.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)(?:\s*[—–-]\s*([^\n\r]+))?/);
       if (linkMatch) {
@@ -74,34 +78,106 @@ export function extractSourcesFromMarkdown(content: string): StreamingSource[] {
           });
         }
       } else if (line.includes("Velora data as of")) {
-        const dateMatch = line.match(/Velora data as of ([^\n\r]+)/);
-        sources.push({
-          name: "Velora Portfolio & Market Engine",
-          domain: "velora.ai",
-          href: "https://velora.anishdubey.com",
-          date: dateMatch ? dateMatch[1].trim() : undefined,
-        });
+        const dateMatch = line.match(/Velora data as of ([^\n\r*]+)/i);
+        const date = dateMatch ? dateMatch[1].trim() : undefined;
+        if (!sources.some(s => s.name === "Velora Portfolio & Market Engine")) {
+          sources.push({
+            name: "Velora Portfolio & Market Engine",
+            domain: "velora.ai",
+            href: "https://velora.anishdubey.com",
+            date,
+          });
+        }
       }
+    }
+  }
+
+  // Fallback: If no explicit ## Sources section was marked but content has links, extract them
+  if (sources.length === 0) {
+    const allLinks = Array.from(content.matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g));
+    for (const match of allLinks) {
+      const name = match[1];
+      const href = match[2];
+      try {
+        const domain = new URL(href).hostname.replace(/^www\./, "");
+        if (!sources.some(s => s.href === href)) {
+          sources.push({ name, domain, href });
+        }
+      } catch {}
     }
   }
 
   return sources;
 }
 
+/**
+ * Beautiful UI Inline Source Chip
+ */
 export function BuiSourceChip({ source }: { source: StreamingSource }) {
   return (
     <a
       href={source.href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex h-5 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-mono text-cyan-300 transition-colors duration-150 hover:bg-white/10 hover:text-white align-middle my-0.5"
+      className="inline-flex h-5 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.05] hover:bg-teal-500/20 px-2 py-0.5 text-[11px] font-mono text-cyan-300 hover:text-white transition-all align-middle mx-1 my-0.5 shadow-sm"
       style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
+      title={source.name}
     >
       <Globe size={11} className="text-teal-400 shrink-0" />
-      <span className="truncate max-w-[140px]">{source.domain}</span>
+      <span className="truncate max-w-[130px]">{source.domain}</span>
       {source.date && <span className="text-[10px] text-white/40">· {source.date}</span>}
+      <ExternalLink size={10} className="opacity-60" />
     </a>
   );
+}
+
+/**
+ * Generates sharp, contextual follow-ups if none were provided
+ */
+function generateContextualFollowUps(content: string): string[] {
+  if (!content) return [];
+
+  // Check for tickers
+  const tickerMatch = content.match(/\b([A-Z]{2,5})\b/);
+  const subjectTicker = tickerMatch ? tickerMatch[1] : null;
+
+  if (content.toLowerCase().includes("portfolio") || content.toLowerCase().includes("health check")) {
+    return [
+      "Which holding has the highest risk concentration?",
+      "Suggest rebalancing ideas based on current winners",
+      "How does my portfolio beta compare to the S&P 500?",
+    ];
+  }
+
+  if (content.toLowerCase().includes("nifty") || content.toLowerCase().includes("sensex")) {
+    return [
+      "What are the key macro catalysts driving Indian markets today?",
+      "Compare Nifty 50 performance with BSE Sensex",
+      "What is the market open and close schedule for this week?",
+    ];
+  }
+
+  if (content.toLowerCase().includes("s&p 500") || content.toLowerCase().includes("nasdaq") || content.toLowerCase().includes("dow")) {
+    return [
+      "What are the upcoming economic events impacting US equities?",
+      "How are mega-cap tech earnings revisions trending?",
+      "What time does the US regular trading session open?",
+    ];
+  }
+
+  if (subjectTicker && !["TRADE", "SETUP", "P/E", "USD", "EST", "IST", "BSE", "NSE"].includes(subjectTicker)) {
+    return [
+      `What are the key downside risks and bear cases for ${subjectTicker}?`,
+      `Compare ${subjectTicker}'s valuation and P/E ratio with peers`,
+      `What is ${subjectTicker}'s 52-week high and low range?`,
+    ];
+  }
+
+  return [
+    "Run a full portfolio health check on my Velora portfolio",
+    "What are today's top market movers and catalysts?",
+    "Give me a combined full analysis of NVDA and TSLA",
+  ];
 }
 
 export function BuiStreamingText({
@@ -115,18 +191,44 @@ export function BuiStreamingText({
   const [copied, setCopied] = useState(false);
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
 
+  // Progressive reveal for smooth streaming & blur-resolve
+  const [displayedLength, setDisplayedLength] = useState(content.length);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setDisplayedLength(content.length);
+      return;
+    }
+
+    if (content.length > displayedLength) {
+      // Step progressive display smoothly (30-50 chars per tick)
+      const diff = content.length - displayedLength;
+      const step = Math.max(1, Math.min(diff, Math.ceil(diff / 3)));
+      const timer = setTimeout(() => {
+        setDisplayedLength((prev) => Math.min(content.length, prev + step));
+      }, 20);
+      return () => clearTimeout(timer);
+    }
+  }, [content, isStreaming, displayedLength]);
+
   const sources = useMemo(() => extractSourcesFromMarkdown(content), [content]);
 
-  // Strip the redundant trailing "## Sources" block if we render it as an interactive panel
+  // Strip the raw trailing "## Sources" block if rendered separately
   const displayContent = useMemo(() => {
+    const raw = isStreaming ? content.slice(0, displayedLength) : content;
     if (sources.length > 0 && !isStreaming) {
-      const idx = content.search(/##\s*Sources/i);
+      const idx = raw.search(/#{1,3}\s*(?:\d+\.\s*)?(?:verified\s*)?sources/i);
       if (idx !== -1) {
-        return content.slice(0, idx).trim();
+        return raw.slice(0, idx).trim();
       }
     }
-    return content;
-  }, [content, sources, isStreaming]);
+    return raw;
+  }, [content, isStreaming, displayedLength, sources]);
+
+  const resolvedFollowUps = useMemo(() => {
+    if (followUps && followUps.length > 0) return followUps;
+    return generateContextualFollowUps(content);
+  }, [followUps, content]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -134,11 +236,37 @@ export function BuiStreamingText({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Merge custom markdown components with inline source chips
+  const mergedMarkdownComponents = useMemo(() => {
+    return {
+      ...markdownComponents,
+      // Render markdown links inline as Beautiful UI Source Chips
+      a: ({ href, children }: any) => {
+        let domain = "";
+        try {
+          domain = href ? new URL(href).hostname.replace(/^www\./, "") : "";
+        } catch {}
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-white/[0.06] hover:bg-teal-500/20 border border-white/10 hover:border-teal-500/30 text-teal-300 hover:text-white text-[11px] font-mono align-middle transition-colors shadow-sm"
+          >
+            <Globe size={11} className="text-teal-400 shrink-0" />
+            <span className="truncate max-w-[120px]">{domain || children}</span>
+            <ExternalLink size={9} className="opacity-50" />
+          </a>
+        );
+      },
+    };
+  }, [markdownComponents]);
+
   return (
     <div className="w-full space-y-3">
-      {/* Markdown rendered stream */}
-      <div className="relative">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {/* Markdown rendered stream with blur-resolve class */}
+      <div className={cn("relative", isStreaming && "blur-resolve-stream")}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mergedMarkdownComponents}>
           {displayContent}
         </ReactMarkdown>
 
@@ -153,14 +281,14 @@ export function BuiStreamingText({
 
       {/* Finished State: Actions, Real Sources, and Follow-up Suggestions */}
       {!isStreaming && content && (
-        <div className="pt-2 border-t border-white/5 space-y-3">
+        <div className="pt-2 border-t border-white/5 space-y-3" style={{ animation: "fade-in 300ms ease-out both" }}>
           {/* Action Row */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {onRerun && (
               <button
                 type="button"
                 onClick={onRerun}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs text-white/60 hover:text-white hover:bg-white/10 transition"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 title="Rerun analysis"
               >
                 <RotateCcw size={12} />
@@ -171,18 +299,19 @@ export function BuiStreamingText({
             <button
               type="button"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs text-white/60 hover:text-white hover:bg-white/10 transition"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
               title="Copy to clipboard"
             >
               {copied ? <Check size={12} className="text-teal-400" /> : <Copy size={12} />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
 
+            {/* Consistent Verified Sources button */}
             {sources.length > 0 && (
               <button
                 type="button"
                 onClick={() => setSourcesExpanded(prev => !prev)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300 hover:bg-teal-500/20 transition"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300 hover:bg-teal-500/20 transition cursor-pointer"
               >
                 <Globe size={12} />
                 <span>{sources.length} Verified Sources</span>
@@ -196,8 +325,9 @@ export function BuiStreamingText({
               className="p-3 rounded-xl bg-[#080D1A] border border-white/10 space-y-2"
               style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
             >
-              <div className="text-[11px] font-bold uppercase tracking-wider text-teal-300">
-                Verified Information Sources & Telemetry
+              <div className="text-[11px] font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                <Globe size={12} className="text-teal-400" />
+                <span>Verified Information Sources & Telemetry</span>
               </div>
               <div className="flex flex-col gap-1.5">
                 {sources.map((s, idx) => (
@@ -223,21 +353,25 @@ export function BuiStreamingText({
             </div>
           )}
 
-          {/* Follow-up Prompts */}
-          {followUps && followUps.length > 0 && onFollowUp && (
-            <div className="pt-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1.5">
+          {/* Follow-up Prompts (Beautiful UI style) */}
+          {resolvedFollowUps.length > 0 && onFollowUp && (
+            <div className="pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-2 flex items-center gap-1.5">
                 <Sparkles size={12} className="text-teal-400" /> Suggested Follow-ups
               </p>
-              <div className="flex flex-wrap gap-2">
-                {followUps.map((prompt, idx) => (
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                {resolvedFollowUps.map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => onFollowUp(prompt)}
-                    className="text-xs px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 hover:text-white hover:border-teal-500/40 hover:bg-white/[0.07] transition text-left"
+                    className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 hover:text-white hover:border-teal-500/40 hover:bg-white/[0.07] transition text-left cursor-pointer group"
                     style={{ animation: `fade-up 300ms cubic-bezier(0.23,1,0.32,1) ${idx * 60}ms both` }}
                   >
-                    {prompt}
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-400/70 group-hover:text-teal-300 shrink-0">
+                      <path d="M9 10l-5 5 5 5" />
+                      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+                    </svg>
+                    <span>{prompt}</span>
                   </button>
                 ))}
               </div>

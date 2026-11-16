@@ -8,7 +8,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, SlidersHorizontal, TrendingUp, TrendingDown } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -47,6 +47,46 @@ export function BuiRecordsTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [density, setDensity] = useState<Density>("normal");
+
+  // Beautiful UI Resizable Columns state
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    symbol: 200,
+    value: 140,
+    totalCost: 140,
+    totalReturn: 190,
+    weight: 130,
+  });
+
+  const resizingRef = useRef<{ col: string; startX: number; startWidth: number } | null>(null);
+
+  const handleResizeStart = (col: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = {
+      col,
+      startX: e.clientX,
+      startWidth: columnWidths[col] || 140,
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = moveEvent.clientX - resizingRef.current.startX;
+      const newWidth = Math.max(80, resizingRef.current.startWidth + delta);
+      setColumnWidths((prev) => ({
+        ...prev,
+        [resizingRef.current!.col]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -129,16 +169,18 @@ export function BuiRecordsTable({
         </div>
       </div>
 
-      {/* Responsive Table Container */}
+      {/* Responsive Table Container with Resizable Columns */}
       <div className="overflow-x-auto app-scroll">
-        <table className="w-full text-left border-collapse text-xs">
+        <table className="w-full text-left border-collapse text-xs table-fixed">
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.02] text-white/50 font-semibold uppercase tracking-wider text-[10.5px]">
+              {/* Column 1: Symbol / Asset */}
               <th
-                className="py-2.5 px-3.5 cursor-pointer hover:text-white transition select-none"
+                style={{ width: `${columnWidths.symbol}px` }}
+                className="relative py-2.5 px-3.5 cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("symbol")}
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 pr-2">
                   <span>Symbol / Asset</span>
                   {sortField === "symbol" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -146,13 +188,23 @@ export function BuiRecordsTable({
                     <ArrowUpDown size={11} className="opacity-40" />
                   )}
                 </div>
+                {/* Drag Resize Affordance */}
+                <div
+                  onMouseDown={(e) => handleResizeStart("symbol", e)}
+                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  title="Drag to resize column"
+                >
+                  <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
+                </div>
               </th>
 
+              {/* Column 2: Market Value */}
               <th
-                className="py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none"
+                style={{ width: `${columnWidths.value}px` }}
+                className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("value")}
               >
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end gap-1 pr-2">
                   <span>Market Value</span>
                   {sortField === "value" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -160,13 +212,23 @@ export function BuiRecordsTable({
                     <ArrowUpDown size={11} className="opacity-40" />
                   )}
                 </div>
+                {/* Drag Resize Affordance */}
+                <div
+                  onMouseDown={(e) => handleResizeStart("value", e)}
+                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  title="Drag to resize column"
+                >
+                  <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
+                </div>
               </th>
 
+              {/* Column 3: Total Cost */}
               <th
-                className="py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none"
+                style={{ width: `${columnWidths.totalCost}px` }}
+                className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("totalCost")}
               >
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end gap-1 pr-2">
                   <span>Total Cost</span>
                   {sortField === "totalCost" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
@@ -174,118 +236,124 @@ export function BuiRecordsTable({
                     <ArrowUpDown size={11} className="opacity-40" />
                   )}
                 </div>
+                {/* Drag Resize Affordance */}
+                <div
+                  onMouseDown={(e) => handleResizeStart("totalCost", e)}
+                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  title="Drag to resize column"
+                >
+                  <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
+                </div>
               </th>
 
+              {/* Column 4: Total Return */}
               <th
-                className="py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none"
+                style={{ width: `${columnWidths.totalReturn}px` }}
+                className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("totalReturn")}
               >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Total Return ($ / %)</span>
+                <div className="flex items-center justify-end gap-1 pr-2">
+                  <span>Total Return</span>
                   {sortField === "totalReturn" || sortField === "totalReturnPercent" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
                   ) : (
                     <ArrowUpDown size={11} className="opacity-40" />
                   )}
                 </div>
+                {/* Drag Resize Affordance */}
+                <div
+                  onMouseDown={(e) => handleResizeStart("totalReturn", e)}
+                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  title="Drag to resize column"
+                >
+                  <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
+                </div>
               </th>
 
+              {/* Column 5: Portfolio Weight */}
               <th
-                className="py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none"
+                style={{ width: `${columnWidths.weight}px` }}
+                className="relative py-2.5 px-3.5 text-right cursor-pointer hover:text-white transition select-none group"
                 onClick={() => handleSort("weight")}
               >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Portfolio Weight</span>
+                <div className="flex items-center justify-end gap-1 pr-2">
+                  <span>Weight</span>
                   {sortField === "weight" ? (
                     sortDirection === "asc" ? <ArrowUp size={11} className="text-teal-400" /> : <ArrowDown size={11} className="text-teal-400" />
                   ) : (
                     <ArrowUpDown size={11} className="opacity-40" />
                   )}
                 </div>
+                {/* Drag Resize Affordance */}
+                <div
+                  onMouseDown={(e) => handleResizeStart("weight", e)}
+                  className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-teal-400/50 flex items-center justify-center transition"
+                  title="Drag to resize column"
+                >
+                  <div className="w-[1.5px] h-3.5 bg-white/20 group-hover:bg-teal-300" />
+                </div>
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-white/5 font-mono">
+          <tbody className="divide-y divide-white/5">
             {filteredAndSorted.map((holding) => {
               const isProfit = holding.totalReturn >= 0;
-              const isWinner = holding.totalReturnPercent >= 0;
+              const paddingClass =
+                density === "compact" ? "py-1.5 px-3.5" : density === "spacious" ? "py-4 px-3.5" : "py-2.5 px-3.5";
 
               return (
                 <tr
-                  key={holding.symbol}
+                  key={holding.id || holding.symbol}
                   onClick={() => onSelectStock?.(holding.symbol)}
-                  className={cn(
-                    "hover:bg-white/[0.04] transition-colors group cursor-pointer",
-                    density === "compact" ? "h-9" : density === "spacious" ? "h-14" : "h-11"
-                  )}
+                  className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
                 >
                   {/* Symbol & Name */}
-                  <td className="py-2 px-3.5">
+                  <td className={cn(paddingClass, "overflow-hidden text-ellipsis whitespace-nowrap")}>
                     <div className="flex items-center gap-2">
-                      <div className="font-bold text-white font-sans text-xs group-hover:text-teal-300 transition">
+                      <span className="font-bold text-white font-mono group-hover:text-teal-300 transition">
                         {holding.symbol}
-                      </div>
+                      </span>
+                      <span className="text-[11px] text-white/50 truncate max-w-[120px]">
+                        {holding.name}
+                      </span>
+                      {/* Beautiful UI Status Chip */}
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider font-sans border",
-                          isWinner
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          "px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider ml-auto shrink-0",
+                          isProfit ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                         )}
                       >
-                        {isWinner ? "Winner" : "Lagging"}
+                        {isProfit ? "WINNER" : "LAGGING"}
                       </span>
-                    </div>
-                    <div className="text-[11px] text-white/40 font-sans truncate max-w-[140px]">
-                      {holding.shares} shrs @ ${holding.purchasePrice?.toFixed(2)}
                     </div>
                   </td>
 
                   {/* Market Value */}
-                  <td className="py-2 px-3.5 text-right text-white font-semibold">
+                  <td className={cn(paddingClass, "text-right font-mono font-medium text-white")}>
                     {formatCurrency(holding.value)}
                   </td>
 
                   {/* Total Cost */}
-                  <td className="py-2 px-3.5 text-right text-white/70">
+                  <td className={cn(paddingClass, "text-right font-mono text-white/60")}>
                     {formatCurrency(holding.totalCost)}
                   </td>
 
-                  {/* Total Return ($ / %) */}
-                  <td className="py-2 px-3.5 text-right">
-                    <div
-                      className={cn(
-                        "font-semibold flex items-center justify-end gap-1",
-                        isProfit ? "text-emerald-400" : "text-rose-400"
-                      )}
-                    >
-                      {isProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                  {/* Total Return Dollar and Percent */}
+                  <td className={cn(paddingClass, "text-right font-mono font-medium")}>
+                    <div className={cn("flex items-center justify-end gap-1", isProfit ? "text-emerald-400" : "text-rose-400")}>
+                      {isProfit ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                       <span>
-                        {isProfit ? "+" : "-"}${Math.abs(holding.totalReturn).toFixed(2)}
+                        {isProfit ? "+" : ""}{formatCurrency(holding.totalReturn)} ({isProfit ? "+" : ""}{holding.totalReturnPercent.toFixed(2)}%)
                       </span>
-                    </div>
-                    <div
-                      className={cn(
-                        "text-[10.5px] font-medium",
-                        isProfit ? "text-emerald-400/80" : "text-rose-400/80"
-                      )}
-                    >
-                      {isProfit ? "+" : ""}{holding.totalReturnPercent.toFixed(2)}%
                     </div>
                   </td>
 
                   {/* Portfolio Weight */}
-                  <td className="py-2 px-3.5 text-right">
-                    <span className="text-white font-medium">
-                      {(holding.weight || 0).toFixed(1)}%
+                  <td className={cn(paddingClass, "text-right font-mono")}>
+                    <span className="text-white/80 font-medium">
+                      {(holding.weight ?? 0).toFixed(1)}%
                     </span>
-                    <div className="w-16 h-1.5 bg-white/10 rounded-full ml-auto mt-1 overflow-hidden">
-                      <div
-                        className="h-full bg-teal-400 rounded-full"
-                        style={{ width: `${Math.min(100, Math.max(2, holding.weight || 0))}%` }}
-                      />
-                    </div>
                   </td>
                 </tr>
               );

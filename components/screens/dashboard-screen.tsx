@@ -7,6 +7,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { BuiMarketHeatmap } from "@/components/ui/bui-market-heatmap";
 import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
 import { BuiInsightCards } from "@/components/ui/bui-insight-cards";
+import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
 
@@ -136,6 +137,76 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
   const [congressPreview, setCongressPreview] = useState<CongressPreview | null>(null);
   const [superInvestorPreview, setSuperInvestorPreview] = useState<SuperInvestorPreview | null>(null);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const [portfolioStats, setPortfolioStats] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchPortfolioData = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data: holdings } = await supabase
+          .from("holdings")
+          .select("*")
+          .order("created_at", { ascending: true });
+
+        if (holdings && holdings.length > 0) {
+          const symbols = holdings.map((h: any) => h.symbol).join(",");
+          const quotesRes = await fetch(`/api/portfolio?symbols=${symbols}`).catch(() => null);
+          const quotesData = quotesRes?.ok ? await quotesRes.json() : null;
+          const quotes = quotesData?.quotes || {};
+
+          let totalValue = 0;
+          let dayChangeValue = 0;
+          let totalCost = 0;
+          let topWinner: any = null;
+          let topLoser: any = null;
+
+          for (const h of holdings) {
+            const shares = Number(h.shares) || 0;
+            const purchasePrice = Number(h.purchase_price) || 0;
+            const quote = quotes[h.symbol] || { price: purchasePrice, change: 0, changePercent: 0 };
+            const value = shares * (quote.price || purchasePrice);
+            const costBasis = shares * purchasePrice;
+            const totalReturn = value - costBasis;
+            const totalReturnPercent = costBasis > 0 ? (totalReturn / costBasis) * 100 : 0;
+            const dayChange = shares * (quote.change || 0);
+
+            totalValue += value;
+            dayChangeValue += dayChange;
+            totalCost += costBasis;
+
+            if (!topWinner || totalReturnPercent > topWinner.returnPercent) {
+              topWinner = { symbol: h.symbol, returnPercent: totalReturnPercent, dollarGain: totalReturn };
+            }
+            if (!topLoser || totalReturnPercent < topLoser.returnPercent) {
+              topLoser = { symbol: h.symbol, returnPercent: totalReturnPercent, dollarGain: totalReturn };
+            }
+          }
+
+          const dayChangePercent = totalValue > 0 ? (dayChangeValue / (totalValue - dayChangeValue)) * 100 : 0;
+          const allTimeReturn = totalValue - totalCost;
+          const allTimePercent = totalCost > 0 ? (allTimeReturn / totalCost) * 100 : 0;
+
+          setPortfolioStats({
+            totalValue,
+            allTimeReturnDollar: allTimeReturn,
+            allTimeReturnPercent: allTimePercent,
+            dayChangeDollar: dayChangeValue,
+            dayChangePercent,
+            topWinner,
+            topLoser,
+            holdingsCount: holdings.length,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch dashboard portfolio snapshot:", e);
+      }
+    };
+
+    fetchPortfolioData();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoadTimedOut(true), 10000);
@@ -280,6 +351,7 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
 
       {/* Beautiful UI Insight Carousel Cards */}
       <BuiInsightCards
+        portfolio={portfolioStats}
         indicators={indicators}
         fearGreed={fearGreed}
         vix={vix}

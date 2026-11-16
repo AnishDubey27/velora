@@ -250,11 +250,23 @@ const markdownComponents = {
       {children}
     </thead>
   ),
-  tr: ({ children }: any) => (
-    <tr className="border-b border-white/5 last:border-0 hover:bg-white/[0.04] transition-colors">
-      {children}
-    </tr>
-  ),
+  tr: ({ children }: any) => {
+    // Sanitize filler/duplicated rows like "AMD Snapshot | AMD Snapshot"
+    const childArray = Array.isArray(children) ? children : [children];
+    const cellTexts = childArray.map((c: any) => extractText(c).trim());
+    if (cellTexts.length >= 2) {
+      const c0 = cellTexts[0].toLowerCase();
+      const c1 = cellTexts[1].toLowerCase();
+      if (c0 === c1 && c0.length > 0) return null;
+      if (c0.includes("snapshot") && c1.includes("snapshot")) return null;
+      if (c1.endsWith(". analysis") || c1 === "analysis") return null;
+    }
+    return (
+      <tr className="border-b border-white/5 last:border-0 hover:bg-white/[0.04] transition-colors">
+        {children}
+      </tr>
+    );
+  },
   th: ({ children }: any) => (
     <th className="px-3.5 py-2.5 font-semibold text-teal-300">
       {children}

@@ -793,6 +793,9 @@ MANDATORY TRADE PLAN & TECHNICAL RULES (SECTION 4):
 CRITICAL TABLE FORMATTING RULE:
 - In Markdown tables, each cell must contain exactly one clean, final value.
 - NEVER output self-correction arrows, transitions, or revision patterns (such as "$3.92T → $1.50T" or "A -> B") inside table cells. Output ONLY the single final verified number (e.g. "$1.50T").
+- NEVER emit filler rows, repeated header rows, or self-referential rows where both cells contain the same or similar text (e.g. NEVER output "| AMD Snapshot | AMD Snapshot |" or "| Snapshot | Snapshot |").
+- Each table row MUST have a unique Metric name in Column 1 and a single verified Value in Column 2.
+- NEVER split a metric across multiple rows (e.g. NEVER emit "P/E Ratio | 115. analysis" followed by "P/E Ratio | 115.0x"). Combine into one clean row: "| P/E Ratio | 115.0x |".
 
 MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
 - For ANY subject stock, check its verified portfolio standing:

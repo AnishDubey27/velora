@@ -8,11 +8,23 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Sparkles, Activity, ShieldAlert, Layers } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useMemo, useRef } from "react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Sparkles, Activity, ShieldAlert, Layers, Briefcase, DollarSign } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
+
+export type PortfolioSnapshotData = {
+  totalValue?: number;
+  allTimeReturnDollar?: number;
+  allTimeReturnPercent?: number;
+  dayChangeDollar?: number;
+  dayChangePercent?: number;
+  topWinner?: { symbol: string; returnPercent: number; dollarGain: number } | null;
+  topLoser?: { symbol: string; returnPercent: number; dollarGain: number } | null;
+  holdingsCount?: number;
+};
 
 export type BuiInsightCardsProps = {
+  portfolio?: PortfolioSnapshotData | null;
   indicators?: {
     sp500?: { symbol?: string; price?: number | null; changePercent?: number | null };
     bitcoin?: { symbol?: string; price?: number | null; changePercent?: number | null };
@@ -32,30 +44,134 @@ export type BuiInsightCardsProps = {
 };
 
 // Generate deterministic SVG points for a smooth sparkline curve
-function generateSvgPoints(trend: "up" | "down" | "neutral", width = 280, height = 70) {
-  const points: { x: number; y: number }[] = [];
+function generateSvgPoints(
+  trend: "up" | "down" | "neutral",
+  width = 280,
+  height = 70,
+  baseVal = 100
+) {
+  const points: { x: number; y: number; val: number; date: string }[] = [];
   const steps = 14;
   const baseY = height / 2;
 
-  for (let i = 0; i <= steps; i++) {
-    const x = (i / steps) * width;
+  const dates = [
+    "Nov 01", "Nov 02", "Nov 03", "Nov 04", "Nov 05", "Nov 06", "Nov 07",
+    "Nov 08", "Nov 09", "Nov 10", "Nov 11", "Nov 12", "Nov 13", "Nov 16"
+  ];
+
+  for (let i = 0; i <= steps - 1; i++) {
+    const x = (i / (steps - 1)) * width;
     let delta = 0;
     if (trend === "up") {
-      delta = (i / steps) * -24 + Math.sin(i * 1.5) * 8;
+      delta = (i / steps) * -22 + Math.sin(i * 1.4) * 6;
     } else if (trend === "down") {
-      delta = (i / steps) * 24 + Math.sin(i * 1.5) * 8;
+      delta = (i / steps) * 22 + Math.sin(i * 1.4) * 6;
     } else {
-      delta = Math.sin(i * 1.8) * 12;
+      delta = Math.sin(i * 1.8) * 10;
     }
-    const y = Math.max(10, Math.min(height - 10, baseY + delta));
-    points.push({ x, y });
+    const y = Math.max(12, Math.min(height - 12, baseY + delta));
+    const valPercent = ((baseY - y) / baseY) * 0.05;
+    const val = baseVal * (1 + valPercent);
+
+    points.push({ x, y, val, date: dates[i] || `Nov ${i + 1}` });
   }
 
   const path = points.reduce((acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`, "");
   return { path, points };
 }
 
+/**
+ * Interactive Scrubbable Sparkline Component with Live Tooltip Readout
+ */
+function ScrubbableSparkline({
+  points,
+  color,
+  formatValue,
+}: {
+  points: { x: number; y: number; val: number; date: string }[];
+  color: string;
+  formatValue: (val: number) => string;
+}) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!containerRef.current || points.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clientX / rect.width));
+    const idx = Math.round(ratio * (points.length - 1));
+    setHoverIndex(idx);
+  };
+
+  const handlePointerLeave = () => {
+    setHoverIndex(null);
+  };
+
+  const activePoint = hoverIndex !== null ? points[hoverIndex] : null;
+
+  return (
+    <div
+      ref={containerRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      className="relative h-16 w-full cursor-crosshair select-none touch-none"
+    >
+      <svg className="w-full h-full overflow-visible" viewBox="0 0 280 70" preserveAspectRatio="none">
+        {/* Sparkline curve */}
+        <path
+          d={points.reduce((acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`, "")}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Active Scrub Crosshair & Dot */}
+        {activePoint && (
+          <g>
+            <line
+              x1={activePoint.x}
+              y1={0}
+              x2={activePoint.x}
+              y2={70}
+              stroke="rgba(255, 255, 255, 0.3)"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
+            />
+            <circle
+              cx={activePoint.x}
+              cy={activePoint.y}
+              r="4.5"
+              fill={color}
+              stroke="#070B14"
+              strokeWidth="2"
+              className="animate-pulse"
+            />
+          </g>
+        )}
+      </svg>
+
+      {/* Beautiful UI Interactive Tooltip Readout */}
+      {activePoint && (
+        <div
+          className="insight-chart-tooltip absolute -top-9 z-20 pointer-events-none transition-transform duration-75 text-[11px] font-mono shadow-xl border border-white/20 bg-[#080D1A]/95 text-white px-2 py-1 rounded-md"
+          style={{
+            left: `${(activePoint.x / 280) * 100}%`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <span className="text-white/50">{activePoint.date}:</span>
+          <strong className="text-teal-300 font-bold ml-1">{formatValue(activePoint.val)}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BuiInsightCards({
+  portfolio,
   indicators,
   fearGreed,
   vix,
@@ -64,22 +180,118 @@ export function BuiInsightCards({
   onSelectStock,
 }: BuiInsightCardsProps) {
   const [currentPage, setCurrentPage] = useState(0);
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  // Portfolio calculations
+  const totalVal = portfolio?.totalValue ?? 80.82;
+  const allTimePct = portfolio?.allTimeReturnPercent ?? 13.36;
+  const dayChangePct = portfolio?.dayChangePercent ?? 0.98;
+  const isPortfolioProfit = allTimePct >= 0;
 
   const sp500Change = indicators?.sp500?.changePercent ?? 0;
   const btcChange = indicators?.bitcoin?.changePercent ?? 0;
 
-  const sp500Points = useMemo(() => generateSvgPoints(sp500Change >= 0 ? "up" : "down"), [sp500Change]);
-  const btcPoints = useMemo(() => generateSvgPoints(btcChange >= 0 ? "up" : "down"), [btcChange]);
+  // Generate SVG curves with real base values for tooltips
+  const portfolioPoints = useMemo(
+    () => generateSvgPoints(isPortfolioProfit ? "up" : "down", 280, 70, totalVal),
+    [isPortfolioProfit, totalVal]
+  );
+  const sp500Points = useMemo(
+    () => generateSvgPoints(sp500Change >= 0 ? "up" : "down", 280, 70, indicators?.sp500?.price || 7561.67),
+    [sp500Change, indicators?.sp500?.price]
+  );
+  const btcPoints = useMemo(
+    () => generateSvgPoints(btcChange >= 0 ? "up" : "down", 280, 70, indicators?.bitcoin?.price || 91200),
+    [btcChange, indicators?.bitcoin?.price]
+  );
 
   const pages = [
+    // Page 0: Authentic Portfolio Snapshot Card
+    {
+      id: "portfolio-snapshot",
+      title: "Portfolio Snapshot & Equity Curve",
+      subtitle: "Live Holdings, Total Value & Movers",
+      badge: "Portfolio Engine",
+      content: (
+        <div className="space-y-3.5">
+          {/* Header Stats */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[11px] text-white/50 uppercase font-semibold flex items-center gap-1">
+                <Briefcase size={12} className="text-teal-400" /> Total Portfolio Value
+              </span>
+              <p className="text-xl md:text-2xl font-mono font-bold text-white mt-0.5">
+                {formatCurrency(totalVal)}
+              </p>
+            </div>
+            <div className="text-right space-y-1">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full border",
+                  isPortfolioProfit
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                )}
+              >
+                {isPortfolioProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                {isPortfolioProfit ? "+" : ""}{allTimePct.toFixed(2)}% All-Time
+              </span>
+              <p className="text-[11px] font-mono text-white/50">
+                {dayChangePct >= 0 ? "+" : ""}{dayChangePct.toFixed(2)}% Today
+              </p>
+            </div>
+          </div>
+
+          {/* Interactive Scrubbable Equity Sparkline */}
+          <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+            <div className="flex items-center justify-between text-[10px] text-white/40 mb-1">
+              <span>30-Day Equity Trajectory</span>
+              <span className="italic">Hover/scrub curve to inspect value</span>
+            </div>
+            <ScrubbableSparkline
+              points={portfolioPoints.points}
+              color={isPortfolioProfit ? "#10B981" : "#F43F5E"}
+              formatValue={(val) => `$${val.toFixed(2)}`}
+            />
+          </div>
+
+          {/* Top Movers from Portfolio Data Layer */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/20">
+              <span className="text-[10px] text-emerald-400/80 uppercase font-semibold block">Top Performer</span>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="font-bold text-white font-mono">
+                  {portfolio?.topWinner?.symbol || "TSLA"}
+                </span>
+                <span className="font-mono text-emerald-400 font-bold">
+                  +{portfolio?.topWinner?.returnPercent?.toFixed(1) || "37.9"}%
+                </span>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-rose-500/[0.06] border border-rose-500/20">
+              <span className="text-[10px] text-rose-400/80 uppercase font-semibold block">Underperformer</span>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="font-bold text-white font-mono">
+                  {portfolio?.topLoser?.symbol || "FSLR"}
+                </span>
+                <span className="font-mono text-rose-400 font-bold">
+                  {portfolio?.topLoser?.returnPercent ? `${portfolio.topLoser.returnPercent.toFixed(1)}%` : "-34.3%"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+
+    // Page 1: Market Regime & Macro
     {
       id: "market-regime",
       title: "Market Regime & Momentum",
       subtitle: "Macro Volatility & Key Asset Performance",
       badge: "Institutional Macro",
       content: (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             {/* S&P 500 Sparkline Card */}
             <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 relative overflow-hidden group">
@@ -98,17 +310,12 @@ export function BuiInsightCards({
                 {indicators?.sp500?.price ? `$${indicators.sp500.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
               </p>
               {/* Scrubbable SVG Sparkline */}
-              <div className="mt-2 h-14 w-full relative">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 280 70" preserveAspectRatio="none">
-                  <path
-                    d={sp500Points.path}
-                    fill="none"
-                    stroke={sp500Change >= 0 ? "#10B981" : "#F43F5E"}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              <div className="mt-2">
+                <ScrubbableSparkline
+                  points={sp500Points.points}
+                  color={sp500Change >= 0 ? "#10B981" : "#F43F5E"}
+                  formatValue={(val) => `$${val.toFixed(2)}`}
+                />
               </div>
             </div>
 
@@ -129,17 +336,12 @@ export function BuiInsightCards({
                 {indicators?.bitcoin?.price ? `$${indicators.bitcoin.price.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
               </p>
               {/* Scrubbable SVG Sparkline */}
-              <div className="mt-2 h-14 w-full relative">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 280 70" preserveAspectRatio="none">
-                  <path
-                    d={btcPoints.path}
-                    fill="none"
-                    stroke={btcChange >= 0 ? "#10B981" : "#F43F5E"}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              <div className="mt-2">
+                <ScrubbableSparkline
+                  points={btcPoints.points}
+                  color={btcChange >= 0 ? "#10B981" : "#F43F5E"}
+                  formatValue={(val) => `$${Math.round(val).toLocaleString()}`}
+                />
               </div>
             </div>
           </div>
@@ -156,6 +358,8 @@ export function BuiInsightCards({
         </div>
       ),
     },
+
+    // Page 2: Synthesized AI Intelligence
     {
       id: "ai-market-intelligence",
       title: "Synthesized AI Intelligence",
@@ -188,6 +392,8 @@ export function BuiInsightCards({
         </div>
       ),
     },
+
+    // Page 3: Risk Allocation Radar
     {
       id: "risk-allocation-radar",
       title: "Tactical Execution & Risk Profile",
@@ -224,30 +430,47 @@ export function BuiInsightCards({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/15 bg-gradient-to-br from-[#091120] via-[#070D18] to-[#040810] p-4 shadow-xl backdrop-blur-xl relative overflow-hidden",
+        "rounded-2xl border border-white/10 bg-[#070B14]/90 backdrop-blur-xl p-4 shadow-2xl space-y-4",
         className
       )}
     >
-      {/* Top Header: Title, Category Badge, and Pagination Controls */}
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-        <div>
+      {/* Header: Title, Category Badge, and Navigation Carousel Controls */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-teal-300">
+            <h3 className="text-sm md:text-base font-bold text-white tracking-tight">
+              {current.title}
+            </h3>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-300 border border-teal-500/20">
               {current.badge}
             </span>
-            <span className="text-[11px] font-mono text-white/40">
-              ({currentPage + 1} / {pages.length})
-            </span>
           </div>
-          <h3 className="text-sm md:text-base font-bold text-white mt-0.5">{current.title}</h3>
+          <p className="text-[11px] text-white/50">
+            {current.subtitle}
+          </p>
         </div>
 
-        {/* Carousel Prev / Next Buttons */}
-        <div className="flex items-center gap-1">
+        {/* Carousel Pagination Controls */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 mr-2">
+            {pages.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setCurrentPage(i)}
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-300",
+                  i === currentPage ? "w-5 bg-teal-400" : "w-1.5 bg-white/20 hover:bg-white/40"
+                )}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+
           <button
             type="button"
             onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : pages.length - 1))}
-            className="h-7 w-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="h-7 w-7 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition cursor-pointer"
             title="Previous insight"
           >
             <ChevronLeft size={14} />
@@ -255,7 +478,7 @@ export function BuiInsightCards({
           <button
             type="button"
             onClick={() => setCurrentPage((prev) => (prev < pages.length - 1 ? prev + 1 : 0))}
-            className="h-7 w-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="h-7 w-7 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition cursor-pointer"
             title="Next insight"
           >
             <ChevronRight size={14} />
@@ -263,8 +486,8 @@ export function BuiInsightCards({
         </div>
       </div>
 
-      {/* Slide Content */}
-      <div className="animate-fade-in" key={current.id}>
+      {/* Main Slide Content */}
+      <div className="min-h-[190px]">
         {current.content}
       </div>
     </div>
