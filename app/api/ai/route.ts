@@ -187,6 +187,7 @@ export async function POST(request: Request) {
 
     let knownHoldingsSymbols: string[] = [];
     let userAnalyzedHoldings: AnalyzedHolding[] = [];
+    let canonicalHoldingsTable = "";
     let userTotalPortfolioValue = 0;
     let userTotalCostBasis = 0;
     let portfolioContextMsg: ChatMessage | null = null;
@@ -201,9 +202,13 @@ export async function POST(request: Request) {
       if (user) {
         const { data: holdings } = await supabase
           .from('holdings')
-          .select('symbol, shares, purchase_price')
+          .select('symbol, name, shares, purchase_price')
           .eq('user_id', user.id);
         userHoldings = holdings;
+      }
+
+      if (!userHoldings && Array.isArray(payload?.holdings) && payload.holdings.length > 0) {
+        userHoldings = payload.holdings;
       }
 
       if (userHoldings && userHoldings.length > 0) {
@@ -244,6 +249,7 @@ export async function POST(request: Request) {
 
               return {
                 symbol: h.symbol,
+                name: h.name || h.symbol,
                 shares,
                 purchasePrice,
                 currentPrice,
@@ -279,6 +285,19 @@ export async function POST(request: Request) {
           const losers = userAnalyzedHoldings.filter((h) => !h.isProfit);
           const sortedWinners = [...winners].sort((a, b) => b.positionValue - a.positionValue);
           const sortedLosers = [...losers].sort((a, b) => b.positionValue - a.positionValue);
+
+          // Canonical Markdown Table of Holdings (matching Portfolio Screen row-for-row)
+          canonicalHoldingsTable = [
+            "| Asset | Market Value | Cost Basis | Unrealized P&L | Return (%) | Weight (%) | Status |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            ...sortedByValue.map((h) => {
+              const sign = h.returnDollar >= 0 ? "+" : "-";
+              const pnlStr = `${sign}$${Math.abs(h.returnDollar).toFixed(2)}`;
+              const retPctStr = `${h.returnDollar >= 0 ? "+" : ""}${h.returnPercent.toFixed(2)}%`;
+              const status = h.isProfit ? "WINNER" : "UNDERPERFORMER";
+              return `| ${h.symbol} | $${h.positionValue.toFixed(2)} | $${h.positionCost.toFixed(2)} | ${pnlStr} | ${retPctStr} | ${h.weightPercent.toFixed(1)}% | ${status} |`;
+            }),
+          ].join("\n");
 
           // Top-3 and Top-5 Holdings Concentrations
           const top3Holdings = sortedByValue.slice(0, 3);
@@ -337,6 +356,9 @@ OFFICIAL VERIFIED PORTFOLIO METRICS (Source of Truth - Velora Portfolio Engine)
 • Total Portfolio Cost Basis: $${totalCostBasis.toFixed(2)}
 • All-Time Unrealized Return: ${isTotalProfit ? '+' : '-'}$${Math.abs(totalReturnDollar).toFixed(2)} (${isTotalProfit ? '+' : ''}${totalReturnPercent.toFixed(2)}%) [${isTotalProfit ? 'OVERALL PROFIT' : 'OVERALL LOSS'}]
 
+OFFICIAL CANONICAL PORTFOLIO HOLDINGS TABLE (Matches Velora Portfolio Screen row-for-row):
+${canonicalHoldingsTable}
+
 OFFICIAL VERIFIED DERIVED AGGREGATES & CONCENTRATION METRICS:
 • Top-3 Holdings by Portfolio Value (${top3TickersStr}): Combined Value $${top3Value.toFixed(2)} (${top3Weight.toFixed(1)}% of total portfolio value)
 • Top-5 Holdings by Portfolio Value (${top5TickersStr}): Combined Value $${top5Value.toFixed(2)} (${top5Weight.toFixed(1)}% of total portfolio value)
@@ -356,13 +378,21 @@ ${losersText}
 
 CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 1. The Total Portfolio Market Value is EXACTLY $${totalPortfolioValue.toFixed(2)}. NEVER cite any other total (do NOT hallucinate $13,370 or any other unverified number).
-2. ALWAYS quote the exact pre-computed percentages and dollars from the verified data above. DO NOT calculate concentration percentages, sums, or weights in your head.
-3. CENT-LEVEL P&L ACCURACY: When citing dollar profit or loss for individual holdings (e.g. CRSP, BWXT, TSLA, FSLR), you MUST COPY the exact dollar figures directly from the verified lists above (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate individual dollar P&L in your head.
-4. Denominator Discipline: Distinguish strictly between "% of portfolio value" (denominator is Total Portfolio Market Value $${totalPortfolioValue.toFixed(2)}) and "% of unrealized gains" or "% return on cost". NEVER describe a dollar amount representing a share of portfolio value as a share of unrealized gains.
-5. Concentration Labels: Do NOT mislabel Top-5 concentration as Top-3 concentration. Top-3 overall holdings concentration is EXACTLY ${top3Weight.toFixed(1)}% (or Top-3 winners ${top3WinnersWeight.toFixed(1)}%); Top-5 concentration is EXACTLY ${top5Weight.toFixed(1)}%.
-6. Underperformer Claims: NEVER say "no single losing position exceeds X%" unless that claim is strictly true against the verified Underperformers list above (e.g. if CRSP is 5.0% and FSLR is 4.3%, do NOT claim no losing position exceeds 3.5%).
-7. POSITIONS LISTED UNDER "WINNERS" HAVE POSITIVE RETURNS (+). Never classify a winner as a loss, drag, or underperformer.
-8. POSITIONS LISTED UNDER "UNDERPERFORMERS" HAVE NEGATIVE RETURNS (-).
+2. The Total Portfolio Cost Basis is EXACTLY $${totalCostBasis.toFixed(2)}.
+3. CANONICAL PORTFOLIO HOLDINGS TABLE MANDATE (FOR PORTFOLIO HEALTH CHECKS & REVIEWS):
+   - When answering portfolio health checks, asset allocations, or general portfolio reviews, Section 3 ("## 3. Quantitative Ratios & Valuation (use Markdown tables)") MUST output the OFFICIAL CANONICAL PORTFOLIO HOLDINGS TABLE above VERBATIM, row-for-row.
+   - Column 2 is ALWAYS Market Value (sums to the headline total $${totalPortfolioValue.toFixed(2)}).
+   - Column 3 is ALWAYS Cost Basis (sums to total cost basis $${totalCostBasis.toFixed(2)}). NEVER print cost basis as market value.
+   - NEVER recompute, alter, swap, or shift numbers between rows. Each holding (e.g. META, AMD, BABA, CRSP, IONQ, NRGV, TSLA) MUST strictly use its own exact values from this table.
+   - In prose narrative (Section 1, Section 2, Section 4, or Section 5), every holding's market value, cost basis, unrealized P&L ($ and %), and status (WINNER vs UNDERPERFORMER) MUST match this table exactly:
+     * POSITIONS WITH POSITIVE RETURNS (+) ARE WINNERS: (e.g. META +$4.89 / +81.50% WINNER, AMD +$0.75 WINNER). NEVER classify a winner as a loser, loss, or negative return.
+     * POSITIONS WITH NEGATIVE RETURNS (-) ARE UNDERPERFORMERS: (e.g. BABA -$2.15 / UNDERPERFORMER). NEVER classify an underperformer as a winner.
+     * NEVER assign one stock's numbers to another (e.g. NEVER give CRSP's numbers to IONQ, or IONQ's numbers to NRGV).
+4. ALWAYS quote the exact pre-computed percentages and dollars from the verified data above. DO NOT calculate concentration percentages, sums, or weights in your head.
+5. CENT-LEVEL P&L ACCURACY: When citing dollar profit or loss for individual holdings (e.g. CRSP, BWXT, TSLA, FSLR), you MUST COPY the exact dollar figures directly from the verified table above. NEVER recalculate individual dollar P&L in your head.
+6. Denominator Discipline: Distinguish strictly between "% of portfolio value" (denominator is Total Portfolio Market Value $${totalPortfolioValue.toFixed(2)}) and "% of unrealized gains" or "% return on cost". NEVER describe a dollar amount representing a share of portfolio value as a share of unrealized gains.
+7. Concentration Labels: Do NOT mislabel Top-5 concentration as Top-3 concentration. Top-3 overall holdings concentration is EXACTLY ${top3Weight.toFixed(1)}% (or Top-3 winners ${top3WinnersWeight.toFixed(1)}%); Top-5 concentration is EXACTLY ${top5Weight.toFixed(1)}%.
+8. Underperformer Claims: NEVER say "no single losing position exceeds X%" unless that claim is strictly true against the verified Underperformers list above.
 9. COST BASIS CLARITY: When citing cost basis in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)". Never confuse total cost with purchase price per share.
 10. GENERAL PORTFOLIO HEALTH QUERIES (NO LEAKED TEMPLATES):
 - When answering portfolio health checks, asset allocations, or general portfolio reviews, "Previous Session Close" and single-ticker trading day metrics DO NOT APPLY to the overall portfolio.
@@ -501,7 +531,7 @@ CRITICAL GROUNDING RULES FOR ${sym}:
 2. In prose, percentage changes MUST match the verified changePercent (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%").
 3. UNIFORMLY OMIT unverified secondary support/resistance/dip levels. Cite ONLY Current Price ($${currentPrice.toFixed(2)}) and 52-Week Range (${week52}). Discuss technical momentum qualitatively without inventing specific price targets or support levels.
 4. Strictly follow the Velora Portfolio Standing above in Section 5 (Portfolio Impact).
-5. PREVIOUS CLOSE AUDITABILITY FOR ${sym}: When citing Previous Session Close for ${sym} in Section 1 or Section 3's table, you MUST use the verified figure: "$${previousClose.toFixed(2)} (${prevCloseMonthDayYear})" (or "$${previousClose.toFixed(2)} on ${prevCloseWeekday}, ${prevCloseMonthDayYear}"). In the table, format as: | Previous Session Close | $${previousClose.toFixed(2)} (${prevCloseMonthDayYear}) |. NEVER invent or hallucinate unverified dates (such as Saturday dates).
+5. PREVIOUS CLOSE AUDITABILITY FOR ${sym}: When citing Previous Session Close for ${sym} in Section 1 or Section 3's table, you MUST use the verified figure: "$${previousClose.toFixed(2)} (${prevCloseMonthDayYear})" (or "$${previousClose.toFixed(2)} on ${prevCloseWeekday}, ${prevCloseMonthDayYear}"). In Section 3's table, format as exactly ONE row: | Previous Session Close | $${previousClose.toFixed(2)} (${prevCloseMonthDayYear}) |. NEVER output duplicate or repeated "Previous Session Close" rows, and NEVER invent or hallucinate unverified dates (such as Saturday dates).
 ======================================================================`);
             } catch (err) {
               console.error(`Failed to fetch verified market data for ${sym}:`, err);
@@ -811,9 +841,9 @@ MANDATORY MARKET INDEX & TEMPORAL RULES:
 - PREVIOUS CLOSE AUDITABILITY (INDEX & TICKER ANSWERS ONLY):
   Whenever citing the previous session close for an index or stock, you MUST ALWAYS provide both the previous close level AND its session date:
   * In Section 1 (Executive Takeaway): State both the previous close price and date (e.g. "...from the previous session close of 7,561.67 on Friday, November 13, 2026").
-  * In Section 3 (Quantitative Ratios & Valuation table): You MUST include the date in the previous close row:
+  * In Section 3 (Quantitative Ratios & Valuation table): You MUST include the date in a single previous close row:
     | Previous Session Close | 7,561.67 (November 13, 2026) |
-    (or "| Previous Session Close | 7,561.67 |\n| Previous Session Date | November 13, 2026 |")
+    Include exactly ONE "Previous Session Close" row in any table. NEVER output duplicate or redundant previous close rows.
   * NEVER omit the previous session date in either Fast or Deep mode.
   * CRITICAL EXCLUSION FOR PORTFOLIO HEALTH CHECKS: When analyzing the user's overall portfolio health or holdings, "Previous Session Close" does NOT apply to the portfolio. Completely OMIT the previous close sentence. NEVER write "from the previous session close of N/A on N/A" or emit any "N/A" template fields.
 - INLINE SOURCE CITATIONS:
@@ -839,6 +869,7 @@ MANDATORY TRADE PLAN & TECHNICAL RULES (SECTION 4):
 
 CRITICAL TABLE FORMATTING RULE:
 - In Markdown tables, each cell must contain exactly one clean, final value.
+- NEVER output duplicate rows for the same metric in any table. Specifically, in single-ticker snapshot tables, include exactly ONE row for "Previous Session Close" (e.g. "| Previous Session Close | $390.22 (Friday, November 13, 2026) |"). NEVER emit duplicate "Previous Session Close" rows.
 - NEVER output self-correction arrows, transitions, or revision patterns (such as "$3.92T → $1.50T" or "A -> B") inside table cells. Output ONLY the single final verified number (e.g. "$1.50T").
 - NEVER emit filler rows, repeated header rows, or self-referential rows where both cells contain the same or similar text (e.g. NEVER output "| AMD Snapshot | AMD Snapshot |" or "| Snapshot | Snapshot |").
 - Each table row MUST have a unique Metric name in Column 1 and a single verified Value in Column 2.
@@ -867,6 +898,8 @@ NEVER label sources as "— Recent" without an actual date.
 IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitative analysis for informational and research purposes only, not financial or investment advice. Always append this exact disclaimer at the very end: "*Velora AI provides financial intelligence for informational and research purposes only, not investment advice.*"`;
 
     // 7. Assemble Complete Messages Array
+    const isPortfolioQuery = /(?:portfolio|health|holdings|asset allocation|my stocks|my positions|breakdown)/i.test(lastUserMsg);
+
     const messages: ChatMessage[] = [
       { role: "system", content: baseSystemPrompt }
     ];
@@ -876,6 +909,18 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
     }
     if (portfolioContextMsg) {
       messages.push(portfolioContextMsg);
+    }
+    if (isPortfolioQuery && userAnalyzedHoldings.length > 0 && canonicalHoldingsTable) {
+      messages.push({
+        role: "system",
+        content: `CRITICAL MANDATE FOR THIS PORTFOLIO HEALTH CHECK ANSWER:
+1. In Section 3 ("## 3. Quantitative Ratios & Valuation (use Markdown tables)"), you MUST render the following exact Markdown table verbatim, row-for-row:
+${canonicalHoldingsTable}
+
+2. Headline Market Value is $${userTotalPortfolioValue.toFixed(2)} (the sum of Column 2). Total Cost Basis is $${userTotalCostBasis.toFixed(2)} (the sum of Column 3).
+3. Do NOT invent, recalculate, or shift any numbers in prose. Every holding's dollar value, P&L, return %, and Winner/Underperformer label in your prose narrative MUST match this table exactly.
+4. Omit all single-ticker previous close sentences or trade setup blocks from this portfolio-level answer.`
+      });
     }
     if (verifiedTickerContextMsg) {
       messages.push(verifiedTickerContextMsg);

@@ -111,6 +111,66 @@ export function extractSourcesFromMarkdown(content: string): StreamingSource[] {
 }
 
 /**
+ * Deduplicates rows in Markdown tables where column 1 (metric/asset name) is repeated.
+ * Keeps the most informative row (e.g. one containing session date in parentheses).
+ */
+export function deduplicateMarkdownTableRows(text: string): string {
+  if (!text || !text.includes("|")) return text;
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inTable = false;
+  let seenMetricKeys = new Set<string>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      inTable = true;
+      const parts = trimmed.split("|").slice(1, -1);
+      
+      // Separator line (e.g. | :--- | :--- |)
+      if (parts.every((p) => /^[\s:-]+$/.test(p))) {
+        result.push(line);
+        continue;
+      }
+
+      const col1Raw = parts[0] || "";
+      const col1Key = col1Raw.trim().toLowerCase().replace(/[*_`]/g, "");
+
+      if (seenMetricKeys.has(col1Key)) {
+        const existingIdx = result.findLastIndex((r) => {
+          const rTrimmed = r.trim();
+          if (rTrimmed.startsWith("|") && rTrimmed.endsWith("|")) {
+            const rParts = rTrimmed.split("|").slice(1, -1);
+            return (rParts[0] || "").trim().toLowerCase().replace(/[*_`]/g, "") === col1Key;
+          }
+          return false;
+        });
+
+        if (existingIdx !== -1) {
+          if (line.length > result[existingIdx].length) {
+            result[existingIdx] = line;
+          }
+          continue;
+        }
+      }
+
+      seenMetricKeys.add(col1Key);
+      result.push(line);
+    } else {
+      if (inTable) {
+        inTable = false;
+        seenMetricKeys.clear();
+      }
+      result.push(line);
+    }
+  }
+
+  return result.join("\n");
+}
+
+/**
  * Beautiful UI Inline Source Chip
  */
 export function BuiSourceChip({ source }: { source: StreamingSource }) {
@@ -219,6 +279,9 @@ export function BuiStreamingText({
 
     // Sanitize any rogue template artifact: "from the previous session close of N/A on N/A"
     raw = raw.replace(/\s*(?:,\s*a\s+move\s+of\s+[^,.]+)?\s*(?:from\s+the\s+)?previous\s+session\s+close\s+of\s+N\/A(?:\s+on\s+N\/A)?\.?/gi, ".");
+
+    // Deduplicate any repeated metric/asset rows in Markdown tables
+    raw = deduplicateMarkdownTableRows(raw);
 
     if (sources.length > 0 && !isStreaming) {
       const idx = raw.search(/#{1,3}\s*(?:\d+\.\s*)?(?:verified\s*)?sources/i);

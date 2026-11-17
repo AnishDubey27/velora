@@ -131,17 +131,17 @@ export function BuiPromptBar({
       {/* Beautiful UI Continuous Ambient Glow (360-degree perimeter aura) */}
       <div
         className={cn(
-          "absolute -inset-1 rounded-[36px] transition-all duration-700 pointer-events-none",
+          "absolute -inset-1 rounded-full transition-all duration-700 pointer-events-none",
           isFocused || isListening
             ? "opacity-100 bg-gradient-to-r from-teal-500/60 via-cyan-400/70 to-emerald-500/60 blur-md shadow-[0_0_30px_rgba(20,184,166,0.4)]"
             : "ambient-glow bg-gradient-to-r from-teal-500/40 via-cyan-400/50 to-emerald-500/40 blur-md"
         )}
       />
 
-      {/* Main Composer Box (True 36px capsule pill silhouette) */}
+      {/* Main Composer Box (True capsule pill silhouette with rounded-full) */}
       <div
         className={cn(
-          "relative flex flex-col rounded-[36px] border bg-[#080D1A]/95 backdrop-blur-2xl shadow-2xl transition-all duration-200 overflow-hidden",
+          "relative flex flex-col rounded-full border bg-[#080D1A]/95 backdrop-blur-2xl shadow-2xl transition-all duration-200 overflow-hidden",
           isFocused
             ? "border-teal-500/50 shadow-[0_0_24px_rgba(0,212,255,0.25)]"
             : "border-white/15 hover:border-white/25"
@@ -156,8 +156,8 @@ export function BuiPromptBar({
           onChange={handleFileChange}
         />
 
-        {/* Top Input Area */}
-        <div className="flex items-start gap-2 px-5 pt-3.5 pb-2">
+        {/* Top Input Area with generous pill cap padding */}
+        <div className="flex items-start gap-2 px-7 md:px-8 pt-3.5 pb-2">
           <textarea
             ref={textareaRef}
             value={value}
@@ -173,7 +173,7 @@ export function BuiPromptBar({
         </div>
 
         {/* Bottom Toolbar: Attach Affordance, Model Selector Badge, Dictation & Send */}
-        <div className="flex items-center justify-between px-5 py-2.5 border-t border-white/5 bg-white/[0.015]">
+        <div className="flex items-center justify-between px-7 md:px-8 py-2.5 border-t border-white/5 bg-white/[0.015]">
           {/* Left: Model Selector & Attach Affordance */}
           <div className="flex items-center gap-2">
             <BuiModelSelector
