@@ -75,7 +75,10 @@ console.log("Test 3: Session Status Computation...");
   const inSession = getMarketSessionStatus("IN", mondayPostCloseIndia);
   assert.equal(inSession.phase, "POST_CLOSE");
   assert.equal(inSession.isOpen, false);
-  assert.ok(inSession.latestCompletedSessionLabel.includes("today's close (11/16/2026)"));
+  assert.ok(
+    inSession.latestCompletedSessionLabel.includes("Monday's close (11/16/2026)") ||
+    inSession.latestCompletedSessionLabel.includes("today's close (11/16/2026)")
+  );
 
   const usPreMarket = getMarketSessionStatus("US", mondayPostCloseIndia);
   // In US (New York), 11:00 UTC is 06:00 EST -> Pre-market

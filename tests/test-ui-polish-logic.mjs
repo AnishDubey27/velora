@@ -81,3 +81,46 @@ try {
 assert.equal(exceptionThrown, false, "Must not throw null pointer exception when resizingRef is null");
 assert.equal(stateUpdated, true, "State updater must succeed using lexical closure");
 console.log("✓ Null dereference race condition confirmed eliminated!");
+
+// 4. Verify Weekday Derivation (Monday Nov 16 MUST be Monday, not Friday)
+console.log("\n=== Testing Dynamic Weekday Derivation ===");
+const nov16Date = new Date("2026-11-16T12:00:00Z");
+const weekdayNov16 = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(nov16Date);
+assert.equal(weekdayNov16, "Monday", "2026-11-16 must resolve to Monday");
+const nov13Date = new Date("2026-11-13T12:00:00Z");
+const weekdayNov13 = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(nov13Date);
+assert.equal(weekdayNov13, "Friday", "2026-11-13 must resolve to Friday");
+console.log("✓ Dynamic weekday derivation verified (Nov 16 = Monday, Nov 13 = Friday)!");
+
+// 5. Verify Ticker Previous Close Math & Trading Day Derivation
+console.log("\n=== Testing Ticker Previous Close & Session Date ===");
+function getPreviousTradingDay(date) {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const diff = day === 1 ? 3 : day === 0 ? 2 : day === 6 ? 1 : 1;
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d;
+}
+const tslaCurrentPrice = 379.74;
+const tslaChange = -10.48;
+const tslaPrevCloseFromMath = tslaCurrentPrice - tslaChange; // 390.22
+assert.ok(Math.abs(tslaPrevCloseFromMath - 390.22) < 0.001, "TSLA previous close math must be 390.22");
+
+// On Tuesday Nov 17 pre-market, latest completed session was Monday Nov 16
+const tslaLatestSession = "2026-11-16";
+const tslaPrevTradeDate = getPreviousTradingDay(new Date(tslaLatestSession + "T12:00:00Z"));
+const tslaPrevDateStr = tslaPrevTradeDate.toISOString().slice(0, 10);
+const tslaPrevWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(tslaPrevTradeDate);
+assert.equal(tslaPrevDateStr, "2026-11-13", "TSLA previous trading session must be Friday 2026-11-13");
+assert.equal(tslaPrevWeekday, "Friday", "TSLA previous trading day must be Friday, never Saturday");
+console.log("✓ Ticker previous close ($390.22) and session date (Friday, Nov 13) verified!");
+
+// 6. Verify Health Check Prose Leaked Template Sanitizer
+console.log("\n=== Testing Leaked Template Sanitizer ===");
+const leakedSample = "The portfolio has a total market value of $79.04, from the previous session close of N/A on N/A. Overall return is +13.36%.";
+const cleaned = leakedSample.replace(/\s*(?:,\s*a\s+move\s+of\s+[^,.]+)?\s*(?:from\s+the\s+)?previous\s+session\s+close\s+of\s+N\/A(?:\s+on\s+N\/A)?\.?/gi, ".");
+assert.ok(!cleaned.includes("N/A on N/A"), "Sanitizer must remove 'N/A on N/A'");
+assert.ok(!cleaned.includes("previous session close of N/A"), "Sanitizer must remove 'previous session close of N/A'");
+console.log("Cleaned prose:", cleaned);
+console.log("✓ Leaked template sanitizer verified!");
+

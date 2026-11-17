@@ -10,6 +10,7 @@ import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
 import {
   SUPPORTED_INDICES,
   getMarketSessionStatus,
+  getPreviousTradingDay,
   fetchVerifiedIndex,
   detectIndicesInQuery,
   extractRequestedDateFromQuery,
@@ -363,6 +364,9 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 7. POSITIONS LISTED UNDER "WINNERS" HAVE POSITIVE RETURNS (+). Never classify a winner as a loss, drag, or underperformer.
 8. POSITIONS LISTED UNDER "UNDERPERFORMERS" HAVE NEGATIVE RETURNS (-).
 9. COST BASIS CLARITY: When citing cost basis in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)". Never confuse total cost with purchase price per share.
+10. GENERAL PORTFOLIO HEALTH QUERIES (NO LEAKED TEMPLATES):
+- When answering portfolio health checks, asset allocations, or general portfolio reviews, "Previous Session Close" and single-ticker trading day metrics DO NOT APPLY to the overall portfolio.
+- Completely OMIT any previous session close sentence. NEVER write "from the previous session close of N/A on N/A" or emit any "N/A" placeholders.
 ======================================================================`
           };
         }
@@ -398,6 +402,27 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
               const currentPrice = quoteRes.c;
               const change = quoteRes.d ?? 0;
               const changePercent = quoteRes.dp ?? 0;
+              const previousClose = typeof quoteRes.pc === "number" && quoteRes.pc > 0
+                ? quoteRes.pc
+                : currentPrice - change;
+
+              // Derive previous session date and weekday for the ticker
+              const usSession = getMarketSessionStatus("US");
+              let tickerPrevCloseDateStr: string;
+              if (usSession.phase === "REGULAR_HOURS") {
+                tickerPrevCloseDateStr = usSession.latestCompletedSessionDate;
+              } else if (usSession.phase === "POST_CLOSE") {
+                const d = getPreviousTradingDay(new Date(usSession.localDateStr + "T12:00:00Z"));
+                tickerPrevCloseDateStr = d.toISOString().slice(0, 10);
+              } else {
+                // PRE_MARKET or WEEKEND_CLOSED
+                const d = getPreviousTradingDay(new Date(usSession.latestCompletedSessionDate + "T12:00:00Z"));
+                tickerPrevCloseDateStr = d.toISOString().slice(0, 10);
+              }
+
+              const prevCloseObj = new Date(tickerPrevCloseDateStr + "T12:00:00Z");
+              const prevCloseWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(prevCloseObj);
+              const prevCloseMonthDayYear = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(prevCloseObj);
               const metric = metricRes?.metric || {};
               const peRatio = metric.peTTM ? `${metric.peTTM.toFixed(1)}x` : (metric.peExclExtraTTM ? `${metric.peExclExtraTTM.toFixed(1)}x` : "Unavailable");
               const marketCapRaw = profileRes?.marketCapitalization ? profileRes.marketCapitalization * 1e6 : 0;
@@ -461,6 +486,7 @@ Ticker: ${sym} (${profileRes?.name || sym})
 Data Timestamp: ${new Date().toISOString()}
 • Current Price: $${currentPrice.toFixed(2)}
 • Daily Change: ${change >= 0 ? "+" : ""}${change.toFixed(2)} (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%)
+• Previous Session Close: $${previousClose.toFixed(2)} (Session Date: ${prevCloseWeekday}, ${prevCloseMonthDayYear})
 • P/E Ratio (TTM): ${peRatio}
 • Market Capitalization: ${marketCapStr}
 • EPS (TTM): ${eps}
@@ -475,6 +501,7 @@ CRITICAL GROUNDING RULES FOR ${sym}:
 2. In prose, percentage changes MUST match the verified changePercent (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%). NEVER substitute the dollar change as a percentage (e.g. if a stock dropped $3.34 or -2.01%, NEVER state "it declined 3.34%").
 3. UNIFORMLY OMIT unverified secondary support/resistance/dip levels. Cite ONLY Current Price ($${currentPrice.toFixed(2)}) and 52-Week Range (${week52}). Discuss technical momentum qualitatively without inventing specific price targets or support levels.
 4. Strictly follow the Velora Portfolio Standing above in Section 5 (Portfolio Impact).
+5. PREVIOUS CLOSE AUDITABILITY FOR ${sym}: When citing Previous Session Close for ${sym} in Section 1 or Section 3's table, you MUST use the verified figure: "$${previousClose.toFixed(2)} (${prevCloseMonthDayYear})" (or "$${previousClose.toFixed(2)} on ${prevCloseWeekday}, ${prevCloseMonthDayYear}"). In the table, format as: | Previous Session Close | $${previousClose.toFixed(2)} (${prevCloseMonthDayYear}) |. NEVER invent or hallucinate unverified dates (such as Saturday dates).
 ======================================================================`);
             } catch (err) {
               console.error(`Failed to fetch verified market data for ${sym}:`, err);
@@ -582,8 +609,8 @@ CRITICAL RULE: State honestly and consistently: "Velora's verified historical da
               if (quote.market === "US" && session.phase === "PRE_MARKET") {
                 sessionGuidance = `• PRE-MARKET US SESSION NOTICE:
   Today is ${session.dayOfWeek}, ${session.localDateStr}. Regular US trading has NOT opened yet (regular market hours: 09:30 - 16:00 EST / 20:00 - 02:30 IST).
-  Therefore, when asked how the market performed "today", the latest completed session was Friday's close (${session.latestCompletedSessionLabel}).
-  You MUST explicitly state: "The US market has not yet opened for ${session.dayOfWeek}, ${session.localDateStr} (trading begins at 09:30 EST / 20:00 IST). In the latest completed session on Friday (${session.latestCompletedSessionDate}), the ${quote.name} closed at ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%, a move of ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} from the previous session close of ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} on ${quote.previousCloseDateStr})."`;
+  Therefore, when asked how the market performed "today", the latest completed session was ${session.latestCompletedSessionWeekday}'s close (${session.latestCompletedSessionLabel}).
+  You MUST explicitly state: "The US market has not yet opened for ${session.dayOfWeek}, ${session.localDateStr} (trading begins at 09:30 EST / 20:00 IST). In the latest completed session on ${session.latestCompletedSessionWeekday} (${session.latestCompletedSessionDate}), the ${quote.name} closed at ${quote.price.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%, a move of ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} from the previous session close of ${quote.previousClose.toLocaleString("en-US", { minimumFractionDigits: 2 })} on ${quote.previousCloseDateStr})."`;
               } else if (quote.market === "IN" && session.phase === "POST_CLOSE") {
                 sessionGuidance = `• COMPLETED SESSION NOTICE:
   Today is ${session.dayOfWeek}, ${session.localDateStr}. The Indian market has CLOSED for the day (trading concluded at 15:30 IST).
@@ -781,18 +808,19 @@ When asked for trade ideas, stock breakdowns, or market analysis, format your ou
 MANDATORY MARKET INDEX & TEMPORAL RULES:
 - When answering questions about market indices (e.g. S&P 500, Nasdaq, Dow, Nifty 50, Sensex), you MUST use the headline figures, price levels, and percentage changes from the OFFICIAL VERIFIED VELORA MARKET DATA provided above.
 - NEVER quote headline index figures from web search news articles. News results may supply colour (drivers, sector moves) but may NEVER supply the headline index figure.
-- PREVIOUS CLOSE AUDITABILITY (BOTH PROSE AND TABLES):
-  Whenever citing the previous session close for an index, you MUST ALWAYS provide both the previous close level AND its session date:
-  * In Section 1 (Executive Takeaway): State both the previous close price and date (e.g. "...from the previous session close of 25,144.30 on Friday, November 13, 2026").
+- PREVIOUS CLOSE AUDITABILITY (INDEX & TICKER ANSWERS ONLY):
+  Whenever citing the previous session close for an index or stock, you MUST ALWAYS provide both the previous close level AND its session date:
+  * In Section 1 (Executive Takeaway): State both the previous close price and date (e.g. "...from the previous session close of 7,561.67 on Friday, November 13, 2026").
   * In Section 3 (Quantitative Ratios & Valuation table): You MUST include the date in the previous close row:
-    | Previous Session Close | 25,144.30 (November 13, 2026) |
-    (or "| Previous Session Close | 25,144.30 |\n| Previous Session Date | November 13, 2026 |")
+    | Previous Session Close | 7,561.67 (November 13, 2026) |
+    (or "| Previous Session Close | 7,561.67 |\n| Previous Session Date | November 13, 2026 |")
   * NEVER omit the previous session date in either Fast or Deep mode.
+  * CRITICAL EXCLUSION FOR PORTFOLIO HEALTH CHECKS: When analyzing the user's overall portfolio health or holdings, "Previous Session Close" does NOT apply to the portfolio. Completely OMIT the previous close sentence. NEVER write "from the previous session close of N/A on N/A" or emit any "N/A" template fields.
 - INLINE SOURCE CITATIONS:
   In Section 1 and Section 2, when citing catalysts, market drivers, or external news, you MUST embed at least one inline markdown citation link directly in the body sentence (e.g. "...supported by FII buying [TradingView](https://www.tradingview.com/news) and lower crude prices [Rediff Business](https://www.rediff.com/business)..."). These links render as interactive inline citation chips in the Velora UI.
 - If the injected market data states that the data is STALE, you MUST OPEN your response with the required staleness disclosure before citing any figures.
 - If the injected market data states that a figure is an INTRADAY SNAPSHOT, you MUST state explicitly that it is an intraday level and not the final close.
-- For US markets queried during Asian/European hours before the 09:30 EST open, "today" refers to the latest completed session (Friday's close). You MUST explicitly label it as Friday's close and state that the US market opens tonight at 20:00 IST (09:30 EST).
+- For US markets queried during Asian/European hours before the 09:30 EST open, "today" refers to the latest completed session's close. You MUST explicitly label it using its actual session weekday and date (e.g. "Monday's close, November 16, 2026" or "Friday's close, November 13, 2026") and state that the US market opens tonight at 20:00 IST (09:30 EST). NEVER mislabel a Monday session as Friday.
 - NEVER present an old close (such as from May, June, or a prior week) as today's market performance.
 - For explicit past-date questions (e.g. "What did the Nifty 50 close at on November 12, 2026?"), quote the verified historical close from the official data provided. Never refuse when verified historical data is present, and never guess from news articles.
 

@@ -27,8 +27,8 @@ jobs:
 
           echo "Supabase Target: ${SUPABASE_URL}"
 
-          # Step 1: Healthcheck GET endpoint
-          READ_ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal?select=id&limit=1"
+          # Step 1: Healthcheck GET endpoint (queries active RLS-protected Postgres tables)
+          READ_ENDPOINT="${SUPABASE_URL}/rest/v1/holdings?select=id&limit=1"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 15 \
             -H "apikey: ${SUPABASE_KEY}" \
@@ -36,7 +36,7 @@ jobs:
             "${READ_ENDPOINT}")
           CURL_EXIT=$?
 
-          echo "GET Status: ${HTTP_STATUS} | curl exit: ${CURL_EXIT}"
+          echo "GET holdings Status: ${HTTP_STATUS} | curl exit: ${CURL_EXIT}"
 
           if [ "$CURL_EXIT" = "6" ] || [ "$CURL_EXIT" = "7" ]; then
             echo "CRITICAL: Cannot reach Supabase host (curl exit ${CURL_EXIT}). Project may be PAUSED."
@@ -48,37 +48,14 @@ jobs:
             exit 1
           fi
 
-          # Step 2: Real Postgres Transaction (INSERT + DELETE)
-          # Supabase requires active database transactions to reset the 7-day inactivity timer
-          WRITE_ENDPOINT="${SUPABASE_URL}/rest/v1/raw_journal"
-          WRITE_RESP=$(curl -s -w "\n%{http_code}" \
+          # Step 2: Second verification query to watchlist
+          WATCHLIST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 15 \
-            -X POST \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            -d '{"phase":"heartbeat","raw_text":"automated-keepalive-ping"}' \
-            "${WRITE_ENDPOINT}")
+            "${SUPABASE_URL}/rest/v1/watchlist?select=id&limit=1")
 
-          WRITE_STATUS=$(echo "$WRITE_RESP" | tail -n1)
-          WRITE_BODY=$(echo "$WRITE_RESP" | sed '$d')
-
-          echo "POST Status: ${WRITE_STATUS}"
-
-          # Extract row ID if created
-          ROW_ID=$(echo "$WRITE_BODY" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4)
-
-          if [ -n "$ROW_ID" ]; then
-            echo "Heartbeat row created (ID: ${ROW_ID}). Cleaning up row..."
-            DEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              --max-time 15 \
-              -X DELETE \
-              -H "apikey: ${SUPABASE_KEY}" \
-              -H "Authorization: Bearer ${SUPABASE_KEY}" \
-              "${WRITE_ENDPOINT}?id=eq.${ROW_ID}")
-            echo "DELETE cleanup status: ${DEL_STATUS}"
-          fi
+          echo "GET watchlist Status: ${WATCHLIST_STATUS}"
 
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
             echo "SUCCESS: Supabase database heartbeat verified and active!"

@@ -216,6 +216,10 @@ export function BuiStreamingText({
   // Strip the raw trailing "## Sources" block if rendered separately, and guarantee inline citation chip
   const displayContent = useMemo(() => {
     let raw = isStreaming ? content.slice(0, displayedLength) : content;
+
+    // Sanitize any rogue template artifact: "from the previous session close of N/A on N/A"
+    raw = raw.replace(/\s*(?:,\s*a\s+move\s+of\s+[^,.]+)?\s*(?:from\s+the\s+)?previous\s+session\s+close\s+of\s+N\/A(?:\s+on\s+N\/A)?\.?/gi, ".");
+
     if (sources.length > 0 && !isStreaming) {
       const idx = raw.search(/#{1,3}\s*(?:\d+\.\s*)?(?:verified\s*)?sources/i);
       if (idx !== -1) {

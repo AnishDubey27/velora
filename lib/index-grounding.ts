@@ -31,6 +31,7 @@ export interface MarketSessionInfo {
   isOpen: boolean;
   phase: SessionPhase;
   latestCompletedSessionDate: string; // YYYY-MM-DD
+  latestCompletedSessionWeekday: string; // Monday, Tuesday, ...
   latestCompletedSessionLabel: string; // e.g. "Monday, Nov 16, 2026 Close" or "Friday, Nov 13, 2026 Close"
   nextSessionOpensLabel: string;
 }
@@ -170,8 +171,9 @@ export function getMarketSessionStatus(market: MarketCode, now: Date = new Date(
     const prevTradeDate = getPreviousTradingDay(now);
     const prevParts = Object.fromEntries(formatter.formatToParts(prevTradeDate).map((p) => [p.type, p.value]));
     latestCompletedSessionDate = `${prevParts.year}-${prevParts.month}-${prevParts.day}`;
-    const prevDayName = dayOfWeek === "Mon" ? "Friday's" : "yesterday's";
-    latestCompletedSessionLabel = `${prevDayName} close (${prevParts.month}/${prevParts.day}/${prevParts.year})`;
+    const sessionDateObj = new Date(latestCompletedSessionDate + "T12:00:00Z");
+    const prevWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(sessionDateObj);
+    latestCompletedSessionLabel = `${prevWeekday}'s close (${prevParts.month}/${prevParts.day}/${prevParts.year})`;
     nextSessionOpensLabel = `today at ${market === "IN" ? "09:15 IST" : "09:30 EST (20:00 IST)"}`;
   } else if (timeMins >= openMins && timeMins < closeMins) {
     phase = "REGULAR_HOURS";
@@ -179,17 +181,27 @@ export function getMarketSessionStatus(market: MarketCode, now: Date = new Date(
     const prevTradeDate = getPreviousTradingDay(now);
     const prevParts = Object.fromEntries(formatter.formatToParts(prevTradeDate).map((p) => [p.type, p.value]));
     latestCompletedSessionDate = `${prevParts.year}-${prevParts.month}-${prevParts.day}`;
-    latestCompletedSessionLabel = `previous close (${prevParts.month}/${prevParts.day}/${prevParts.year})`;
+    const sessionDateObj = new Date(latestCompletedSessionDate + "T12:00:00Z");
+    const prevWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(sessionDateObj);
+    latestCompletedSessionLabel = `${prevWeekday}'s close (${prevParts.month}/${prevParts.day}/${prevParts.year})`;
     nextSessionOpensLabel = `Session in progress (closes at ${market === "IN" ? "15:30 IST" : "16:00 EST"})`;
   } else {
     phase = "POST_CLOSE";
     latestCompletedSessionDate = localDateStr;
-    latestCompletedSessionLabel = `today's close (${parts.month}/${parts.day}/${parts.year})`;
+    const sessionDateObj = new Date(latestCompletedSessionDate + "T12:00:00Z");
+    const sessionWeekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(sessionDateObj);
+    latestCompletedSessionLabel = `${sessionWeekday}'s close (${parts.month}/${parts.day}/${parts.year})`;
     const isFriday = dayOfWeek === "Fri";
     nextSessionOpensLabel = isFriday
       ? `Monday at ${market === "IN" ? "09:15 IST" : "09:30 EST (20:00 IST)"}`
       : `tomorrow at ${market === "IN" ? "09:15 IST" : "09:30 EST (20:00 IST)"}`;
   }
+
+  const sessionDateObj = new Date(latestCompletedSessionDate + "T12:00:00Z");
+  const latestCompletedSessionWeekday = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(sessionDateObj);
 
   return {
     market,
@@ -200,6 +212,7 @@ export function getMarketSessionStatus(market: MarketCode, now: Date = new Date(
     isOpen,
     phase,
     latestCompletedSessionDate,
+    latestCompletedSessionWeekday,
     latestCompletedSessionLabel,
     nextSessionOpensLabel,
   };
