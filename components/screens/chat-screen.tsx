@@ -239,19 +239,19 @@ const markdownComponents = {
   ),
   blockquote: InfographicBlockquote,
   table: ({ children }: any) => (
-    <div className="my-4 overflow-hidden overflow-x-auto rounded-2xl border border-white/15 bg-[#080D1A]/90 backdrop-blur-md shadow-2xl">
-      <table className="w-full text-left text-xs md:text-sm text-white/90 border-collapse">
+    <div className="my-3 md:my-4 w-full overflow-x-auto rounded-xl md:rounded-2xl border border-white/15 bg-[#080D1A]/90 backdrop-blur-md shadow-2xl app-scroll">
+      <table className="w-full min-w-[500px] text-left text-[11px] md:text-sm text-white/90 border-collapse">
         {children}
       </table>
     </div>
   ),
   thead: ({ children }: any) => (
-    <thead className="bg-vel-teal/20 text-vel-teal border-b border-white/10 font-semibold uppercase tracking-wider text-[11px]">
+    <thead className="bg-vel-teal/20 text-vel-teal border-b border-white/10 font-semibold uppercase tracking-wider text-[10px] md:text-[11px]">
       {children}
     </thead>
   ),
   tr: ({ children }: any) => {
-    // Sanitize filler/duplicated rows like "AMD Snapshot | AMD Snapshot"
+    // Sanitize filler/duplicated rows like "AMD Snapshot | AMD Snapshot" or "N/A" rows
     const childArray = Array.isArray(children) ? children : [children];
     const cellTexts = childArray.map((c: any) => extractText(c).trim());
     if (cellTexts.length >= 2) {
@@ -260,7 +260,10 @@ const markdownComponents = {
       if (c0 === c1 && c0.length > 0) return null;
       if (c0.includes("snapshot") && c1.includes("snapshot")) return null;
       if (c1.endsWith(". analysis") || c1 === "analysis") return null;
+      // Drop any row where value is N/A or empty
+      if (/^(?:n\/a|none|unavailable|n\/a on n\/a|\s*)$/i.test(c1)) return null;
     }
+    if (cellTexts.some((c: string) => /^(?:n\/a|none|unavailable|n\/a on n\/a)$/i.test(c))) return null;
     return (
       <tr className="border-b border-white/5 last:border-0 hover:bg-white/[0.04] transition-colors">
         {children}
@@ -697,32 +700,32 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] md:h-[calc(100vh-140px)] flex-col bg-[#05080F]">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+    <div className="flex h-full flex-col bg-[#05080F] overflow-hidden min-w-0">
+      <div className="flex items-center gap-3 px-3.5 py-2.5 md:px-4 md:py-3 border-b border-white/5 flex-none">
         <button 
           onClick={onBack}
-          className="grid h-9 w-9 place-items-center rounded-xl bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition"
+          className="grid h-8 w-8 md:h-9 md:w-9 place-items-center rounded-xl bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shrink-0"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-vel-teal/20 flex items-center justify-center">
-            <Bot size={16} className="text-vel-teal" />
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-vel-teal/20 flex items-center justify-center shrink-0">
+            <Bot size={15} className="text-vel-teal" />
           </div>
-          <div>
-            <h2 className="text-[15px] font-semibold text-white">Velora AI</h2>
-            <p className="text-[11px] text-white/50">Powered by NVIDIA NIM & Tavily</p>
+          <div className="min-w-0 truncate">
+            <h2 className="text-[14px] md:text-[15px] font-semibold text-white truncate">Velora AI</h2>
+            <p className="text-[10.5px] md:text-[11px] text-white/50 truncate">Powered by NVIDIA NIM & Tavily</p>
           </div>
         </div>
         <div className="flex-1" />
         {messages.length > 0 && (
           <button
             onClick={handleNewChat}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition flex items-center gap-1.5"
+            className="text-xs px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition flex items-center gap-1.5 shrink-0"
             title="Start fresh conversation"
           >
             <RotateCcw size={12} />
-            <span>New Chat</span>
+            <span className="hidden sm:inline">New Chat</span>
           </button>
         )}
         <BuiModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
@@ -774,24 +777,24 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className={cn(
-              "flex gap-3 max-w-[85%]",
-              msg.role === "user" ? "ml-auto flex-row-reverse" : ""
+              "flex gap-2.5 md:gap-3 w-full",
+              msg.role === "user" ? "ml-auto justify-end max-w-[90%] md:max-w-[75%]" : "justify-start max-w-full md:max-w-[90%]"
             )}
           >
             <div className={cn(
-              "flex-none h-8 w-8 rounded-full flex items-center justify-center",
+              "flex-none h-7 w-7 md:h-8 md:w-8 rounded-full flex items-center justify-center shrink-0",
               msg.role === "user" ? "bg-white/10" : "bg-vel-teal/20"
             )}>
-              {msg.role === "user" ? <User size={14} className="text-white/70" /> : <Bot size={14} className="text-vel-teal" />}
+              {msg.role === "user" ? <User size={13} className="text-white/70" /> : <Bot size={13} className="text-vel-teal" />}
             </div>
             <div className={cn(
-              "rounded-2xl px-4 py-3 text-[14px] leading-relaxed",
+              "min-w-0 flex-1 rounded-2xl px-3.5 py-3 md:px-5 md:py-4 text-[13.5px] md:text-[14px] leading-relaxed",
               msg.role === "user" 
-                ? "bg-white/10 text-white" 
-                : "bg-transparent border border-white/10 text-white/90"
+                ? "bg-white/10 text-white max-w-fit" 
+                : "bg-transparent border border-white/10 text-white/90 w-full overflow-hidden"
             )}>
               {msg.role === "user" ? (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
               ) : !msg.content && isLoading && i === messages.length - 1 ? (
                 <div className="flex flex-col gap-2 py-1">
                   {isDeep ? (
@@ -809,7 +812,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
                   )}
                 </div>
               ) : (
-                <div className="w-full space-y-2">
+                <div className="w-full space-y-2 min-w-0">
                   {isDeep && (
                     <BuiThinkingState
                       durationSeconds={thoughtDurations[i]}
@@ -836,7 +839,8 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
         <div ref={endOfMessagesRef} />
       </div>
 
-      <div className="p-4 bg-gradient-to-t from-[#05080F] via-[#05080F] to-transparent">
+      {/* Composer Container: sits fully above mobile nav bar with clean clearance */}
+      <div className="flex-none p-2.5 pb-1.5 md:p-4 bg-gradient-to-t from-[#05080F] via-[#05080F] to-transparent">
         <BuiPromptBar
           value={input}
           onChange={setInput}
@@ -846,7 +850,7 @@ export function ChatScreen({ initialPrompt, skillContext, onBack }: ChatScreenPr
           selectedModel={selectedModel}
           onSelectModel={setSelectedModel}
         />
-        <p className="mt-2 text-center text-[10px] text-white/40">
+        <p className="mt-1 md:mt-2 text-center text-[10px] text-white/40">
           Velora AI is a market intelligence and quantitative research tool. Insights are for educational purposes only, not financial advice.
         </p>
       </div>

@@ -128,20 +128,20 @@ export function BuiPromptBar({
 
   return (
     <div className={cn("relative w-full max-w-4xl mx-auto", className)}>
-      {/* Beautiful UI Continuous Ambient Glow (360-degree perimeter aura) */}
+      {/* Beautiful UI Continuous Ambient Glow: rounded-2xl on mobile, rounded-full capsule pill on desktop */}
       <div
         className={cn(
-          "absolute -inset-1 rounded-full transition-all duration-700 pointer-events-none",
+          "absolute -inset-1 rounded-2xl md:rounded-full transition-all duration-700 pointer-events-none",
           isFocused || isListening
             ? "opacity-100 bg-gradient-to-r from-teal-500/60 via-cyan-400/70 to-emerald-500/60 blur-md shadow-[0_0_30px_rgba(20,184,166,0.4)]"
             : "ambient-glow bg-gradient-to-r from-teal-500/40 via-cyan-400/50 to-emerald-500/40 blur-md"
         )}
       />
 
-      {/* Main Composer Box (True capsule pill silhouette with rounded-full) */}
+      {/* Main Composer Box: rounded-2xl on mobile, rounded-full capsule pill on desktop */}
       <div
         className={cn(
-          "relative flex flex-col rounded-full border bg-[#080D1A]/95 backdrop-blur-2xl shadow-2xl transition-all duration-200 overflow-hidden",
+          "relative flex flex-col rounded-2xl md:rounded-full border bg-[#080D1A]/95 backdrop-blur-2xl shadow-2xl transition-all duration-200 overflow-hidden",
           isFocused
             ? "border-teal-500/50 shadow-[0_0_24px_rgba(0,212,255,0.25)]"
             : "border-white/15 hover:border-white/25"
@@ -156,8 +156,8 @@ export function BuiPromptBar({
           onChange={handleFileChange}
         />
 
-        {/* Top Input Area with generous pill cap padding */}
-        <div className="flex items-start gap-2 px-7 md:px-8 pt-3.5 pb-2">
+        {/* Top Input Area: comfortable padding without edge pinching */}
+        <div className="flex items-start gap-2 px-3.5 pt-2.5 pb-1.5 md:px-8 md:pt-3.5 md:pb-2">
           <textarea
             ref={textareaRef}
             value={value}
@@ -168,14 +168,14 @@ export function BuiPromptBar({
             placeholder={isListening ? "Listening... Speak now..." : placeholder}
             disabled={disabled}
             rows={1}
-            className="flex-1 bg-transparent text-[14px] md:text-[15px] text-white placeholder:text-white/40 focus:outline-none resize-none app-scroll leading-relaxed min-h-[44px]"
+            className="flex-1 bg-transparent text-[14px] md:text-[15px] text-white placeholder:text-white/40 focus:outline-none resize-none app-scroll leading-relaxed min-h-[38px] md:min-h-[44px]"
           />
         </div>
 
         {/* Bottom Toolbar: Attach Affordance, Model Selector Badge, Dictation & Send */}
-        <div className="flex items-center justify-between px-7 md:px-8 py-2.5 border-t border-white/5 bg-white/[0.015]">
+        <div className="flex items-center justify-between px-3.5 py-2 md:px-8 md:py-2.5 border-t border-white/5 bg-white/[0.015]">
           {/* Left: Model Selector & Attach Affordance */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             <BuiModelSelector
               selectedModel={selectedModel}
               onSelectModel={onSelectModel}
@@ -193,7 +193,7 @@ export function BuiPromptBar({
           </div>
 
           {/* Right: Dictation Equalizer & Send/Stop Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {/* Dictation Equalizer Button */}
             <button
               type="button"

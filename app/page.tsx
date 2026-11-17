@@ -17,6 +17,7 @@ import { SuperInvestorsScreen } from "@/components/screens/super-investors-scree
 import { SuperInvestorProfileScreen } from "@/components/screens/super-investor-profile-screen";
 import { StockDetailScreen } from "@/components/screens/stock-detail-screen";
 import type { NavKey, Skill } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const screenVariants = {
   enter: { opacity: 0, y: 12, filter: "blur(8px)" },
@@ -302,7 +303,7 @@ export default function Home() {
           animate="center"
           exit="exit"
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="min-h-full"
+          className={cn("min-h-full", (active === "chat" || active === "research") && "h-full flex flex-col min-w-0")}
         >
           {screen}
         </motion.main>

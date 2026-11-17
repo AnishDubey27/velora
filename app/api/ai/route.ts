@@ -874,6 +874,8 @@ CRITICAL TABLE FORMATTING RULE:
 - NEVER emit filler rows, repeated header rows, or self-referential rows where both cells contain the same or similar text (e.g. NEVER output "| AMD Snapshot | AMD Snapshot |" or "| Snapshot | Snapshot |").
 - Each table row MUST have a unique Metric name in Column 1 and a single verified Value in Column 2.
 - NEVER split a metric across multiple rows (e.g. NEVER emit "P/E Ratio | 115. analysis" followed by "P/E Ratio | 115.0x"). Combine into one clean row: "| P/E Ratio | 115.0x |".
+- ABSOLUTE PROHIBITION ON 'N/A' TABLE CELLS: NEVER output any table cell containing 'N/A', 'n/a', 'None', or empty placeholders in any table. If a metric value is not available, completely omit that row.
+- NO-DATA PORTFOLIO EXCLUSION: When no portfolio holdings or market metrics are available, DO NOT generate any metrics table or snapshot table at all. Never emit a table containing 'N/A'.
 
 MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
 - For ANY subject stock, check its verified portfolio standing:
@@ -920,6 +922,16 @@ ${canonicalHoldingsTable}
 2. Headline Market Value is $${userTotalPortfolioValue.toFixed(2)} (the sum of Column 2). Total Cost Basis is $${userTotalCostBasis.toFixed(2)} (the sum of Column 3).
 3. Do NOT invent, recalculate, or shift any numbers in prose. Every holding's dollar value, P&L, return %, and Winner/Underperformer label in your prose narrative MUST match this table exactly.
 4. Omit all single-ticker previous close sentences or trade setup blocks from this portfolio-level answer.`
+      });
+    } else if (isPortfolioQuery && userAnalyzedHoldings.length === 0) {
+      messages.push({
+        role: "system",
+        content: `MANDATORY DIRECTIVE FOR UNLOCKED VAULT / NO PORTFOLIO DATA:
+The user is requesting a portfolio health check or portfolio review, but NO portfolio data or active holdings are available in this session (the user's portfolio vault is locked or no holdings have been connected).
+1. State clearly, professionally, and helpfully that no active portfolio holdings or positions are currently accessible in this session, and invite the user to unlock their portfolio vault or add holdings in the Portfolio tab.
+2. DO NOT output any quantitative metrics table, valuation table, or snapshot table. Completely OMIT any Markdown table from your entire response.
+3. NEVER emit any "Previous Session Close" rows, single-ticker trading day metrics, or "N/A" cells.
+4. Omit trade setup blocks and technical price levels.`
       });
     }
     if (verifiedTickerContextMsg) {

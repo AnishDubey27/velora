@@ -111,15 +111,73 @@ export function extractSourcesFromMarkdown(content: string): StreamingSource[] {
 }
 
 /**
- * Deduplicates rows in Markdown tables where column 1 (metric/asset name) is repeated.
- * Keeps the most informative row (e.g. one containing session date in parentheses).
+ * Sanitizes and deduplicates Markdown tables:
+ * 1. Drops any table row where column 2 (value) is 'N/A', 'n/a', 'None', 'Unavailable', or 'N/A on N/A'.
+ * 2. Deduplicates rows with identical metric keys, preserving the most informative (date-inclusive) row.
+ * 3. If a table has 0 valid data rows remaining (e.g. only header and separator), drops the entire table block.
  */
-export function deduplicateMarkdownTableRows(text: string): string {
+export function sanitizeAndDeduplicateMarkdownTables(text: string): string {
   if (!text || !text.includes("|")) return text;
+
   const lines = text.split("\n");
   const result: string[] = [];
+  let tableRows: string[] = [];
   let inTable = false;
-  let seenMetricKeys = new Set<string>();
+
+  function flushTable(rows: string[]) {
+    if (rows.length === 0) return;
+
+    const cleanRows: string[] = [];
+    const seenMetricKeys = new Set<string>();
+    let dataRowCount = 0;
+
+    for (const row of rows) {
+      const parts = row.trim().split("|").slice(1, -1);
+
+      // Separator line (e.g. | :--- | :--- |)
+      if (parts.every((p) => /^[\s:-]+$/.test(p))) {
+        cleanRows.push(row);
+        continue;
+      }
+
+      const col1Raw = parts[0] || "";
+      const col1Key = col1Raw.trim().toLowerCase().replace(/[*_`]/g, "");
+      const isHeader = col1Key === "metric" || col1Key === "asset" || col1Key === "ticker" || col1Key === "holding";
+
+      if (!isHeader) {
+        // Drop any row where value contains N/A or empty
+        const col2Raw = parts[1] || "";
+        const col2Val = col2Raw.trim().replace(/[*_`]/g, "");
+        if (/^(?:N\/A|None|Unavailable|N\/A on N\/A|\s*)$/i.test(col2Val)) {
+          continue;
+        }
+
+        // Deduplication
+        if (seenMetricKeys.has(col1Key)) {
+          const existingIdx = cleanRows.findLastIndex((r) => {
+            const rParts = r.trim().split("|").slice(1, -1);
+            return (rParts[0] || "").trim().toLowerCase().replace(/[*_`]/g, "") === col1Key;
+          });
+          if (existingIdx !== -1) {
+            if (row.length > cleanRows[existingIdx].length) {
+              cleanRows[existingIdx] = row;
+            }
+            continue;
+          }
+        }
+
+        seenMetricKeys.add(col1Key);
+        dataRowCount++;
+      }
+
+      cleanRows.push(row);
+    }
+
+    // Only render the table if it contains at least one real data row!
+    if (dataRowCount > 0) {
+      result.push(...cleanRows);
+    }
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -127,48 +185,28 @@ export function deduplicateMarkdownTableRows(text: string): string {
 
     if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
       inTable = true;
-      const parts = trimmed.split("|").slice(1, -1);
-      
-      // Separator line (e.g. | :--- | :--- |)
-      if (parts.every((p) => /^[\s:-]+$/.test(p))) {
-        result.push(line);
-        continue;
-      }
-
-      const col1Raw = parts[0] || "";
-      const col1Key = col1Raw.trim().toLowerCase().replace(/[*_`]/g, "");
-
-      if (seenMetricKeys.has(col1Key)) {
-        const existingIdx = result.findLastIndex((r) => {
-          const rTrimmed = r.trim();
-          if (rTrimmed.startsWith("|") && rTrimmed.endsWith("|")) {
-            const rParts = rTrimmed.split("|").slice(1, -1);
-            return (rParts[0] || "").trim().toLowerCase().replace(/[*_`]/g, "") === col1Key;
-          }
-          return false;
-        });
-
-        if (existingIdx !== -1) {
-          if (line.length > result[existingIdx].length) {
-            result[existingIdx] = line;
-          }
-          continue;
-        }
-      }
-
-      seenMetricKeys.add(col1Key);
-      result.push(line);
+      tableRows.push(line);
     } else {
       if (inTable) {
+        flushTable(tableRows);
+        tableRows = [];
         inTable = false;
-        seenMetricKeys.clear();
       }
       result.push(line);
     }
   }
 
-  return result.join("\n");
+  if (inTable) {
+    flushTable(tableRows);
+  }
+
+  let sanitized = result.join("\n");
+  // Clean up any orphan section header if its table was dropped
+  sanitized = sanitized.replace(/#{1,3}\s*(?:\d+\.\s*)?Quantitative Ratios[^\n]*(?:\n\s*)+(?=#{1,3}\s|$)/gi, "");
+  return sanitized;
 }
+
+export const deduplicateMarkdownTableRows = sanitizeAndDeduplicateMarkdownTables;
 
 /**
  * Beautiful UI Inline Source Chip
@@ -431,23 +469,23 @@ export function BuiStreamingText({
 
           {/* Follow-up Prompts (Beautiful UI style) */}
           {resolvedFollowUps.length > 0 && onFollowUp && (
-            <div className="pt-2">
+            <div className="pt-2 max-w-full">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-2 flex items-center gap-1.5">
                 <Sparkles size={12} className="text-teal-400" /> Suggested Follow-ups
               </p>
-              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 md:gap-2 max-w-full">
                 {resolvedFollowUps.map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => onFollowUp(prompt)}
-                    className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 hover:text-white hover:border-teal-500/40 hover:bg-white/[0.07] transition text-left cursor-pointer group"
+                    className="inline-flex items-center gap-1.5 md:gap-2 text-[11.5px] md:text-xs px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 hover:text-white hover:border-teal-500/40 hover:bg-white/[0.07] transition text-left cursor-pointer group max-w-full break-words"
                     style={{ animation: `fade-up 300ms cubic-bezier(0.23,1,0.32,1) ${idx * 60}ms both` }}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-400/70 group-hover:text-teal-300 shrink-0">
                       <path d="M9 10l-5 5 5 5" />
                       <path d="M20 4v7a4 4 0 0 1-4 4H4" />
                     </svg>
-                    <span>{prompt}</span>
+                    <span className="line-clamp-2 md:line-clamp-1 break-words">{prompt}</span>
                   </button>
                 ))}
               </div>

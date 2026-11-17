@@ -263,13 +263,161 @@ assert.ok(renderedTable.includes("| BABA | $2.50 | $4.65 | -$2.15 | -46.24% | 4.
 console.log("Rendered Canonical Table:\n" + renderedTable);
 console.log("✓ Canonical portfolio holdings table generation and integrity verified!");
 
-// 9. Verify Prompt Bar Capsule Pill Styling (Item 3)
-console.log("\n=== Testing Prompt Bar Capsule Pill Styling ===");
+// 9. Verify Responsive Composer Styling (Mobile rounded-2xl + Desktop rounded-full pill)
+console.log("\n=== Testing Responsive Composer Styling ===");
 import fs from "node:fs";
 const promptBarSrc = fs.readFileSync("components/ui/bui-prompt-bar.tsx", "utf8");
-assert.ok(promptBarSrc.includes("rounded-full"), "Prompt bar container and ambient glow must use 'rounded-full'");
+assert.ok(promptBarSrc.includes("rounded-2xl md:rounded-full"), "Prompt bar must use rounded-2xl on mobile and rounded-full on desktop");
 assert.ok(!promptBarSrc.includes("rounded-[36px]"), "Legacy 'rounded-[36px]' must be completely replaced");
-assert.ok(promptBarSrc.includes("px-7 md:px-8"), "Prompt bar input and toolbar must have generous 'px-7 md:px-8' padding");
-console.log("✓ Prompt bar true capsule pill silhouette confirmed in code!");
+assert.ok(promptBarSrc.includes("md:px-8"), "Prompt bar input and toolbar must have desktop md:px-8 padding");
+assert.ok(promptBarSrc.includes("px-3.5"), "Prompt bar input and toolbar must have mobile px-3.5 compact padding");
+console.log("✓ Responsive composer silhouette (mobile rounded-2xl / desktop rounded-full) confirmed in code!");
+
+// 10. Verify Mobile App Shell Clearance for Bottom Navigation
+console.log("\n=== Testing Mobile App Shell Clearance for BottomNav ===");
+const appShellSrc = fs.readFileSync("components/app-shell.tsx", "utf8");
+assert.ok(appShellSrc.includes("pb-[calc(76px+env(safe-area-inset-bottom))] md:pb-0"), "Mobile app-shell must allocate bottom clearance for fixed BottomNav");
+console.log("✓ Mobile app-shell bottom navigation clearance confirmed!");
+
+// 11. Verify Table Sanitization & No-Data Exclusion (sanitizeAndDeduplicateMarkdownTables)
+console.log("\n=== Testing sanitizeAndDeduplicateMarkdownTables Logic ===");
+function sanitizeAndDeduplicateMarkdownTables(text) {
+  if (!text || !text.includes("|")) return text;
+
+  const lines = text.split("\n");
+  const result = [];
+  let tableRows = [];
+  let inTable = false;
+
+  function flushTable(rows) {
+    if (rows.length === 0) return;
+
+    const cleanRows = [];
+    const seenMetricKeys = new Set();
+    let dataRowCount = 0;
+
+    for (const row of rows) {
+      const parts = row.trim().split("|").slice(1, -1);
+
+      // Separator line (e.g. | :--- | :--- |)
+      if (parts.every((p) => /^[\s:-]+$/.test(p))) {
+        cleanRows.push(row);
+        continue;
+      }
+
+      const col1Raw = parts[0] || "";
+      const col1Key = col1Raw.trim().toLowerCase().replace(/[*_`]/g, "");
+      const isHeader = col1Key === "metric" || col1Key === "asset" || col1Key === "ticker" || col1Key === "holding";
+
+      if (!isHeader) {
+        // Drop any row where value contains N/A or empty
+        const col2Raw = parts[1] || "";
+        const col2Val = col2Raw.trim().replace(/[*_`]/g, "");
+        if (/^(?:N\/A|None|Unavailable|N\/A on N\/A|\s*)$/i.test(col2Val)) {
+          continue;
+        }
+
+        // Deduplication
+        if (seenMetricKeys.has(col1Key)) {
+          const existingIdx = cleanRows.findLastIndex((r) => {
+            const rParts = r.trim().split("|").slice(1, -1);
+            return (rParts[0] || "").trim().toLowerCase().replace(/[*_`]/g, "") === col1Key;
+          });
+          if (existingIdx !== -1) {
+            if (row.length > cleanRows[existingIdx].length) {
+              cleanRows[existingIdx] = row;
+            }
+            continue;
+          }
+        }
+
+        seenMetricKeys.add(col1Key);
+        dataRowCount++;
+      }
+
+      cleanRows.push(row);
+    }
+
+    // Only render the table if it contains at least one real data row!
+    if (dataRowCount > 0) {
+      result.push(...cleanRows);
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      inTable = true;
+      tableRows.push(line);
+    } else {
+      if (inTable) {
+        flushTable(tableRows);
+        tableRows = [];
+        inTable = false;
+      }
+      result.push(line);
+    }
+  }
+
+  if (inTable) {
+    flushTable(tableRows);
+  }
+
+  let sanitized = result.join("\n");
+  sanitized = sanitized.replace(/#{1,3}\s*(?:\d+\.\s*)?Quantitative Ratios[^\n]*(?:\n\s*)+(?=#{1,3}\s|$)/gi, "");
+  return sanitized;
+}
+
+// Case 1: Table with ONLY N/A row (the no-data locked-vault scenario)
+const noDataMarkdown = `
+## 1. Executive Summary
+Your portfolio vault has not been unlocked yet. Please unlock the vault.
+
+## 3. Quantitative Ratios & Valuation
+| Metric | Value |
+| :--- | :--- |
+| Previous Session Close | N/A |
+
+## 4. Summary & Action Plan
+Unlock your vault to view holdings.
+`.trim();
+
+const sanitizedNoData = sanitizeAndDeduplicateMarkdownTables(noDataMarkdown);
+assert.ok(!sanitizedNoData.includes("| Previous Session Close | N/A |"), "Must not contain 'Previous Session Close | N/A'");
+assert.ok(!sanitizedNoData.includes("| Metric | Value |"), "Must not contain empty table header when all rows are N/A");
+assert.ok(!sanitizedNoData.includes("Quantitative Ratios"), "Orphan section header must be pruned when table is dropped");
+assert.ok(sanitizedNoData.includes("Your portfolio vault has not been unlocked yet"), "Preserves prose explanation");
+console.log("✓ Case 1 passed: Table with only N/A row is completely eliminated with zero orphan header!");
+
+// Case 2: Table with valid rows + an N/A row
+const mixedMarkdown = `
+| Metric | Value |
+| :--- | :--- |
+| Market Cap | $3.2T |
+| Previous Session Close | N/A |
+| Forward P/E | 32.5x |
+`.trim();
+
+const sanitizedMixed = sanitizeAndDeduplicateMarkdownTables(mixedMarkdown);
+assert.ok(!sanitizedMixed.includes("Previous Session Close"), "N/A row must be removed from mixed table");
+assert.ok(sanitizedMixed.includes("| Market Cap | $3.2T |"), "Valid Market Cap row must be retained");
+assert.ok(sanitizedMixed.includes("| Forward P/E | 32.5x |"), "Valid Forward P/E row must be retained");
+console.log("✓ Case 2 passed: N/A rows stripped while valid metric rows are cleanly preserved!");
+
+// Case 3: Table with duplicate rows (e.g. Previous Session Close duplicate)
+const duplicateMarkdown = `
+| Metric | Value |
+| :--- | :--- |
+| Previous Session Close | $390.22 |
+| Previous Session Close | $390.22 (Friday, November 13, 2026) |
+`.trim();
+
+const sanitizedDup = sanitizeAndDeduplicateMarkdownTables(duplicateMarkdown);
+assert.equal(sanitizedDup.match(/Previous Session Close/g)?.length, 1, "Must contain exactly ONE Previous Session Close row");
+assert.ok(sanitizedDup.includes("$390.22 (Friday, November 13, 2026)"), "Must preserve the date-inclusive enriched row");
+console.log("✓ Case 3 passed: Duplicate rows deduplicated cleanly!");
+
 
 

@@ -147,12 +147,24 @@ export function AppShell({
             onWatchlistClick={() => setWatchlistOpen(true)}
           />
 
-          {/* Main scrollable area */}
-          <main className="flex-1 overflow-y-auto overscroll-y-contain px-4 pb-20 pt-2 md:px-8 md:pb-12 md:pt-6 app-scroll z-10">
-            <div className="mx-auto max-w-5xl">
-              {children}
-            </div>
-          </main>
+          {/* Main scrollable area (clears fixed mobile bottom nav) */}
+          {(() => {
+            const isChatActive = active === "chat" || active === "research";
+            return (
+              <main
+                className={cn(
+                  "flex-1 z-10 min-w-0",
+                  isChatActive
+                    ? "overflow-hidden flex flex-col p-0 pb-[calc(76px+env(safe-area-inset-bottom))] md:pb-0 md:px-8 md:pt-4"
+                    : "overflow-y-auto overscroll-y-contain px-4 pb-24 pt-2 md:px-8 md:pb-12 md:pt-6 app-scroll"
+                )}
+              >
+                <div className={cn("mx-auto max-w-5xl w-full min-w-0", isChatActive && "h-full flex flex-col")}>
+                  {children}
+                </div>
+              </main>
+            );
+          })()}
 
           <div className="md:hidden">
             <BottomNav active={active} onNavigate={onNavigate} />

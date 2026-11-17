@@ -66,18 +66,18 @@ export function BuiModelSelector({ selectedModel, onSelectModel, className }: Bu
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.09] transition-all cursor-pointer shadow-lg backdrop-blur-md"
+        className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.09] transition-all cursor-pointer shadow-lg backdrop-blur-md"
       >
-        <div className="h-5 w-5 rounded-md bg-vel-teal/20 flex items-center justify-center border border-vel-teal/30">
+        <div className="h-5 w-5 rounded-md bg-vel-teal/20 flex items-center justify-center border border-vel-teal/30 shrink-0">
           <ActiveIcon size={12} className="text-vel-teal" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold text-white">{activeOption.name}</span>
-          <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
+        <div className="flex items-center gap-1 md:gap-1.5">
+          <span className="text-xs font-semibold text-white whitespace-nowrap">{activeOption.name}</span>
+          <span className="hidden sm:inline-block text-[10px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
             {activeOption.latency}
           </span>
         </div>
-        <ChevronDown size={13} className={cn("text-white/50 transition-transform duration-200", isOpen && "rotate-180")} />
+        <ChevronDown size={13} className={cn("text-white/50 transition-transform duration-200 shrink-0", isOpen && "rotate-180")} />
       </button>
 
       {/* Popover Dropdown */}
