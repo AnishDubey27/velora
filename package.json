@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/portfolio-healthcheck-regression.test.mjs && node tests/ai-thinking-and-guard-regression.test.mjs && node --experimental-strip-types tests/market-data-freshness-regression.test.mjs && node tests/test-ui-polish-logic.mjs"
+    "test": "node tests/portfolio-healthcheck-regression.test.mjs && node tests/ai-thinking-and-guard-regression.test.mjs && node --experimental-strip-types tests/market-data-freshness-regression.test.mjs && node tests/test-ui-polish-logic.mjs && node --experimental-strip-types tests/cost-basis-and-snapshot-regression.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

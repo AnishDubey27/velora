@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import useSWR from "swr";
 import { SectionTitle } from "@/components/ui/section-title";
 import { BuiMarketHeatmap } from "@/components/ui/bui-market-heatmap";
 import { BuiAnimatedTicker } from "@/components/ui/bui-animated-ticker";
-import { BuiInsightCards } from "@/components/ui/bui-insight-cards";
+import { BuiInsightCards, type PortfolioLoadStatus } from "@/components/ui/bui-insight-cards";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "@/lib/types";
@@ -132,81 +133,195 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
   const vix = typeof vixRaw?.value === "number" ? vixRaw.value : null;
 
   // Signal preview states
+  const router = useRouter();
   const [redditPreview, setRedditPreview] = useState<RedditPreview | null>(null);
   const [insiderPreview, setInsiderPreview] = useState<InsiderPreview | null>(null);
   const [congressPreview, setCongressPreview] = useState<CongressPreview | null>(null);
   const [superInvestorPreview, setSuperInvestorPreview] = useState<SuperInvestorPreview | null>(null);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [portfolioStats, setPortfolioStats] = useState<any>(null);
+  const [portfolioStatus, setPortfolioStatus] = useState<PortfolioLoadStatus>("loading");
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
+  const portfolioRequestIdRef = useRef(0);
+
+  const fetchPortfolioData = useCallback(async () => {
+    const reqId = ++portfolioRequestIdRef.current;
+    setPortfolioStatus("loading");
+    setPortfolioError(null);
+
+    // Hard 10-second safety ceiling: never allow an endless skeleton state
+    const hardTimeout = setTimeout(() => {
+      if (portfolioRequestIdRef.current === reqId) {
+        setPortfolioStatus((prev) => {
+          if (prev === "loading") {
+            setPortfolioError("Request timed out while loading live portfolio quotes.");
+            return "error";
+          }
+          return prev;
+        });
+      }
+    }, 10_000);
+
+    try {
+      const supabase = createClient();
+
+      // 1. Resolve authenticated session (handles mobile wake / cookie hydration)
+      let hasUser = false;
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.user) {
+        hasUser = true;
+      } else {
+        const { data: userData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+        if (userData?.user) {
+          hasUser = true;
+        }
+      }
+
+      if (portfolioRequestIdRef.current !== reqId) return;
+
+      if (!hasUser) {
+        setPortfolioStats(null);
+        setPortfolioStatus("unauthenticated");
+        return;
+      }
+
+      // 2. Fetch holdings (retry once after token refresh if JWT expired on mobile wake)
+      let { data: holdings, error: holdingsError } = await supabase
+        .from("holdings")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (holdingsError) {
+        const { data: refreshed } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }));
+        if (refreshed?.session) {
+          const retry = await supabase
+            .from("holdings")
+            .select("*")
+            .order("created_at", { ascending: true });
+          holdings = retry.data;
+          holdingsError = retry.error;
+        }
+      }
+
+      if (portfolioRequestIdRef.current !== reqId) return;
+
+      if (holdingsError) {
+        console.error("Failed to query dashboard holdings:", holdingsError);
+        setPortfolioStats(null);
+        setPortfolioError("Could not read portfolio holdings. Tap Retry to try again.");
+        setPortfolioStatus("error");
+        return;
+      }
+
+      if (!holdings || holdings.length === 0) {
+        setPortfolioStats(null);
+        setPortfolioStatus("empty");
+        return;
+      }
+
+      // 3. Fetch live quotes with strict 8-second abort timeout
+      const symbols = holdings.map((h: any) => h.symbol).join(",");
+      const controller = new AbortController();
+      const quoteTimeout = setTimeout(() => controller.abort(), 8_000);
+
+      let quotesRes: Response | null = null;
+      try {
+        quotesRes = await fetch(`/api/portfolio?symbols=${encodeURIComponent(symbols)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(quoteTimeout);
+      }
+
+      if (portfolioRequestIdRef.current !== reqId) return;
+
+      if (!quotesRes || !quotesRes.ok) {
+        setPortfolioStats(null);
+        setPortfolioError("Live market quotes are temporarily unavailable. Tap Retry to try again.");
+        setPortfolioStatus("error");
+        return;
+      }
+
+      const quotesData = await quotesRes.json();
+      const quotes = quotesData?.quotes || {};
+
+      let totalValue = 0;
+      let dayChangeValue = 0;
+      let totalCost = 0;
+      let topWinner: any = null;
+      let topLoser: any = null;
+
+      for (const h of holdings) {
+        const shares = Number(h.shares) || 0;
+        const purchasePrice = Number(h.purchase_price) || 0;
+        const sym = String(h.symbol || "").toUpperCase();
+        const quote = quotes[sym] || quotes[h.symbol] || { price: purchasePrice, change: 0, changePercent: 0 };
+        const livePrice = typeof quote.price === "number" && quote.price > 0 ? quote.price : purchasePrice;
+        const value = shares * livePrice;
+        const costBasis = shares * purchasePrice;
+        const totalReturn = value - costBasis;
+        const totalReturnPercent = costBasis > 0 ? (totalReturn / costBasis) * 100 : 0;
+        const dayChange = shares * (Number(quote.change) || 0);
+
+        totalValue += value;
+        dayChangeValue += dayChange;
+        totalCost += costBasis;
+
+        if (!topWinner || totalReturnPercent > topWinner.returnPercent) {
+          topWinner = { symbol: sym, returnPercent: totalReturnPercent, dollarGain: totalReturn };
+        }
+        if (!topLoser || totalReturnPercent < topLoser.returnPercent) {
+          topLoser = { symbol: sym, returnPercent: totalReturnPercent, dollarGain: totalReturn };
+        }
+      }
+
+      const prevTotalValue = totalValue - dayChangeValue;
+      const dayChangePercent = prevTotalValue > 0 ? (dayChangeValue / prevTotalValue) * 100 : 0;
+      const allTimeReturn = totalValue - totalCost;
+      const allTimePercent = totalCost > 0 ? (allTimeReturn / totalCost) * 100 : 0;
+
+      setPortfolioStats({
+        totalValue,
+        allTimeReturnDollar: allTimeReturn,
+        allTimeReturnPercent: allTimePercent,
+        dayChangeDollar: dayChangeValue,
+        dayChangePercent,
+        topWinner,
+        topLoser,
+        holdingsCount: holdings.length,
+      });
+      setPortfolioStatus("ready");
+    } catch (e: any) {
+      if (portfolioRequestIdRef.current !== reqId) return;
+      console.error("Failed to fetch dashboard portfolio snapshot:", e);
+      setPortfolioStats(null);
+      setPortfolioError(
+        e?.name === "AbortError"
+          ? "Timed out waiting for live portfolio quotes."
+          : "Unable to load portfolio snapshot right now."
+      );
+      setPortfolioStatus("error");
+    } finally {
+      clearTimeout(hardTimeout);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchPortfolioData = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const { data: holdings } = await supabase
-          .from("holdings")
-          .select("*")
-          .order("created_at", { ascending: true });
-
-        if (holdings && holdings.length > 0) {
-          const symbols = holdings.map((h: any) => h.symbol).join(",");
-          const quotesRes = await fetch(`/api/portfolio?symbols=${symbols}`).catch(() => null);
-          const quotesData = quotesRes?.ok ? await quotesRes.json() : null;
-          const quotes = quotesData?.quotes || {};
-
-          let totalValue = 0;
-          let dayChangeValue = 0;
-          let totalCost = 0;
-          let topWinner: any = null;
-          let topLoser: any = null;
-
-          for (const h of holdings) {
-            const shares = Number(h.shares) || 0;
-            const purchasePrice = Number(h.purchase_price) || 0;
-            const quote = quotes[h.symbol] || { price: purchasePrice, change: 0, changePercent: 0 };
-            const value = shares * (quote.price || purchasePrice);
-            const costBasis = shares * purchasePrice;
-            const totalReturn = value - costBasis;
-            const totalReturnPercent = costBasis > 0 ? (totalReturn / costBasis) * 100 : 0;
-            const dayChange = shares * (quote.change || 0);
-
-            totalValue += value;
-            dayChangeValue += dayChange;
-            totalCost += costBasis;
-
-            if (!topWinner || totalReturnPercent > topWinner.returnPercent) {
-              topWinner = { symbol: h.symbol, returnPercent: totalReturnPercent, dollarGain: totalReturn };
-            }
-            if (!topLoser || totalReturnPercent < topLoser.returnPercent) {
-              topLoser = { symbol: h.symbol, returnPercent: totalReturnPercent, dollarGain: totalReturn };
-            }
-          }
-
-          const dayChangePercent = totalValue > 0 ? (dayChangeValue / (totalValue - dayChangeValue)) * 100 : 0;
-          const allTimeReturn = totalValue - totalCost;
-          const allTimePercent = totalCost > 0 ? (allTimeReturn / totalCost) * 100 : 0;
-
-          setPortfolioStats({
-            totalValue,
-            allTimeReturnDollar: allTimeReturn,
-            allTimeReturnPercent: allTimePercent,
-            dayChangeDollar: dayChangeValue,
-            dayChangePercent,
-            topWinner,
-            topLoser,
-            holdingsCount: holdings.length,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to fetch dashboard portfolio snapshot:", e);
-      }
-    };
-
     fetchPortfolioData();
-  }, []);
+
+    // Re-sync automatically if mobile session hydrates or refreshes after mount
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT") {
+        fetchPortfolioData();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchPortfolioData]);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoadTimedOut(true), 10000);
@@ -352,6 +467,11 @@ export function DashboardScreen({ onNavigate, onViewStock }: DashboardScreenProp
       {/* Beautiful UI Insight Carousel Cards */}
       <BuiInsightCards
         portfolio={portfolioStats}
+        portfolioStatus={portfolioStatus}
+        portfolioError={portfolioError}
+        onRetryPortfolio={fetchPortfolioData}
+        onNavigatePortfolio={() => onNavigate?.("portfolio")}
+        onSignIn={() => router.push("/login?next=dashboard")}
         indicators={indicators}
         fearGreed={fearGreed}
         vix={vix}

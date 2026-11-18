@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getEnv } from "@/lib/env";
 import { DEFAULT_MODEL, NVIDIA_API_URL } from "@/lib/nvidia";
 import { tavilySearch, isTavilyConfigured } from "@/lib/tavily";
+import { createCostBasisStreamGuard } from "@/lib/cost-basis-guard";
 import {
   SUPPORTED_INDICES,
   getMarketSessionStatus,
@@ -190,6 +191,7 @@ export async function POST(request: Request) {
     let canonicalHoldingsTable = "";
     let userTotalPortfolioValue = 0;
     let userTotalCostBasis = 0;
+    let isUserAuthenticated = false;
     let portfolioContextMsg: ChatMessage | null = null;
 
     // 1. Fetch Portfolio Context
@@ -200,6 +202,7 @@ export async function POST(request: Request) {
       
       let userHoldings: any[] | null = null;
       if (user) {
+        isUserAuthenticated = true;
         const { data: holdings } = await supabase
           .from('holdings')
           .select('symbol, name, shares, purchase_price')
@@ -288,7 +291,7 @@ export async function POST(request: Request) {
 
           // Canonical Markdown Table of Holdings (matching Portfolio Screen row-for-row)
           canonicalHoldingsTable = [
-            "| Asset | Market Value | Cost Basis | Unrealized P&L | Return (%) | Weight (%) | Status |",
+            "| Asset | Market Value | Total Cost Basis | Unrealized P&L | Return (%) | Weight (%) | Status |",
             "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
             ...sortedByValue.map((h) => {
               const sign = h.returnDollar >= 0 ? "+" : "-";
@@ -331,19 +334,25 @@ export async function POST(request: Request) {
 
           // Underperformers individual weights breakdown
           const underperformersWeightsList = sortedLosers.map(l =>
-            `  • ${l.symbol}: Value $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of total portfolio value) | Total Cost: $${l.positionCost.toFixed(2)} ($${l.purchasePrice.toFixed(2)} per share purchase price) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%)`
+            `  • ${l.symbol}: Value $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of total portfolio value) | Total Position Cost: $${l.positionCost.toFixed(2)} (${l.shares} shs @ $${l.purchasePrice.toFixed(2)}/share) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%)`
           ).join("\n");
           const largestLoserByWeight = sortedLosers[0]
             ? `${sortedLosers[0].symbol} at $${sortedLosers[0].positionValue.toFixed(2)} (${sortedLosers[0].weightPercent.toFixed(1)}% of portfolio value)`
             : "None";
 
           const winnersText = winners.length > 0
-            ? winners.map(w => `  • ${w.symbol} (${w.shares} shs): Mkt Val $${w.positionValue.toFixed(2)} (${w.weightPercent.toFixed(1)}% of port) | Total Cost: $${w.positionCost.toFixed(2)} ($${w.purchasePrice.toFixed(2)} per share purchase price) | Return: +$${w.returnDollar.toFixed(2)} (+${w.returnPercent.toFixed(2)}%) [WINNER/GAIN]`).join("\n")
+            ? winners.map(w => `  • ${w.symbol} (${w.shares} shs): Mkt Val $${w.positionValue.toFixed(2)} (${w.weightPercent.toFixed(1)}% of port) | Total Position Cost: $${w.positionCost.toFixed(2)} (${w.shares} shs @ $${w.purchasePrice.toFixed(2)}/share) | Return: +$${w.returnDollar.toFixed(2)} (+${w.returnPercent.toFixed(2)}%) [WINNER/GAIN]`).join("\n")
             : "  • None";
 
           const losersText = losers.length > 0
-            ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of port) | Total Cost: $${l.positionCost.toFixed(2)} ($${l.purchasePrice.toFixed(2)} per share purchase price) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
+            ? losers.map(l => `  • ${l.symbol} (${l.shares} shs): Mkt Val $${l.positionValue.toFixed(2)} (${l.weightPercent.toFixed(1)}% of port) | Total Position Cost: $${l.positionCost.toFixed(2)} (${l.shares} shs @ $${l.purchasePrice.toFixed(2)}/share) | Return: -$${Math.abs(l.returnDollar).toFixed(2)} (${l.returnPercent.toFixed(2)}%) [UNDERPERFORMER/LOSS]`).join("\n")
             : "  • None";
+
+          const costBasisExamples = sortedByValue
+            .filter((h) => Math.abs(h.positionCost - h.purchasePrice) > 0.02)
+            .slice(0, 3)
+            .map((h) => `${h.symbol}: Total Cost Basis is $${h.positionCost.toFixed(2)} (NEVER write "$${h.positionCost.toFixed(2)}/share" — per-share cost is $${h.purchasePrice.toFixed(2)}/share)`)
+            .join("; ");
 
           verifiedDataDates.push(new Date().toISOString().slice(0, 10));
 
@@ -382,9 +391,9 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 3. CANONICAL PORTFOLIO HOLDINGS TABLE MANDATE (FOR PORTFOLIO HEALTH CHECKS & REVIEWS):
    - When answering portfolio health checks, asset allocations, or general portfolio reviews, Section 3 ("## 3. Quantitative Ratios & Valuation (use Markdown tables)") MUST output the OFFICIAL CANONICAL PORTFOLIO HOLDINGS TABLE above VERBATIM, row-for-row.
    - Column 2 is ALWAYS Market Value (sums to the headline total $${totalPortfolioValue.toFixed(2)}).
-   - Column 3 is ALWAYS Cost Basis (sums to total cost basis $${totalCostBasis.toFixed(2)}). NEVER print cost basis as market value.
+   - Column 3 is ALWAYS Total Cost Basis for the whole position (sums to total cost basis $${totalCostBasis.toFixed(2)}). It is NOT a per-share price! NEVER print cost basis as market value and NEVER attach "/share" to Column 3 figures.
    - NEVER recompute, alter, swap, or shift numbers between rows. Each holding (e.g. META, AMD, BABA, CRSP, IONQ, NRGV, TSLA) MUST strictly use its own exact values from this table.
-   - In prose narrative (Section 1, Section 2, Section 4, or Section 5), every holding's market value, cost basis, unrealized P&L ($ and %), and status (WINNER vs UNDERPERFORMER) MUST match this table exactly:
+   - In prose narrative (Section 1, Section 2, Section 4, or Section 5), every holding's market value, total cost basis, unrealized P&L ($ and %), and status (WINNER vs UNDERPERFORMER) MUST match this table exactly:
      * POSITIONS WITH POSITIVE RETURNS (+) ARE WINNERS: (e.g. META +$4.89 / +81.50% WINNER, AMD +$0.75 WINNER). NEVER classify a winner as a loser, loss, or negative return.
      * POSITIONS WITH NEGATIVE RETURNS (-) ARE UNDERPERFORMERS: (e.g. BABA -$2.15 / UNDERPERFORMER). NEVER classify an underperformer as a winner.
      * NEVER assign one stock's numbers to another (e.g. NEVER give CRSP's numbers to IONQ, or IONQ's numbers to NRGV).
@@ -393,7 +402,7 @@ CRITICAL RULES FOR PROSE NARRATIVE & DERIVED STATISTICS:
 6. Denominator Discipline: Distinguish strictly between "% of portfolio value" (denominator is Total Portfolio Market Value $${totalPortfolioValue.toFixed(2)}) and "% of unrealized gains" or "% return on cost". NEVER describe a dollar amount representing a share of portfolio value as a share of unrealized gains.
 7. Concentration Labels: Do NOT mislabel Top-5 concentration as Top-3 concentration. Top-3 overall holdings concentration is EXACTLY ${top3Weight.toFixed(1)}% (or Top-3 winners ${top3WinnersWeight.toFixed(1)}%); Top-5 concentration is EXACTLY ${top5Weight.toFixed(1)}%.
 8. Underperformer Claims: NEVER say "no single losing position exceeds X%" unless that claim is strictly true against the verified Underperformers list above.
-9. COST BASIS CLARITY: When citing cost basis in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)". Never confuse total cost with purchase price per share.
+9. ZERO-TOLERANCE COST BASIS VS PER-SHARE RULE: Column 3 ("Total Cost Basis") is the TOTAL dollar cost of the entire holding, NOT a per-share price. NEVER append "/share" or "per share" to any Total Cost Basis figure!${costBasisExamples ? ` Examples: ${costBasisExamples}.` : ""} When citing cost in prose, write either "total cost of $X.XX" or "total cost of $X.XX ($Y.YY/share)".
 10. GENERAL PORTFOLIO HEALTH QUERIES (NO LEAKED TEMPLATES):
 - When answering portfolio health checks, asset allocations, or general portfolio reviews, "Previous Session Close" and single-ticker trading day metrics DO NOT APPLY to the overall portfolio.
 - Completely OMIT any previous session close sentence. NEVER write "from the previous session close of N/A on N/A" or emit any "N/A" placeholders.
@@ -883,8 +892,8 @@ MANDATORY PORTFOLIO IMPACT RULES (FOR SECTION 5):
   * If the stock is NOT held in the user's portfolio: state explicitly that it is NOT currently held in the user's portfolio.
   * NEVER cross-assign or swap returns between different stocks (e.g. NEVER assign a loss from another stock like FSLR to TSLA).
 - STRICT COST BASIS & PER-SHARE DISTINCTION:
-  * Clearly distinguish between Total Cost Basis ($X.XX) and Per-Share Purchase Price ($Y.YY/share).
-  * When mentioning cost in prose narrative, ALWAYS use the format: "Total Cost of $X.XX ($Y.YY per share)" (e.g. "Total Cost of $14.15 ($283.00 per share)").
+  * Clearly distinguish between Total Cost Basis ($X.XX for the entire position) and Per-Share Purchase Price ($Y.YY/share).
+  * NEVER attach "/share" or "per share" to a Total Cost Basis figure! (e.g. if Total Cost Basis is $14.15 for fractional shares bought at $283.00/share, NEVER write "$14.15/share" — write "total cost of $14.15 ($283.00/share)" or "total cost of $14.15").
   * NEVER state that the cost basis is $283.00 without specifying "per share", and NEVER claim the entire position cost $283.00 when the total cost was $14.15.
 - Derived Portfolio Aggregates: When discussing portfolio concentration or holdings weights in narrative, quote the exact pre-computed percentages from the official data. Never confuse "% of portfolio value" with "% of unrealized gains".
 - Citing Individual Holding P&L: ALWAYS copy the exact dollar P&L directly from the verified table (e.g. CRSP: -$1.02, BWXT: -$1.72, TSLA: +$5.36). NEVER recalculate in your head.
@@ -920,17 +929,25 @@ IMPORTANT COMPLIANCE NOTICE: Velora provides market intelligence and quantitativ
 ${canonicalHoldingsTable}
 
 2. Headline Market Value is $${userTotalPortfolioValue.toFixed(2)} (the sum of Column 2). Total Cost Basis is $${userTotalCostBasis.toFixed(2)} (the sum of Column 3).
-3. Do NOT invent, recalculate, or shift any numbers in prose. Every holding's dollar value, P&L, return %, and Winner/Underperformer label in your prose narrative MUST match this table exactly.
-4. Omit all single-ticker previous close sentences or trade setup blocks from this portfolio-level answer.`
+3. Column 3 ("Total Cost Basis") is the TOTAL dollar cost of each position, NOT a per-share cost! NEVER write "/share" or "per share" after any Column 3 Total Cost Basis figure. If you cite a per-share cost, it MUST be the actual per-share purchase price from the verified list.
+4. Do NOT invent, recalculate, or shift any numbers in prose. Every holding's dollar value, total cost basis, P&L, return %, and Winner/Underperformer label in your prose narrative MUST match this table exactly.
+5. Omit all single-ticker previous close sentences or trade setup blocks from this portfolio-level answer.`
       });
     } else if (isPortfolioQuery && userAnalyzedHoldings.length === 0) {
       messages.push({
         role: "system",
-        content: `MANDATORY DIRECTIVE FOR UNLOCKED VAULT / NO PORTFOLIO DATA:
-The user is requesting a portfolio health check or portfolio review, but NO portfolio data or active holdings are available in this session (the user's portfolio vault is locked or no holdings have been connected).
-1. State clearly, professionally, and helpfully that no active portfolio holdings or positions are currently accessible in this session, and invite the user to unlock their portfolio vault or add holdings in the Portfolio tab.
+        content: isUserAuthenticated
+          ? `MANDATORY DIRECTIVE FOR EMPTY PORTFOLIO (0 HOLDINGS):
+The user is signed in and requesting a portfolio health check or portfolio review, but their portfolio currently has 0 holdings (nothing to check yet).
+1. State clearly, directly, and helpfully that their portfolio currently has no holdings to analyze, and invite them to add positions in the Portfolio tab.
 2. DO NOT output any quantitative metrics table, valuation table, or snapshot table. Completely OMIT any Markdown table from your entire response.
-3. NEVER emit any "Previous Session Close" rows, single-ticker trading day metrics, or "N/A" cells.
+3. NEVER emit any "Previous Session Close" rows, single-ticker trading day metrics, or "N/A" anywhere in your answer.
+4. Omit trade setup blocks and technical price levels.`
+          : `MANDATORY DIRECTIVE FOR UNAUTHENTICATED PORTFOLIO QUERY:
+The user is requesting a portfolio health check or portfolio review, but they are not signed in yet, so no portfolio holdings are accessible in this session.
+1. State clearly, directly, and helpfully that no portfolio data is available because they are not signed in yet, and invite them to sign in via the Portfolio tab to analyze their holdings.
+2. DO NOT output any quantitative metrics table, valuation table, or snapshot table. Completely OMIT any Markdown table from your entire response.
+3. NEVER emit any "Previous Session Close" rows, single-ticker trading day metrics, or "N/A" anywhere in your answer.
 4. Omit trade setup blocks and technical price levels.`
       });
     }
@@ -1107,6 +1124,7 @@ The user is requesting a portfolio health check or portfolio review, but NO port
         let firstTokenTime = Date.now() - requestStartTime;
         let lastTokenTime = firstTokenTime;
         const repetitionGuard = new RepetitionGuard(3);
+        const costBasisGuard = createCostBasisStreamGuard(userAnalyzedHoldings);
 
         let watchdogTimer: NodeJS.Timeout | null = null;
         const cancelWatchdog = () => {
@@ -1122,6 +1140,11 @@ The user is requesting a portfolio health check or portfolio review, but NO port
           cancelWatchdog();
           console.log(`[Stream Finalized] Reason: ${reason} | Model: ${activeModel} | Tokens: ${tokensEmitted} | Duration: ${Date.now() - streamStartTime}ms`);
           try {
+            const remainder = costBasisGuard.flush();
+            if (remainder) {
+              tokensEmitted++;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: remainder })}\n\n`));
+            }
             if (tokensEmitted > 0) {
               const finalNote = "\n\n*[Analysis finalized. Velora AI provides financial intelligence for informational and research purposes only, not investment advice.]*\n\n";
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: finalNote })}\n\n`));
@@ -1148,8 +1171,11 @@ The user is requesting a portfolio health check or portfolio review, but NO port
 
         // Enqueue prebuffered tokens
         for (const token of prebufferTokens) {
-          tokensEmitted++;
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`));
+          const safeText = costBasisGuard.push(token);
+          if (safeText) {
+            tokensEmitted++;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: safeText })}\n\n`));
+          }
         }
 
         // Arm watchdog
@@ -1216,12 +1242,15 @@ The user is requesting a portfolio health check or portfolio review, but NO port
                         break;
                       }
 
-                      tokensEmitted++;
-                      lastTokenTime = Date.now() - requestStartTime;
+                      const safeText = costBasisGuard.push(token);
+                      if (safeText) {
+                        tokensEmitted++;
+                        lastTokenTime = Date.now() - requestStartTime;
 
-                      controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`)
-                      );
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ text: safeText })}\n\n`)
+                        );
+                      }
                     }
                   }
                 } catch {
@@ -1234,6 +1263,11 @@ The user is requesting a portfolio health check or portfolio review, but NO port
           cancelWatchdog();
           if (!streamClosed) {
             streamClosed = true;
+            const remainder = costBasisGuard.flush();
+            if (remainder) {
+              tokensEmitted++;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: remainder })}\n\n`));
+            }
             console.log(`[AI Instrumentation] Model: ${activeModel} | Emitted: ${tokensEmitted} tokens | TTFT: ${firstTokenTime}ms | Duration: ${Date.now() - requestStartTime}ms | FinishReason: ${finishReason}`);
             
             if (tokensEmitted === 0) {

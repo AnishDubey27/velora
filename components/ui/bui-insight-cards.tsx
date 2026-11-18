@@ -9,8 +9,10 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Sparkles, Activity, ShieldAlert, Layers, Briefcase, DollarSign } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Sparkles, Activity, ShieldAlert, Layers, Briefcase, DollarSign, RotateCcw, LogIn, PlusCircle, AlertCircle } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+
+export type PortfolioLoadStatus = "loading" | "ready" | "empty" | "unauthenticated" | "error";
 
 export type PortfolioSnapshotData = {
   totalValue?: number;
@@ -25,6 +27,11 @@ export type PortfolioSnapshotData = {
 
 export type BuiInsightCardsProps = {
   portfolio?: PortfolioSnapshotData | null;
+  portfolioStatus?: PortfolioLoadStatus;
+  portfolioError?: string | null;
+  onRetryPortfolio?: () => void;
+  onNavigatePortfolio?: () => void;
+  onSignIn?: () => void;
   indicators?: {
     sp500?: { symbol?: string; price?: number | null; changePercent?: number | null };
     bitcoin?: { symbol?: string; price?: number | null; changePercent?: number | null };
@@ -54,10 +61,12 @@ function generateSvgPoints(
   const steps = 14;
   const baseY = height / 2;
 
-  const dates = [
-    "Nov 01", "Nov 02", "Nov 03", "Nov 04", "Nov 05", "Nov 06", "Nov 07",
-    "Nov 08", "Nov 09", "Nov 10", "Nov 11", "Nov 12", "Nov 13", "Nov 16"
-  ];
+  const now = new Date();
+  const dates: string[] = [];
+  for (let i = steps - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    dates.push(d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }));
+  }
 
   for (let i = 0; i <= steps - 1; i++) {
     const x = (i / (steps - 1)) * width;
@@ -181,6 +190,11 @@ function ScrubbableSparkline({
 
 export function BuiInsightCards({
   portfolio,
+  portfolioStatus,
+  portfolioError,
+  onRetryPortfolio,
+  onNavigatePortfolio,
+  onSignIn,
   indicators,
   fearGreed,
   vix,
@@ -190,8 +204,12 @@ export function BuiInsightCards({
 }: BuiInsightCardsProps) {
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Portfolio calculations - strictly figure-free during loading
-  const isPortfolioLoading = !portfolio || typeof portfolio.totalValue !== "number";
+  // Resolve explicit portfolio state — strictly figure-free during loading,
+  // honest empty/unauthenticated/error states instead of endless skeleton.
+  const resolvedPortfolioStatus: PortfolioLoadStatus =
+    portfolioStatus ?? (portfolio && typeof portfolio.totalValue === "number" ? "ready" : "loading");
+  const isPortfolioReady =
+    resolvedPortfolioStatus === "ready" && Boolean(portfolio) && typeof portfolio?.totalValue === "number";
   const totalVal = portfolio?.totalValue ?? 0;
   const allTimePct = portfolio?.allTimeReturnPercent ?? 0;
   const dayChangePct = portfolio?.dayChangePercent ?? 0;
@@ -214,15 +232,10 @@ export function BuiInsightCards({
     [btcChange, indicators?.bitcoin?.price]
   );
 
-  const pages = [
-    // Page 0: Authentic Portfolio Snapshot Card
-    {
-      id: "portfolio-snapshot",
-      title: "Portfolio Snapshot & Equity Curve",
-      subtitle: "Live Holdings, Total Value & Movers",
-      badge: "Portfolio Engine",
-      content: isPortfolioLoading ? (
-        <div className="space-y-3.5 animate-pulse">
+  const renderPortfolioSnapshotContent = () => {
+    if (resolvedPortfolioStatus === "loading") {
+      return (
+        <div className="space-y-3.5 animate-pulse" data-testid="portfolio-snapshot-skeleton">
           {/* Header Stats Skeleton */}
           <div className="flex items-center justify-between">
             <div>
@@ -256,77 +269,165 @@ export function BuiInsightCards({
             </div>
           </div>
         </div>
-      ) : (
-        <div className="space-y-3.5">
-          {/* Header Stats */}
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[11px] text-white/50 uppercase font-semibold flex items-center gap-1">
-                <Briefcase size={12} className="text-teal-400" /> Total Portfolio Value
+      );
+    }
+
+    if (resolvedPortfolioStatus === "unauthenticated") {
+      return (
+        <div className="flex flex-col items-center justify-center text-center py-6 px-3 space-y-3" data-testid="portfolio-snapshot-unauthenticated">
+          <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+            <Briefcase size={20} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">Sign in to view your portfolio</p>
+            <p className="text-xs text-white/55 max-w-xs mx-auto">
+              Authenticate to sync your live holdings, total portfolio value, equity curve, and top movers.
+            </p>
+          </div>
+          {onSignIn && (
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="inline-flex items-center gap-1.5 rounded-full bg-vel-teal px-4 py-1.5 text-xs font-semibold text-[#041018] hover:opacity-90 transition cursor-pointer"
+            >
+              <LogIn size={13} /> Sign In
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (resolvedPortfolioStatus === "empty") {
+      return (
+        <div className="flex flex-col items-center justify-center text-center py-6 px-3 space-y-3" data-testid="portfolio-snapshot-empty">
+          <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+            <PlusCircle size={20} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">No holdings tracked yet</p>
+            <p className="text-xs text-white/55 max-w-xs mx-auto">
+              Add your first stock position in the Portfolio tab to unlock live valuation, equity trajectory, and mover tracking.
+            </p>
+          </div>
+          {onNavigatePortfolio && (
+            <button
+              type="button"
+              onClick={onNavigatePortfolio}
+              className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-500/15 px-4 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-500/25 transition cursor-pointer"
+            >
+              <PlusCircle size={13} /> Add Holdings
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (resolvedPortfolioStatus === "error" || !isPortfolioReady || !portfolio) {
+      return (
+        <div className="flex flex-col items-center justify-center text-center py-6 px-3 space-y-3" data-testid="portfolio-snapshot-error">
+          <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-center justify-center text-rose-400">
+            <AlertCircle size={20} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">Unable to load portfolio snapshot</p>
+            <p className="text-xs text-white/55 max-w-xs mx-auto">
+              {portfolioError || "Live portfolio quotes could not be fetched right now."}
+            </p>
+          </div>
+          {onRetryPortfolio && (
+            <button
+              type="button"
+              onClick={onRetryPortfolio}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/[0.12] transition cursor-pointer"
+            >
+              <RotateCcw size={13} /> Retry
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3.5" data-testid="portfolio-snapshot-ready">
+        {/* Header Stats */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-white/50 uppercase font-semibold flex items-center gap-1">
+              <Briefcase size={12} className="text-teal-400" /> Total Portfolio Value
+            </span>
+            <p className="text-xl md:text-2xl font-mono font-bold text-white mt-0.5">
+              {formatCurrency(totalVal)}
+            </p>
+          </div>
+          <div className="text-right space-y-1">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full border",
+                isPortfolioProfit
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  : "bg-rose-500/20 text-rose-400 border-rose-500/30"
+              )}
+            >
+              {isPortfolioProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              {isPortfolioProfit ? "+" : ""}{allTimePct.toFixed(2)}% All-Time
+            </span>
+            <p className="text-[11px] font-mono text-white/50">
+              {dayChangePct >= 0 ? "+" : ""}{dayChangePct.toFixed(2)}% Today
+            </p>
+          </div>
+        </div>
+
+        {/* Interactive Scrubbable Equity Sparkline */}
+        <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+          <div className="flex items-center justify-between text-[10px] text-white/40 mb-1">
+            <span>30-Day Equity Trajectory</span>
+            <span className="italic">Hover/scrub curve to inspect value</span>
+          </div>
+          <ScrubbableSparkline
+            points={portfolioPoints.points}
+            color={isPortfolioProfit ? "#10B981" : "#F43F5E"}
+            formatValue={(val) => `$${val.toFixed(2)}`}
+          />
+        </div>
+
+        {/* Top Movers from Portfolio Data Layer */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="p-2 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/20">
+            <span className="text-[10px] text-emerald-400/80 uppercase font-semibold block">Top Performer</span>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="font-bold text-white font-mono">
+                {portfolio.topWinner?.symbol || "—"}
               </span>
-              <p className="text-xl md:text-2xl font-mono font-bold text-white mt-0.5">
-                {formatCurrency(totalVal)}
-              </p>
-            </div>
-            <div className="text-right space-y-1">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full border",
-                  isPortfolioProfit
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                    : "bg-rose-500/20 text-rose-400 border-rose-500/30"
-                )}
-              >
-                {isPortfolioProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                {isPortfolioProfit ? "+" : ""}{allTimePct.toFixed(2)}% All-Time
+              <span className="font-mono text-emerald-400 font-bold">
+                {portfolio.topWinner ? `${portfolio.topWinner.returnPercent >= 0 ? "+" : ""}${portfolio.topWinner.returnPercent.toFixed(1)}%` : "—"}
               </span>
-              <p className="text-[11px] font-mono text-white/50">
-                {dayChangePct >= 0 ? "+" : ""}{dayChangePct.toFixed(2)}% Today
-              </p>
             </div>
           </div>
 
-          {/* Interactive Scrubbable Equity Sparkline */}
-          <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
-            <div className="flex items-center justify-between text-[10px] text-white/40 mb-1">
-              <span>30-Day Equity Trajectory</span>
-              <span className="italic">Hover/scrub curve to inspect value</span>
-            </div>
-            <ScrubbableSparkline
-              points={portfolioPoints.points}
-              color={isPortfolioProfit ? "#10B981" : "#F43F5E"}
-              formatValue={(val) => `$${val.toFixed(2)}`}
-            />
-          </div>
-
-          {/* Top Movers from Portfolio Data Layer */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/20">
-              <span className="text-[10px] text-emerald-400/80 uppercase font-semibold block">Top Performer</span>
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="font-bold text-white font-mono">
-                  {portfolio.topWinner?.symbol || "—"}
-                </span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  {portfolio.topWinner ? `+${portfolio.topWinner.returnPercent.toFixed(1)}%` : "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2 rounded-lg bg-rose-500/[0.06] border border-rose-500/20">
-              <span className="text-[10px] text-rose-400/80 uppercase font-semibold block">Underperformer</span>
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="font-bold text-white font-mono">
-                  {portfolio.topLoser?.symbol || "—"}
-                </span>
-                <span className="font-mono text-rose-400 font-bold">
-                  {portfolio.topLoser ? `${portfolio.topLoser.returnPercent.toFixed(1)}%` : "—"}
-                </span>
-              </div>
+          <div className="p-2 rounded-lg bg-rose-500/[0.06] border border-rose-500/20">
+            <span className="text-[10px] text-rose-400/80 uppercase font-semibold block">Underperformer</span>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="font-bold text-white font-mono">
+                {portfolio.topLoser?.symbol || "—"}
+              </span>
+              <span className="font-mono text-rose-400 font-bold">
+                {portfolio.topLoser ? `${portfolio.topLoser.returnPercent >= 0 ? "+" : ""}${portfolio.topLoser.returnPercent.toFixed(1)}%` : "—"}
+              </span>
             </div>
           </div>
         </div>
-      ),
+      </div>
+    );
+  };
+
+  const pages = [
+    // Page 0: Authentic Portfolio Snapshot Card
+    {
+      id: "portfolio-snapshot",
+      title: "Portfolio Snapshot & Equity Curve",
+      subtitle: "Live Holdings, Total Value & Movers",
+      badge: "Portfolio Engine",
+      content: renderPortfolioSnapshotContent(),
     },
 
     // Page 1: Market Regime & Macro
