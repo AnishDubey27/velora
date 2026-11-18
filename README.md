@@ -9,6 +9,14 @@
 </p>
 
 <p align="center">
+  <strong>Live demo: <a href="https://velora.anishdubey.com">https://velora.anishdubey.com</a></strong>
+</p>
+
+<p align="center">
+  Explore the live market dashboard, macro sentiment indicators, breaking news, SEC/congressional disclosures, stock detail pages, and Velora AI market research without signing up. A test account is available on request for the authenticated portfolio tracking and health-check workflow.
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-15-black?style=flat&logo=next.js" alt="Next.js" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat&logo=typescript&logoColor=white" alt="TypeScript" /></a>
@@ -21,9 +29,29 @@
 
 ## Overview
 
-**Velora** is an open-source financial research engine and market intelligence platform designed to bridge institutional-grade intelligence and retail accessibility. It combines real-time financial market data feeds (**Finnhub**, **MarketAux**, **Brave Search**), cloud **PostgreSQL** persistence via Supabase, and contextual **Large Language Model (LLM)** synthesis into a unified, responsive interface.
+**Velora** is an open-source financial research engine and market intelligence platform designed to bridge institutional-grade intelligence and retail accessibility. It combines real-time financial market data feeds (**Finnhub**, **Yahoo Finance**, **MarketAux**, **Tavily**, **Brave Search**), cloud **PostgreSQL** persistence via Supabase, and contextual **Large Language Model (LLM)** synthesis into a unified, responsive interface.
 
 Velora autonomously ingests breaking macro news, cross-references live ticker telemetry (S&P 500, VIX, CNN Fear & Greed, Coinbase crypto streams), evaluates congressional and insider trading disclosures, and computes real-time portfolio risk metrics (Sharpe Ratio, Beta, Volatility).
+
+Velora provides research and summaries for education; it does not provide investment advice.
+
+---
+
+## See It in Action
+
+### Market Dashboard & Live Portfolio Snapshot (Desktop)
+![Velora Dashboard showing Market Snapshot, live Portfolio Snapshot & Equity Curve, and Fear & Greed Index](docs/screenshots/dashboard-desktop.png)
+
+### Grounded AI Portfolio Health Check (Desktop)
+![Velora AI Chat showing a grounded Portfolio Health Check with the canonical holdings table](docs/screenshots/ai-chat-desktop.png)
+
+### Portfolio Holdings & Records Table (Desktop)
+![Velora Portfolio page showing live total valuation, risk metrics, and the sortable Records Table](docs/screenshots/portfolio-desktop.png)
+
+### Responsive Mobile Chat Experience (Phone)
+<p align="center">
+  <img src="docs/screenshots/chat-mobile.png" alt="Velora AI Chat screen on mobile with quick research prompts and bottom navigation" width="340" />
+</p>
 
 ---
 
@@ -36,15 +64,15 @@ graph TD
     User["Web & Mobile Browser"] -->|HTTPS / WSS| NextApp["Next.js 15 Application Server (Node.js 22 Standalone)"]
 
     subgraph DataIngestion["Multi-Source Ingestion Layer"]
-        Finnhub["Finnhub API<br/>(Quotes, Earnings, Targets)"]
+        Finnhub["Finnhub & Yahoo Finance<br/>(Quotes, Indices, Earnings, Targets)"]
         MarketAux["MarketAux API<br/>(Real-Time Global News)"]
-        BraveSearch["Brave Search & Tavily<br/>(Web Context & Discovery)"]
-        FRED["FRED / CNN<br/>(VIX & Fear/Greed)"]
+        BraveSearch["Tavily & Brave Search<br/>(Web Context & Discovery)"]
+        FRED["FRED / CNN / Coinbase<br/>(VIX, Fear/Greed & Crypto)"]
     end
 
-    subgraph Intelligence["Cognitive & Analytics Layer"]
-        NVIDIA["NVIDIA NIM Inference<br/>(Nemotron, MiniMax)"]
-        Microservices["Python Microservices<br/>(SEC 10-K & Transcript Parsers)"]
+    subgraph Intelligence["Cognitive & Grounding Layer"]
+        NVIDIA["NVIDIA NIM Inference<br/>(Nemotron 3.5 Bolt/Lightning, MiniMax M3.1)"]
+        Grounding["Server-Side Grounding & Parsers<br/>(Index Math, Cost-Basis Guard, SEC 13F)"]
     end
 
     subgraph Storage["Persistence & Identity"]
@@ -65,37 +93,47 @@ graph TD
 | **Styling & UI** | [Tailwind CSS 3](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) | High-contrast, responsive dark-mode financial telemetry |
 | **Animations & Graphs** | [Framer Motion](https://www.framer.com/motion/) + [Recharts](https://recharts.org/) | Smooth micro-interactions and dynamic financial data charts |
 | **Database & Auth** | [Supabase](https://supabase.com/) / [PostgreSQL](https://www.postgresql.org/) | Secure authentication, user holdings, and Row Level Security |
-| **Microservices** | [Python 3.11+](https://www.python.org/) | Automated SEC 10-K extraction and earnings transcript parsing |
-| **AI Inference** | [NVIDIA NIM](https://build.nvidia.com/) / OpenAI APIs | Contextual prompt skills, trade idea generation, sentiment scans |
-| **Market Ingestion** | Finnhub, MarketAux, Brave Search, FRED | Real-time pricing, global news sentiment, search telemetry |
+| **AI Inference** | [NVIDIA NIM](https://build.nvidia.com/) (`nvidia/nemotron-3.5-bolt-e4b`, `minimaxai/minimax-m3.1-flash`, `nvidia/nemotron-3.5-lightning-30b-a3b`) | Contextual prompt skills, research synthesis, streaming market & portfolio Q&A |
+| **Market Ingestion** | Finnhub, Yahoo Finance, MarketAux, Tavily, Brave Search, FRED, SEC EDGAR | Real-time pricing, session-aware indices, global news sentiment, 13F disclosures |
 | **Containerization** | [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/) | Multi-stage slim runtime bounded to low memory footprints |
-| **CI/CD & Security** | [GitHub Actions](https://github.com/features/actions) + [Trivy](https://github.com/aquasecurity/trivy) | Automated linting, vulnerability auditing, GHCR publishing |
+| **CI/CD & Security** | [GitHub Actions](https://github.com/features/actions) + [Trivy](https://github.com/aquasecurity/trivy) | Automated linting, regression tests, vulnerability auditing, GHCR publishing |
 
 ---
 
 ## Key Features
 
 - **Multi-Source Financial Data Ingestion**:
-  - Live quote streams, bid/ask spreads, and day changes via Finnhub.
+  - Live quote streams and day changes via Finnhub with automatic Yahoo Finance fallback.
   - Multi-region news filtering (US, India, Crypto) with sentiment weighting via MarketAux.
   - CNN Business Fear & Greed Index with Alternative.me crypto fallback.
   - VIX Volatility telemetry from FRED & Finnhub.
-  - Macro indices (S&P 500, NASDAQ) and 24/7 crypto spot prices from Coinbase Exchange.
+  - Session-aware global indices (S&P 500, NASDAQ, Nifty 50) and 24/7 crypto spot prices from Coinbase Exchange.
 
-- **AI-Driven SEC Filing & Earnings Transcript Synthesis**:
-  - Modular AI analysis skills ranked dynamically by breaking market events.
-  - Automated analysis of company profiles, buy/sell timing, insider filings (Form 4), and congressional disclosures.
+- **AI-Driven Market & Filing Research Synthesis**:
+  - Modular AI analysis skills ranked dynamically by breaking market events, with Fast (`nemotron-3.5-bolt-e4b`) and Deep (`minimax-m3.1-flash`) modes.
+  - Automated analysis of company profiles, position and disclosure analysis, insider filings (Form 4), and congressional disclosures.
   - Super-investor 13F portfolio analysis and institutional position breakdowns.
 
 - **Portfolio Risk Metrics & Pulse**:
-  - Secure portfolio management with Supabase email/password authentication.
-  - Real-time valuation updates and interactive allocation pie charts.
-  - Computed risk telemetry: Volatility, Sharpe Ratio, Beta, and AI-driven portfolio health scores.
+  - Secure portfolio management with Supabase authentication and owner-only Row Level Security.
+  - Real-time valuation updates, sortable Records Table, and interactive allocation views.
+  - Computed risk telemetry: Volatility, Sharpe Ratio, Beta, and grounded AI portfolio health checks.
 
 - **Self-Hostable Containerized Deployment**:
   - Lean multi-stage Docker build utilizing `node:22-alpine` and Next.js standalone mode.
   - Hard memory cap (`700MB`) configured for resource-constrained virtual machines (e.g., Oracle Cloud Always-Free tier).
   - Production service worker with Network-First navigation and automatic cache purging.
+
+---
+
+## Engineering Highlights
+
+- **Production Deployment on Oracle Cloud**: Runs as a containerized Next.js 15 standalone app managed by Docker Compose behind nginx (700 MB memory limit). Every push to `main` is linted, tested, vulnerability-scanned with Trivy, built by GitHub Actions, published to GHCR (`ghcr.io/anishdubey27/velora:latest`), and auto-deployed to the host (SSH pull/restart and Watchtower).
+- **Data Correctness Discipline**: A single canonical portfolio computation drives the Dashboard Portfolio Snapshot card, the Portfolio Records Table, and AI Health Check responses—so total value, total cost basis, unrealized P&L, and per-holding status agree to the cent across every surface.
+- **AI Grounding & Deterministic Output Guards**: Model answers are grounded in live server-fetched market and portfolio context, paired with a deterministic server-side streaming guard (`lib/cost-basis-guard.ts`) that rewrites mislabelled total-cost-as-per-share figures before tokens reach the client, alongside table sanitization that strips duplicate or `N/A` rows.
+- **Security (Supabase Row Level Security)**: Owner-only RLS policies (`auth.uid() = user_id`) are enforced on all user tables (`holdings`, `watchlist`). A leftover legacy table discovered with RLS disabled was removed and the fix verified.
+- **Resilience Patterns**: Quote ingestion enforces per-symbol fetch timeouts with an automatic Yahoo Finance fallback when Finnhub fails or rate-limits, backed by a 20-second server-side quote cache, automatic mobile session refresh, and explicit `loading / ready / empty / unauthenticated / error` UI states—preventing infinite loading skeletons.
+- **Session-Aware Market Math**: Index levels and daily changes (`lib/index-grounding.ts`) are computed against the previous completed exchange session's close rather than rolling metadata, verified directly against exchange session data.
 
 ---
 
@@ -204,25 +242,25 @@ The app will be accessible at [http://localhost:3000](http://localhost:3000).
 | `GET /api/news` | MarketAux / Brave | Real-time news filterable by region (US, India, Crypto) and impact |
 | `GET /api/fear-greed` | CNN / Alternative.me | Market sentiment index (0-100) with historical trends |
 | `GET /api/vix` | FRED / Finnhub | CBOE Volatility Index data and daily fluctuation |
-| `GET /api/portfolio` | Finnhub | Real-time price quotes and valuation for user holdings |
+| `GET /api/portfolio` | Finnhub / Yahoo Finance | Real-time price quotes with 20s cache and Yahoo Finance fallback |
 | `GET /api/skills` | MarketAux | Dynamically ranked AI skills triggered by trending news |
-| `GET /api/dashboard/indicators` | Finnhub / Coinbase | S&P 500 benchmark and Bitcoin spot market indices |
+| `GET /api/dashboard/indicators` | Yahoo Finance / Finnhub / Coinbase | Session-aware S&P 500 benchmark and Bitcoin spot market indices |
 | `GET /api/dashboard/signals` | Finnhub | Wall Street consensus price targets and analyst ratings |
 | `GET /api/dashboard/events` | Finnhub | Upcoming corporate earnings calls and macroeconomic releases |
 | `GET /api/signals/insider` | Finnhub | Form 4 SEC insider buying and selling transactions |
 | `GET /api/signals/super-investors` | SEC EDGAR / 13F | Institutional holdings and portfolio allocations |
-| `POST /api/ai` | NVIDIA NIM | Contextual streaming chat completions with financial grounding |
+| `POST /api/ai` | NVIDIA NIM / Tavily | Contextual streaming chat completions with financial grounding and output guards |
 
 ---
 
 ## DevOps & Production Infrastructure
 
-Velora is engineered for enterprise-grade continuous delivery and low-footprint operations:
+Velora is engineered for continuous delivery and low-footprint operations:
 
-- **Automated Security Guardrails**: Every commit triggers a [Trivy](https://github.com/aquasecurity/trivy) container vulnerability scan blocking deployments on critical CVEs.
+- **Automated Security Auditing**: Every push to `main` runs a [Trivy](https://github.com/aquasecurity/trivy) container vulnerability scan auditing OS and library dependencies for critical CVEs, alongside ESLint, regression tests (`npm test`), and build verification in CI.
 - **Ultra-Lean Multi-Stage Image**: Standalone Next.js output packaging drops unnecessary build dependencies, producing a minimal Alpine Linux runner.
 - **Resource Limits**: The container is constrained to a 700MB memory ceiling, preventing out-of-memory kernel panics on free-tier 1GB cloud instances.
-- **Continuous Deployment**: Commits pushed to `main` compile and publish to GitHub Container Registry (`ghcr.io/anishdubey27/velora:latest`) and execute a zero-downtime rolling update on the host via SSH.
+- **Continuous Deployment**: Commits pushed to `main` compile and publish to GitHub Container Registry (`ghcr.io/anishdubey27/velora:latest`) and auto-deploy on Oracle Cloud behind nginx (Docker Compose SSH update and Watchtower).
 
 ---
 
@@ -243,7 +281,7 @@ As part of our participation and review under the **OpenAI Codex for Open Source
 We welcome contributions! Please review our [CONTRIBUTING.md](CONTRIBUTING.md) guide for details on:
 - Branch naming standards (`feat/...`, `fix/...`, `docs/...`)
 - Commit message conventions
-- Verification steps (`npm run lint`, `npm run build`)
+- Verification steps (`npm run lint`, `npm test`, `npm run build`)
 - Community code of conduct
 
 ---
